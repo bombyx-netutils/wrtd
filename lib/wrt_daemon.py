@@ -15,7 +15,6 @@ from wrt_dbus import DbusIpForwardObject
 from wrt_param import WrtConfig
 from wrt_param import WrtConfigWifiNetwork
 from wrt_common import WrtCommon
-from wrt_manager_plugin import WrtPluginManager
 from wrt_manager_lan import WrtLanManager
 from wrt_manager_wan import WrtWanManager
 
@@ -34,9 +33,6 @@ class WrtDaemon:
             logging.getLogger().setLevel(WrtUtil.getLoggingLevel(self.param.logLevel))
             logging.info("Program begins.")
 
-            # load configuration
-            self.param.config = self._loadConfig()
-
             # clean up /etc/hosts
             WrtCommon.cleanupEtcHosts()
 
@@ -52,20 +48,18 @@ class WrtDaemon:
                 f.write(str(os.getpid()))
 
             # create nft table
-            WrtUtil.shell('/sbin/nft add table ip fpemud-wrt')
-            WrtUtil.shell('/sbin/nft add chain fpemud-wrt fw { type filter hook prerouting priority 0 \\; }')
-            WrtUtil.shell('/sbin/nft add chain fpemud-wrt natpre { type nat hook prerouting priority 0 \\; }')
-            WrtUtil.shell('/sbin/nft add chain fpemud-wrt natpost { type nat hook postrouting priority 100 \\; }')      # don't know why priority must be 100, from "https://wiki.nftables.org/wiki-nftables/index.php/Performing_Network_Address_Translation_(NAT)"
+            WrtUtil.shell('/sbin/nft add table ip wrtd')
+            WrtUtil.shell('/sbin/nft add chain wrtd fw { type filter hook prerouting priority 0 \\; }')
+            WrtUtil.shell('/sbin/nft add chain wrtd natpre { type nat hook prerouting priority 0 \\; }')
+            WrtUtil.shell('/sbin/nft add chain wrtd natpost { type nat hook postrouting priority 100 \\; }')      # don't know why priority must be 100, from "https://wiki.nftables.org/wiki-nftables/index.php/Performing_Network_Address_Translation_(NAT)"
 
             # create our own resolv.conf
             with open(self.param.ownResolvConf, "w") as f:
                 f.write("")
 
             # business initialize
-            self.param.pluginManager = WrtPluginManager(self.param)
             self.param.lanManager = WrtLanManager(self.param)
-            if self.param.config.wanConnection is not None:
-                self.param.wanManager = WrtWanManager(self.param)
+            self.param.wanManager = WrtWanManager(self.param)
 
             # start main loop
             logging.info("Mainloop begins.")
@@ -79,7 +73,7 @@ class WrtDaemon:
                 self.param.wanManager.dispose()
             if self.param.lanManager is not None:
                 self.param.lanManager.dispose()
-            WrtUtil.shell('/sbin/nft delete table fpemud-wrt')
+            WrtUtil.shell('/sbin/nft delete table wrtd')
             WrtCommon.cleanupEtcHosts()
             logging.shutdown()
             shutil.rmtree(self.param.tmpDir)
@@ -100,23 +94,3 @@ class WrtDaemon:
         if self.vpnClientProc is not None:
             self.vpnClientProc.terminate()
         return True
-
-    def _loadConfig(self):
-        ret = WrtConfig()
-
-        if not os.path.exists(self.param.cfgFile):
-            return ret
-
-        with open(self.param.cfgFile, "r") as f:
-            dc = json.load(f)
-
-            for o in dc["wifi"]:
-                t = WrtConfigWifiNetwork()
-                t.ssid = o["ssid"]
-                if "password" in o:
-                    t.password = o["password"]
-                else:
-                    t.password = ""
-                ret.wifiNetworks.append(t)
-
-        return ret

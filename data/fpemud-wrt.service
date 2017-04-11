@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=dbus
 BusName=org.fpemud.WRT
-ExecStart=/usr/sbin/fpemud-wrt
+ExecStart=/usr/sbin/wrtd
 
 [Install]
 WantedBy=multi-user.target

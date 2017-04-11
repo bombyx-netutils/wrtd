@@ -1,6 +1,6 @@
 #!/bin/bash
 
-FILES="./fpemud-wrt"
+FILES="./wrtd"
 LIBFILES="$(find ./lib -name '*.py' | tr '\n' ' ')"
 ERRFLAG=0
 

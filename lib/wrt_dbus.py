@@ -10,8 +10,8 @@ import dbus.service
 ################################################################################
 #
 # ==== Main Application ====
-# Service               org.fpemud.WRT
-# Interface             org.fpemud.WRT
+# Service               org.fpemud.WRTD
+# Interface             org.fpemud.WRTD
 # Object path           /
 #
 # Methods:
@@ -26,21 +26,21 @@ class DbusMainObject(dbus.service.Object):
         self.param = param
 
         # register dbus object path
-        bus_name = dbus.service.BusName('org.fpemud.WRT', bus=dbus.SystemBus())
+        bus_name = dbus.service.BusName('org.fpemud.WRTD', bus=dbus.SystemBus())
         dbus.service.Object.__init__(self, bus_name, '/org/fpemud/WRT')
 
     def release(self):
         self.remove_from_connection()
 
-    @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='s')
+    @dbus.service.method('org.fpemud.WRTD', in_signature='', out_signature='s')
     def GetIp(self):
         return self.param.ip
 
-    @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='s')
+    @dbus.service.method('org.fpemud.WRTD', in_signature='', out_signature='s')
     def GetMask(self):
         return self.param.mask
 
-    @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='a(sssb)')
+    @dbus.service.method('org.fpemud.WRTD', in_signature='', out_signature='a(sssb)')
     def GetClients(self):
         return []
         # ret = []

@@ -28,23 +28,24 @@ class WrtWanManager:
     def __init__(self, param):
         self.param = param
 
-        #
-        cfgfile = os.path.join(self.param.etcDir, "wan-conn.json")
+        cfgfile = os.path.join(self.param.etcDir, "wan-conn-type.json")
         if os.path.exists(cfgfile):
             cfgObj = None
             with open(cfgfile, "r") as f:
                 cfgObj = json.load(f)
-            self.wanConnPlugin = self.param.pluginManager.getWanConnectionPlugin(cfgObj["connection-type"])
+            self.wanConnPlugin = self.param.pluginManager.getWanConnTypePlugin(cfgObj["connection-type"])
             self.wanConnPlugin.init2(cfgObj, self.param.tmpDir, self.param.ownResolvConf)
             self.wanConnPlugin.start()
             logging.info("WAN: WAN-Connection configuration loaded.")
 
-        with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
-            f.write("1")
-        self._addNftRuleWan()
-        logging.info("WAN: IP forwarding enabled.")
+            self._addNftRuleWan()
+            logging.info("WAN: Firewall is up.")
 
-        cfgfile = os.path.join(self.param.etcDir, "vpn.json")
+            with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
+                f.write("1")
+            logging.info("WAN: IP forwarding enabled.")
+
+        cfgfile = os.path.join(self.param.etcDir, "wan-vpn.json")
         if os.path.exists(cfgfile):
             cfgObj = None
             with open(cfgfile, "r") as f:
@@ -62,36 +63,36 @@ class WrtWanManager:
             del self.vpnRestartCountDown
             del self.vpnTimer
             del self.vpnPlugin
-        with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
-            f.write("0")
         if hasattr(self, "wanConnPlugin"):
+            with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
+                f.write("0")
             self.wanConnPlugin.stop()
             del self.wanConnPlugin
-        WrtUtil.forceDelete("/etc/resolv.conf")
-        WrtUtil.shell("/bin/ifconfig %s down" % (self.param.config.wanConnection.interface))
+            WrtUtil.forceDelete("/etc/resolv.conf")
+            WrtUtil.shell("/bin/ifconfig %s down" % (self.wanConnPlugin.getOutInterface()))
         logging.info("WAN: Terminated.")
 
     def _addNftRuleWan(self):
         intf = self.wanConnPlugin.getOutInterface()
-        WrtUtil.shell('/sbin/nft add rule fpemud-wrt natpost oif %s masquerade' % (intf))
-        WrtUtil.shell('/sbin/nft add rule fpemud-wrt fw iif %s ct state established,related accept' % (intf))
-        WrtUtil.shell('/sbin/nft add rule fpemud-wrt fw iif %s ip protocol icmp accept' % (intf))
-        WrtUtil.shell('/sbin/nft add rule fpemud-wrt fw iif %s drop' % (intf))
+        WrtUtil.shell('/sbin/nft add rule wrtd natpost oif %s masquerade' % (intf))
+        WrtUtil.shell('/sbin/nft add rule wrtd fw iif %s ct state established,related accept' % (intf))
+        WrtUtil.shell('/sbin/nft add rule wrtd fw iif %s ip protocol icmp accept' % (intf))
+        WrtUtil.shell('/sbin/nft add rule wrtd fw iif %s drop' % (intf))
 
     def _addNftRuleVpnSubHost(self, subHostIp, natIp):
-        WrtUtil.shell('/sbin/nft add rule fpemud-wrt natpre ip daddr %s iif %s dnat %s' % (natIp, self.param.vpnIntf, subHostIp))
-        WrtUtil.shell('/sbin/nft add rule fpemud-wrt natpost ip saddr %s oif %s snat %s' % (subHostIp, self.param.vpnIntf, natIp))
+        WrtUtil.shell('/sbin/nft add rule wrtd natpre ip daddr %s iif %s dnat %s' % (natIp, self.param.vpnIntf, subHostIp))
+        WrtUtil.shell('/sbin/nft add rule wrtd natpost ip saddr %s oif %s snat %s' % (subHostIp, self.param.vpnIntf, natIp))
 
     def _removeNftRuleSubHost(self, subHostIp, natIp):
-        rc, msg = WrtUtil.shell('/sbin/nft list table ip fpemud-wrt -a', "retcode+stdout")
+        rc, msg = WrtUtil.shell('/sbin/nft list table ip wrtd -a', "retcode+stdout")
         if rc != 0:
             return
         m = re.search("\\s*ip daddr %s iif \"%s\" dnat to %s # handle ([0-9]+)" % (natIp, self.param.vpnIntf, subHostIp), msg, re.M)
         if m is not None:
-            WrtUtil.shell("/sbin/nft delete rule fpemud-wrt natpre handle %s" % (m.group(1)))
+            WrtUtil.shell("/sbin/nft delete rule wrtd natpre handle %s" % (m.group(1)))
         m = re.search("\\s*ip saddr %s oif \"%s\" snat to %s # handle ([0-9]+)" % (subHostIp, self.param.vpnIntf, natIp), msg, re.M)
         if m is not None:
-            WrtUtil.shell("/sbin/nft delete rule fpemud-wrt natpost handle %s" % (m.group(1)))
+            WrtUtil.shell("/sbin/nft delete rule wrtd natpost handle %s" % (m.group(1)))
 
     def _vpnTimerCallback(self):
         if self.vpnRestartCountDown is None:
