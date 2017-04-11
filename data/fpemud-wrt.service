@@ -1,0 +1,11 @@
+[Unit]
+Description=Fpemud WRT service
+After=network.target
+
+[Service]
+Type=dbus
+BusName=org.fpemud.WRT
+ExecStart=/usr/sbin/fpemud-wrt
+
+[Install]
+WantedBy=multi-user.target

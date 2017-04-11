@@ -1,0 +1,5 @@
+when use with fpemud-cgfw, the global configuration of fpemud-cgfw should be:
+    [global]
+    manage-routes=1
+    run-local-nameserver=0
+    modify-resolv-conf=0
