@@ -3,6 +3,7 @@
 
 import os
 import dbus
+import json
 import shutil
 import socket
 import netifaces
@@ -19,7 +20,7 @@ class WrtLanManager:
         self.wifiNetworks = []
 
         # load config
-        cfgfile = os.path.join(self.param.etcDir, "lan-wifi.json")
+        cfgFile = os.path.join(self.param.etcDir, "lan-wifi.json")
         if os.path.exists(cfgFile):
             with open(self.param.cfgFile, "r") as f:
                 for o in json.load(f):
@@ -40,8 +41,8 @@ class WrtLanManager:
 
         # create bridge interface
         if True:
-            WrtUtil.shell('/sbin/brctl addbr "%s"' % (self.param.brname))
-            WrtUtil.shell('/bin/ifconfig "%s" up' % (self.param.brname))
+            WrtUtil.addBridge(self.param.brname)
+            WrtUtil.setInterfaceUpDown(self.param.brname, True)
             WrtUtil.shell('/bin/ifconfig "%s" "%s" netmask "%s"' % (self.param.brname, self.param.ip, self.param.mask))
         logging.info("LAN: Bridge interface \"%s\" created with IP address %s/%s." % (self.param.brname, self.param.ip, self.param.mask))
 
@@ -49,8 +50,8 @@ class WrtLanManager:
         # start hostapd for all wlan interfaces, hostapd would add all wlan interface into bridge
         for ifname in self.intfList:
             if ifname.startswith("en"):
-                WrtUtil.shell('/bin/ifconfig "%s" up' % (ifname))
-                WrtUtil.shell('/sbin/brctl addif "%s" "%s"' % (self.param.brname, ifname))
+                WrtUtil.setInterfaceUpDown(ifname, True)
+                WrtUtil.addInterfaceToBridge(self.param.brname, ifname)
         self._runHostapd()
         logging.info("LAN: HostAPd started.")
 
@@ -83,8 +84,8 @@ class WrtLanManager:
         self.apiServer.dispose()
         self._stopDnsmasq()
         self._stopHostapd()
-        WrtUtil.shell('/bin/ifconfig "%s" down' % (self.param.brname), "retcode+stdout")
-        WrtUtil.shell('/sbin/brctl delbr "%s"' % (self.param.brname), "retcode+stdout")
+        WrtUtil.setInterfaceUpDown(self.param.brname, False)
+        WrtUtil.removeBridge(self.param.brname)
         logging.info("LAN: Terminated.")
 
     def getInterfaceList(self):

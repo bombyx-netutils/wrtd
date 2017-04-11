@@ -3,7 +3,6 @@
 
 import os
 import sys
-import json
 import signal
 import shutil
 import logging
@@ -12,8 +11,6 @@ from dbus.mainloop.glib import DBusGMainLoop
 from wrt_util import WrtUtil
 from wrt_dbus import DbusMainObject
 from wrt_dbus import DbusIpForwardObject
-from wrt_param import WrtConfig
-from wrt_param import WrtConfigWifiNetwork
 from wrt_common import WrtCommon
 from wrt_manager_lan import WrtLanManager
 from wrt_manager_wan import WrtWanManager

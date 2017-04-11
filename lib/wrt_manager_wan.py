@@ -69,7 +69,7 @@ class WrtWanManager:
             self.wanConnPlugin.stop()
             del self.wanConnPlugin
             WrtUtil.forceDelete("/etc/resolv.conf")
-            WrtUtil.shell("/bin/ifconfig %s down" % (self.wanConnPlugin.getOutInterface()))
+            WrtUtil.setInterfaceUpDown(self.wanConnPlugin.getOutInterface(), False)
         logging.info("WAN: Terminated.")
 
     def _addNftRuleWan(self):
