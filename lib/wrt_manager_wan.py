@@ -28,13 +28,15 @@ class WrtWanManager:
     def __init__(self, param):
         self.param = param
 
-        cfgfile = os.path.join(self.param.etcDir, "wan-conn-type.json")
+        cfgfile = os.path.join(self.param.etcDir, "wan-connection.json")
         if os.path.exists(cfgfile):
             cfgObj = None
             with open(cfgfile, "r") as f:
                 cfgObj = json.load(f)
-            self.wanConnPlugin = self.param.pluginManager.getWanConnTypePlugin(cfgObj["connection-type"])
-            self.wanConnPlugin.init2(cfgObj, self.param.tmpDir, self.param.ownResolvConf)
+            self.wanConnPlugin = self.param.pluginManager.getWanConnTypePlugin(cfgObj["plugin"])
+            tdir = os.path.join(self.param.tmpDir, "wconn")
+            os.mkdir(tdir)
+            self.wanConnPlugin.init2(cfgObj, tdir, self.param.ownResolvConf)
             self.wanConnPlugin.start()
             logging.info("WAN: WAN-Connection configuration loaded.")
 
@@ -50,8 +52,10 @@ class WrtWanManager:
             cfgObj = None
             with open(cfgfile, "r") as f:
                 cfgObj = json.load(f)
-            self.vpnPlugin = self.param.pluginManager.getVpnPlugin(cfgObj["vpn-type"])
-            self.vpnPlugin.init2(cfgObj, self.param.vpnIntf, self.param.tmpDir)
+            self.vpnPlugin = self.param.pluginManager.getVpnPlugin(cfgObj["plugin"])
+            tdir = os.path.join(self.param.tmpDir, "wvpn")
+            os.mkdir(tdir)
+            self.vpnPlugin.init2(cfgObj, self.param.vpnIntf, tdir)
             self.vpnTimer = GObject.timeout_add_seconds(10, self._vpnTimerCallback)
             self.vpnRestartCountDown = 0
             logging.info("WAN: VPN configuration loaded.")
