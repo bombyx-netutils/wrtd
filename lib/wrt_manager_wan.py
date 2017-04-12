@@ -19,7 +19,7 @@ class WrtWanManager:
 
     # currently:
     # 1. default route is created by plugin
-    # 2. /etc/resolv.conf is created by plugin
+    # 2. self.param.ownResolvConf is created by plugin
     # these are to be modified
 
     # sub-host change should be dispatched in 10 seconds
@@ -27,6 +27,8 @@ class WrtWanManager:
 
     def __init__(self, param):
         self.param = param
+        self.wanConnPlugin = None
+        self.vpnPlugin = None
 
         logging.info("WAN: Start.")
         try:
@@ -35,7 +37,7 @@ class WrtWanManager:
                 cfgObj = None
                 with open(cfgfile, "r") as f:
                     cfgObj = json.load(f)
-                self.wanConnPlugin = WrtCommon.getWanConnectionPlugin(cfgObj["plugin"])
+                self.wanConnPlugin = WrtCommon.getWanConnectionPlugin(self.param, cfgObj["plugin"])
                 tdir = os.path.join(self.param.tmpDir, "wconn-%s" % (cfgObj["plugin"]))
                 os.mkdir(tdir)
                 self.wanConnPlugin.init2(cfgObj, tdir, self.param.ownResolvConf)
@@ -56,10 +58,10 @@ class WrtWanManager:
                 cfgObj = None
                 with open(cfgfile, "r") as f:
                     cfgObj = json.load(f)
-                self.vpnPlugin = WrtCommon.getVpnPlugin(cfgObj["plugin"])
+                self.vpnPlugin = WrtCommon.getWanVpnPlugin(self.param, cfgObj["plugin"])
                 tdir = os.path.join(self.param.tmpDir, "wvpn-%s" % (cfgObj["plugin"]))
                 os.mkdir(tdir)
-                self.vpnPlugin.init2(cfgObj, self.param.vpnIntf, tdir)
+                self.vpnPlugin.init2(cfgObj, self.vpnPlugin.get_interface(), tdir)
                 self.vpnTimer = GObject.timeout_add_seconds(10, self._vpnTimerCallback)
                 self.vpnRestartCountDown = 0
                 logging.info("WAN: VPN activated, plugin: %s." % (cfgObj["plugin"]))
@@ -70,42 +72,38 @@ class WrtWanManager:
             raise
 
     def dispose(self):
-        if hasattr(self, "vpnPlugin"):
+        if self.vpnPlugin is not None:
             GLib.source_remove(self.vpnTimer)
             self.vpnPlugin.stop()
-            del self.vpnRestartCountDown
-            del self.vpnTimer
-            del self.vpnPlugin
+            self.vpnPlugin = None
             logging.info("WAN: VPN deactivated.")
-        if hasattr(self, "wanConnPlugin"):
+        if self.wanConnPlugin is not None:
             with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
                 f.write("0")
             self.wanConnPlugin.stop()
-            del self.wanConnPlugin
-            WrtUtil.forceDelete("/etc/resolv.conf")
-            WrtUtil.setInterfaceUpDown(self.wanConnPlugin.getOutInterface(), False)
+            self.wanConnPlugin = None
             logging.info("WAN: Internet connection deactivated.")
         logging.info("WAN: Terminated.")
 
     def _addNftRuleWan(self):
-        intf = self.wanConnPlugin.getOutInterface()
-        WrtUtil.shell('/sbin/nft add rule wrtd natpost oif %s masquerade' % (intf))
-        WrtUtil.shell('/sbin/nft add rule wrtd fw iif %s ct state established,related accept' % (intf))
-        WrtUtil.shell('/sbin/nft add rule wrtd fw iif %s ip protocol icmp accept' % (intf))
-        WrtUtil.shell('/sbin/nft add rule wrtd fw iif %s drop' % (intf))
+        intf = self.wanConnPlugin.get_out_interface()
+        WrtUtil.shell('/sbin/nft add rule wrtd natpost oifname %s masquerade' % (intf))
+        WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ct state established,related accept' % (intf))
+        WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ip protocol icmp accept' % (intf))
+        WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s drop' % (intf))
 
     def _addNftRuleVpnSubHost(self, subHostIp, natIp):
-        WrtUtil.shell('/sbin/nft add rule wrtd natpre ip daddr %s iif %s dnat %s' % (natIp, self.param.vpnIntf, subHostIp))
-        WrtUtil.shell('/sbin/nft add rule wrtd natpost ip saddr %s oif %s snat %s' % (subHostIp, self.param.vpnIntf, natIp))
+        WrtUtil.shell('/sbin/nft add rule wrtd natpre ip daddr %s iif %s dnat %s' % (natIp, self.vpnPlugin.get_interface(), subHostIp))
+        WrtUtil.shell('/sbin/nft add rule wrtd natpost ip saddr %s oif %s snat %s' % (subHostIp, self.vpnPlugin.get_interface(), natIp))
 
     def _removeNftRuleSubHost(self, subHostIp, natIp):
         rc, msg = WrtUtil.shell('/sbin/nft list table ip wrtd -a', "retcode+stdout")
         if rc != 0:
             return
-        m = re.search("\\s*ip daddr %s iif \"%s\" dnat to %s # handle ([0-9]+)" % (natIp, self.param.vpnIntf, subHostIp), msg, re.M)
+        m = re.search("\\s*ip daddr %s iif \"%s\" dnat to %s # handle ([0-9]+)" % (natIp, self.vpnPlugin.get_interface(), subHostIp), msg, re.M)
         if m is not None:
             WrtUtil.shell("/sbin/nft delete rule wrtd natpre handle %s" % (m.group(1)))
-        m = re.search("\\s*ip saddr %s oif \"%s\" snat to %s # handle ([0-9]+)" % (subHostIp, self.param.vpnIntf, natIp), msg, re.M)
+        m = re.search("\\s*ip saddr %s oif \"%s\" snat to %s # handle ([0-9]+)" % (subHostIp, self.vpnPlugin.get_interface(), natIp), msg, re.M)
         if m is not None:
             WrtUtil.shell("/sbin/nft delete rule wrtd natpost handle %s" % (m.group(1)))
 
@@ -198,7 +196,7 @@ class WrtWanManager:
             if not any(x.ip == v[0] and x.hostname == v[1] for x in clientList):
                 print("debugr", self.subHostDict, k, v[0])
                 self._removeNftRuleSubHost(v[0], k)
-                WrtUtil.shell("/bin/ifconfig %s del %s" % (self.param.vpnIntf, k))
+                WrtUtil.shell("/bin/ifconfig %s del %s" % (self.vpnPlugin.get_interface(), k))
                 self.subHostDict[k] = None
                 changed = True
 
@@ -216,7 +214,7 @@ class WrtWanManager:
                         break
             if not found and empty is not None:
                 print("debug", self.subHostDict, empty, client.ip, client.hostname)
-                WrtUtil.shell("/bin/ifconfig %s add %s" % (self.param.vpnIntf, empty))
+                WrtUtil.shell("/bin/ifconfig %s add %s" % (self.vpnPlugin.get_interface(), empty))
                 self._addNftRuleVpnSubHost(client.ip, empty)
                 self.subHostDict[empty] = (client.ip, client.hostname)
                 changed = True

@@ -6,12 +6,15 @@ import sys
 import signal
 import shutil
 import logging
+import netifaces
 from gi.repository import GLib
+from gi.repository import GObject
 from dbus.mainloop.glib import DBusGMainLoop
 from wrt_util import WrtUtil
 from wrt_dbus import DbusMainObject
 from wrt_dbus import DbusIpForwardObject
 from wrt_common import WrtCommon
+from wrt_api_server import WrtApiServer
 from wrt_manager_lan import WrtLanManager
 from wrt_manager_wan import WrtWanManager
 
@@ -21,6 +24,9 @@ class WrtDaemon:
     def __init__(self, param):
         self.param = param
         self.mainloop = None
+        self.apiServer = None
+        self.interfaceDict = dict()
+        self.interfaceTimer = None
 
     def run(self):
         WrtUtil.mkDirAndClear(self.param.tmpDir)
@@ -57,6 +63,11 @@ class WrtDaemon:
             # business initialize
             self.param.wanManager = WrtWanManager(self.param)
             self.param.lanManager = WrtLanManager(self.param)
+            self.interfaceTimer = GObject.timeout_add_seconds(10, self._interfaceTimerCallback)
+
+            # start API server
+            self.apiServer = WrtApiServer(self.param)
+            logging.info("API server started.")
 
             # start main loop
             logging.info("Mainloop begins.")
@@ -66,6 +77,10 @@ class WrtDaemon:
             self.param.mainloop.run()
             logging.info("Mainloop exits.")
         finally:
+            if self.apiServer is not None:
+                self.apiServer.dispose()
+            if self.interfaceTimer is not None:
+                GLib.source_remove(self.interfaceTimer)
             if self.param.lanManager is not None:
                 self.param.lanManager.dispose()
             if self.param.wanManager is not None:
@@ -90,4 +105,37 @@ class WrtDaemon:
         self.bDataChanged = True
         if self.vpnClientProc is not None:
             self.vpnClientProc.terminate()
+        return True
+
+    def _interfaceTimerCallback(self):
+        intfList = netifaces.interfaces()
+        intfList = [x for x in intfList if x.startswith("en") or x.startswith("wl")]
+
+        addList = list(set(intfList) - set(self.interfaceDict.keys()))
+        removeList = list(set(self.interfaceDict.keys()) - set(intfList))
+
+        for intf in removeList:
+            plugin = self.interfaceDict[intf]
+            if plugin is not None:
+                plugin.interface_disappear(intf)
+            del self.interfaceDict[intf]
+
+        for intf in addList:
+            if self.param.wanManager.wanConnPlugin is not None:
+                # wan connection plugin
+                if self.param.wanManager.wanConnPlugin.interface_appear(intf):
+                    self.interfaceDict[intf] = self.param.wanManager.wanConnPlugin
+                    continue
+
+                # lan interface plugin
+                for plugin in self.param.lanManager.pluginList:
+                    if plugin.interface_appear(intf):
+                        self.interfaceDict[intf] = plugin
+                        break
+                if intf in self.interfaceDict:
+                    continue
+
+                # unmanaged interface
+                self.interfaceDict[intf] = None
+
         return True

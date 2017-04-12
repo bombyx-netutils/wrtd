@@ -102,17 +102,21 @@ class WrtCommon:
     def _getPluginList(param, prefix):
         ret = []
         for fn in glob.glob(os.path.join(param.libDir, "plugins", prefix + "_*")):
-            modname = fn.replace("/", ".")
+            modname = fn
+            modname = modname[len(param.libDir + "/"):]
+            modname = modname.replace("/", ".")
             exec("import %s" % (modname))
             ret += eval("%s.get_plugin_list()" % (modname))
         return ret
 
     def _getPlugin(param, prefix, name):
         for fn in glob.glob(os.path.join(param.libDir, "plugins", prefix + "_*")):
-            modname = fn.replace("/", ".")
+            modname = fn
+            modname = modname[len(param.libDir + "/"):]
+            modname = modname.replace("/", ".")
             exec("import %s" % (modname))
             if name in eval("%s.get_plugin_list()" % (modname)):
-                return eval("%s.get_plugin(%s)" % (name))
+                return eval("%s.get_plugin(\"%s\")" % (modname, name))
         return None
 
 
@@ -150,13 +154,23 @@ class PluginTemplateWanConnection:
     def stop(self):
         assert False
 
+    def get_out_interface(self):
+        assert False
+
+    def interface_appear(self, ifname):
+        # return True means we take this interface
+        pass
+
+    def interface_disappear(self, ifname):
+        pass
+
 
 # plugin module name: plugins.wvpn_*
 # config file: ${ETC}/wan-vpn.json
 # only allow one plugin be loaded
 class PluginTemplateWanVpn:
 
-    def init2(self, vpnIntf, tmpDir):
+    def init2(self, tmpDir):
         assert False
 
     def start(self, cfg):
@@ -175,6 +189,9 @@ class PluginTemplateWanVpn:
         assert False
 
     def get_netmask(self):
+        assert False
+
+    def get_interface(self):
         assert False
 
 

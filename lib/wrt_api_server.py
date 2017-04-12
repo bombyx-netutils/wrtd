@@ -93,23 +93,18 @@ class WrtApiServer:
     def __init__(self, param):
         self.param = param
 
-        self.servSockList = []
-        for ip in ["127.0.0.1", self.param.ip]:
-            serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            serverSock.bind((ip, self.param.sgwApiPort))
-            serverSock.listen(5)
-            serverSock.setblocking(0)
-            serverSourceId = GLib.io_add_watch(serverSock, GLib.IO_IN | _flagError, self._onServerAccept)
-            self.servSockList.append((serverSock, serverSourceId))
+        self.serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.serverSock.bind(("0.0.0.0", self.param.apiPort))
+        self.serverSock.listen(5)
+        self.serverSock.setblocking(0)
+        self.serverSourceId = GLib.io_add_watch(self.serverSock, GLib.IO_IN | _flagError, self._onServerAccept)
 
         self.threadDict = dict()
         self.threadDictLock = threading.Lock()
 
     def dispose(self):
-        for serverSock, serverSourceId in self.servSockList:
-            GLib.source_remove(serverSourceId)
-            serverSock.close()
-        self.servSockList = []
+        GLib.source_remove(self.serverSourceId)
+        self.serverSock.close()
 
         with self.threadDictLock:
             for tRecv, tSend in self.threadDict:
@@ -181,9 +176,9 @@ class _CommandThread(threading.Thread):
                 try:
                     jsonObj = json.loads(buf)
                     self._processCommand(jsonObj)
-                    logging.info("Process SGW command \"%s\" from \"%s\"", jsonObj["command"], self.addr)
+                    logging.info("Process API command \"%s\" from \"%s\"", jsonObj["command"], self.addr)
                 except Exception as e:
-                    logging.error("Failed to process SGW command from %s, %s", self.addr, e)
+                    logging.error("Failed to process API command from %s, %s", self.addr, e)
                     logging.debug("_CommandThread.run: Exception, %s, %s", e.__class__, e)
         finally:
             _disposeClient(self.pObj, self.sock, 0)
@@ -251,9 +246,9 @@ class _NotifyThread(threading.Thread):
                     buf = json.dumps(jsonObj)
                     with self.sendLock:
                         self.sock.send(buf)
-                    logging.info("Send SGW notify \"%s\" to \"%s\"", jsonObj["notify"], self.addr)
+                    logging.info("Send notify \"%s\" to \"%s\"", jsonObj["notify"], self.addr)
                 except Exception as e:
-                    logging.error("Failed to send SGW notify to %s, %s", self.addr, e)
+                    logging.error("Failed to send notify to %s, %s", self.addr, e)
                     logging.debug("_NotifyThread.run: Exception, %s, %s", e.__class__, e)
                 finally:
                     self.queue.task_done()

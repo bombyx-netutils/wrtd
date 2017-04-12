@@ -28,10 +28,7 @@ class WrtParam:
         self.baddr = "192.168.2.255"
         self.dhcpRange = ("192.168.2.100", "192.168.2.254")
 
-        self.vpnIntf = "vpnc"
-        self.vpnApiPort = 2220
-
-        self.sgwApiPort = 2300
+        self.apiPort = 2220
 
         self.pidFile = os.path.join(self.runDir, "wrtd.pid")
         self.logLevel = None
