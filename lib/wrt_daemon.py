@@ -55,8 +55,8 @@ class WrtDaemon:
                 f.write("")
 
             # business initialize
-            self.param.lanManager = WrtLanManager(self.param)
             self.param.wanManager = WrtWanManager(self.param)
+            self.param.lanManager = WrtLanManager(self.param)
 
             # start main loop
             logging.info("Mainloop begins.")
@@ -66,10 +66,10 @@ class WrtDaemon:
             self.param.mainloop.run()
             logging.info("Mainloop exits.")
         finally:
-            if self.param.wanManager is not None:
-                self.param.wanManager.dispose()
             if self.param.lanManager is not None:
                 self.param.lanManager.dispose()
+            if self.param.wanManager is not None:
+                self.param.wanManager.dispose()
             WrtUtil.shell('/sbin/nft delete table wrtd')
             WrtCommon.cleanupEtcHosts()
             logging.shutdown()

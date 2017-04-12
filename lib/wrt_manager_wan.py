@@ -28,37 +28,46 @@ class WrtWanManager:
     def __init__(self, param):
         self.param = param
 
-        cfgfile = os.path.join(self.param.etcDir, "wan-connection.json")
-        if os.path.exists(cfgfile):
-            cfgObj = None
-            with open(cfgfile, "r") as f:
-                cfgObj = json.load(f)
-            self.wanConnPlugin = self.param.pluginManager.getWanConnectionPlugin(cfgObj["plugin"])
-            tdir = os.path.join(self.param.tmpDir, "wconn-%s" % (cfgObj["plugin"]))
-            os.mkdir(tdir)
-            self.wanConnPlugin.init2(cfgObj, tdir, self.param.ownResolvConf)
-            self.wanConnPlugin.start()
-            logging.info("WAN: Internet connection activated, plugin: %s." % (cfgObj["plugin"]))
+        logging.info("WAN: Start.")
+        try:
+            cfgfile = os.path.join(self.param.etcDir, "wan-connection.json")
+            if os.path.exists(cfgfile):
+                cfgObj = None
+                with open(cfgfile, "r") as f:
+                    cfgObj = json.load(f)
+                self.wanConnPlugin = WrtCommon.getWanConnectionPlugin(cfgObj["plugin"])
+                tdir = os.path.join(self.param.tmpDir, "wconn-%s" % (cfgObj["plugin"]))
+                os.mkdir(tdir)
+                self.wanConnPlugin.init2(cfgObj, tdir, self.param.ownResolvConf)
+                self.wanConnPlugin.start()
+                logging.info("WAN: Internet connection activated, plugin: %s." % (cfgObj["plugin"]))
 
-            self._addNftRuleWan()
-            logging.info("WAN: Firewall is up.")
+                self._addNftRuleWan()
+                logging.info("WAN: Firewall is up.")
 
-            with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
-                f.write("1")
-            logging.info("WAN: IP forwarding enabled.")
+                with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
+                    f.write("1")
+                logging.info("WAN: IP forwarding enabled.")
+            else:
+                logging.info("WAN: No internet connection configured.")
 
-        cfgfile = os.path.join(self.param.etcDir, "wan-vpn.json")
-        if os.path.exists(cfgfile):
-            cfgObj = None
-            with open(cfgfile, "r") as f:
-                cfgObj = json.load(f)
-            self.vpnPlugin = self.param.pluginManager.getVpnPlugin(cfgObj["plugin"])
-            tdir = os.path.join(self.param.tmpDir, "wvpn-%s" % (cfgObj["plugin"]))
-            os.mkdir(tdir)
-            self.vpnPlugin.init2(cfgObj, self.param.vpnIntf, tdir)
-            self.vpnTimer = GObject.timeout_add_seconds(10, self._vpnTimerCallback)
-            self.vpnRestartCountDown = 0
-            logging.info("WAN: VPN activated, plugin: %s." % (cfgObj["plugin"]))
+            cfgfile = os.path.join(self.param.etcDir, "wan-vpn.json")
+            if os.path.exists(cfgfile):
+                cfgObj = None
+                with open(cfgfile, "r") as f:
+                    cfgObj = json.load(f)
+                self.vpnPlugin = WrtCommon.getVpnPlugin(cfgObj["plugin"])
+                tdir = os.path.join(self.param.tmpDir, "wvpn-%s" % (cfgObj["plugin"]))
+                os.mkdir(tdir)
+                self.vpnPlugin.init2(cfgObj, self.param.vpnIntf, tdir)
+                self.vpnTimer = GObject.timeout_add_seconds(10, self._vpnTimerCallback)
+                self.vpnRestartCountDown = 0
+                logging.info("WAN: VPN activated, plugin: %s." % (cfgObj["plugin"]))
+            else:
+                logging.info("WAN: No VPN configured.")
+        except:
+            self.dispose()
+            raise
 
     def dispose(self):
         if hasattr(self, "vpnPlugin"):
