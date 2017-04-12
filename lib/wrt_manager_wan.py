@@ -38,7 +38,7 @@ class WrtWanManager:
             os.mkdir(tdir)
             self.wanConnPlugin.init2(cfgObj, tdir, self.param.ownResolvConf)
             self.wanConnPlugin.start()
-            logging.info("WAN: WAN-Connection configuration loaded.")
+            logging.info("WAN: Internet connection activated, plugin: %s." % (cfgObj["plugin"]))
 
             self._addNftRuleWan()
             logging.info("WAN: Firewall is up.")
@@ -58,7 +58,7 @@ class WrtWanManager:
             self.vpnPlugin.init2(cfgObj, self.param.vpnIntf, tdir)
             self.vpnTimer = GObject.timeout_add_seconds(10, self._vpnTimerCallback)
             self.vpnRestartCountDown = 0
-            logging.info("WAN: VPN configuration loaded.")
+            logging.info("WAN: VPN activated, plugin: %s." % (cfgObj["plugin"]))
 
     def dispose(self):
         if hasattr(self, "vpnPlugin"):
@@ -67,6 +67,7 @@ class WrtWanManager:
             del self.vpnRestartCountDown
             del self.vpnTimer
             del self.vpnPlugin
+            logging.info("WAN: VPN deactivated.")
         if hasattr(self, "wanConnPlugin"):
             with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
                 f.write("0")
@@ -74,6 +75,7 @@ class WrtWanManager:
             del self.wanConnPlugin
             WrtUtil.forceDelete("/etc/resolv.conf")
             WrtUtil.setInterfaceUpDown(self.wanConnPlugin.getOutInterface(), False)
+            logging.info("WAN: Internet connection deactivated.")
         logging.info("WAN: Terminated.")
 
     def _addNftRuleWan(self):

@@ -1,5 +1,5 @@
 [Unit]
-Description=Fpemud WRT service
+Description=Wireless Router Deamon
 After=network.target
 
 [Service]

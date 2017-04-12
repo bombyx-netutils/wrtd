@@ -39,7 +39,7 @@ class WrtLanManager:
         # start all lan interface plugins
         for name in self.param.pluginManager.getLanInterfacePluginList(self.param):
             tlist = []
-            for fn in glob.glob(os.path.join(self.param.etcDir, "lan-interface-%s*.json" % name)):
+            for fn in glob.glob(os.path.join(self.param.etcDir, "lan-interface-%s*.json" % (name))):
                 bn = os.path.basename(fn)
                 instanceName = bn[len("lan-interface-%s" % (name)):len(".json") * -1]
                 if instanceName != "":

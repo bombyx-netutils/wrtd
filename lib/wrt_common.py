@@ -136,13 +136,9 @@ class DnsMasqHostFilesLock:
         self.lockFd = None
 
 
-"""
-plugin module name: plugins.wconn_*
-config file: ${ETC}/wan-connection.json
-only allow one plugin be loaded
-"""
-
-
+# plugin module name: plugins.wconn_*
+# config file: ${ETC}/wan-connection.json
+# only allow one plugin be loaded
 class PluginTemplateWanConnection:
 
     def init2(self, tmpDir, ownResolvConf):
@@ -155,13 +151,9 @@ class PluginTemplateWanConnection:
         assert False
 
 
-"""
-plugin module name: plugins.wvpn_*
-config file: ${ETC}/wan-vpn.json
-only allow one plugin be loaded
-"""
-
-
+# plugin module name: plugins.wvpn_*
+# config file: ${ETC}/wan-vpn.json
+# only allow one plugin be loaded
 class PluginTemplateWanVpn:
 
     def init2(self, vpnIntf, tmpDir):
@@ -186,16 +178,12 @@ class PluginTemplateWanVpn:
         assert False
 
 
-"""
-plugin module name: plugins.lif_*
-config file: ${ETC}/lan-interface-(PLUGIN_NAME)-(INSTANCE_NAME).json
-allow multiple plugins be loaded, and one plugin can have multiple instances
-"""
-
-
+# plugin module name: plugins.lif_*
+# config file: ${ETC}/lan-interface-(PLUGIN_NAME)-(INSTANCE_NAME).json
+# allow multiple plugins be loaded, and one plugin can have multiple instances
 class _PluginObjectLanInterface:
 
-    def init2(self, cfg):
+    def init2(self, instanceName, cfg, brname, tmpDir):
         pass
 
     def start(self):
