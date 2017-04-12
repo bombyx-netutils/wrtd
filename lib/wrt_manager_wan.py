@@ -140,7 +140,7 @@ class WrtWanManager:
             self.subHostListener = _SubHostListener(self, self.vpnPlugin.get_local_ip(), self.vpnPlugin.get_remote_ip())
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
-                sock.connect((self.vpnPlugin.get_remote_ip(), self.param.vpnApiPort))
+                sock.connect((self.vpnPlugin.get_remote_ip(), self.param.apiPort))
                 sock.send(("register-subhosts-owner %d" % (self.subHostListener.port)).encode("utf-8"))
                 sock.shutdown(socket.SHUT_WR)
                 buf = WrtUtil.recvUntilEof(sock).decode("utf-8")
@@ -238,7 +238,7 @@ class WrtWanManager:
         # update sub-hosts
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
-            sock.connect((self.vpnPlugin.get_remote_ip(), self.param.vpnApiPort))
+            sock.connect((self.vpnPlugin.get_remote_ip(), self.param.apiPort))
             sock.send(("update-subhosts %s" % (json.dumps(jsonObj))).encode("utf-8"))
             sock.shutdown(socket.SHUT_WR)
             buf = WrtUtil.recvUntilEof(sock).decode("utf-8")
@@ -305,7 +305,6 @@ class _SubHostProcessThread(threading.Thread):
             itemList = self._jsonObj2ItemList(json.loads(buf))
             WrtUtil.writeDnsmasqHostFile(fname, itemList)
             self._dnsmasqReloadHosts()                          # bad design. dnsmasq belongs to LanManager. we should notify the LanManager to do dnsmasq reloading
-            WrtCommon.syncToEtcHosts(self.param.tmpDir)
         finally:
             with self.pObj.threadSetLock:
                 self.pObj.threadSet.remove(self)

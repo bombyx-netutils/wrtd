@@ -4,101 +4,44 @@
 import os
 import glob
 import fcntl
-from wrt_util import WrtUtil
 
 
 class WrtCommon:
 
     @staticmethod
-    def cleanupEtcHosts():
-        bNoOp = True
-        lineList = []
-        lineList2 = []
-        with open("/etc/hosts", "r") as f:
-            b = -1
-            for line in f.read().split("\n"):
-                if line == "### wrtd begin ###":
-                    b = 0
-                    bNoOp = False
-                if b == -1:
-                    lineList.append(line)
-                if b == 1:
-                    lineList2.append(line)
-                if line == "### wrtd end ###":
-                    b = 1
-                    bNoOp = False
-        if bNoOp:
-            return
-
-        lineList += lineList2
-        while len(lineList) > 0 and lineList[-1] == "":
-            del lineList[-1]
-
-        with open("/etc/hosts", "w") as f:
-            f.write("\n".join(lineList))
-            f.write("\n")
-
-    @staticmethod
-    def syncToEtcHosts(tmpDir):
-        lineList = []
-        lineList2 = []
-        with open("/etc/hosts", "r") as f:
-            b = -1
-            for line in f.read().rstrip("\n").split("\n"):
-                if line == "### wrtd begin ###":
-                    b = 0
-                if b == -1:
-                    lineList.append(line)
-                if b == 1:
-                    lineList2.append(line)
-                if line == "### wrtd end ###":
-                    b = 1
-
-        lineList.append("### wrtd begin ###")
-        for fn in glob.glob(os.path.join(tmpDir, "hosts.d", "*")):
-            for ip, hostname in WrtUtil.readDnsmasqHostFile(fn):
-                lineList.append("%s %s" % (ip, hostname))
-        for r in WrtUtil.readDnsmasqLeaseFile(os.path.join(tmpDir, "dnsmasq.leases")):
-            if r[2] == "":
-                continue
-            lineList.append("%s %s" % (r[1], r[2]))
-        lineList.append("### wrtd end ###")
-
-        lineList += lineList2
-        while len(lineList) > 0 and lineList[-1] == "":
-            del lineList[-1]
-
-        with open("/etc/hosts", "w") as f:
-            f.write("\n".join(lineList))
-            f.write("\n")
-
     def getWanConnectionPluginList(param):
         return WrtCommon._getPluginList(param, "wconn")
 
+    @staticmethod
     def getWanConnectionPlugin(param, name):
         ret = WrtCommon._getPlugin(param, "wconn", name)
         if ret is None:
             raise Exception("wan connection type plugin %s does not exists" % (name))
         return ret
 
+    @staticmethod
     def getWanVpnPluginList(param):
         return WrtCommon._getPluginList(param, "wvpn")
 
+    @staticmethod
     def getWanVpnPlugin(param, name):
         ret = WrtCommon._getPlugin(param, "wvpn", name)
         if ret is None:
             raise Exception("wan vpn plugin %s does not exists" % (name))
         return ret
 
+    @staticmethod
     def getLanInterfacePluginList(param):
         return WrtCommon._getPluginList(param, "lif")
 
+    @staticmethod
     def getLanInterfacePlugin(param, name):
         ret = WrtCommon._getPlugin(param, "lif", name)
         if ret is None:
             raise Exception("lan interface plugin %s does not exists" % (name))
         return ret
 
+    @staticmethod
     def _getPluginList(param, prefix):
         ret = []
         for fn in glob.glob(os.path.join(param.libDir, "plugins", prefix + "_*")):
@@ -109,6 +52,7 @@ class WrtCommon:
             ret += eval("%s.get_plugin_list()" % (modname))
         return ret
 
+    @staticmethod
     def _getPlugin(param, prefix, name):
         for fn in glob.glob(os.path.join(param.libDir, "plugins", prefix + "_*")):
             modname = fn

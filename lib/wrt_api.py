@@ -5,12 +5,90 @@ import os
 import glob
 import json
 import time
+import dbus
 import queue
 import socket
 import logging
 import threading
+import dbus.service
 from gi.repository import GLib
 from wrt_util import WrtUtil
+
+
+################################################################################
+# DBus API Docs
+################################################################################
+#
+# ==== Main Application ====
+# Service               org.fpemud.WRT
+# Interface             org.fpemud.WRT
+# Object path           /
+#
+# Methods:
+# str                                          GetIp()
+# int                                          GetMask()
+# (mac,ip,hostname,bWiredOrWireless)           GetClients()
+#
+class DbusMainObject(dbus.service.Object):
+
+    def __init__(self, param):
+        self.param = param
+
+        # register dbus object path
+        bus_name = dbus.service.BusName('org.fpemud.WRT', bus=dbus.SystemBus())
+        dbus.service.Object.__init__(self, bus_name, '/org/fpemud/WRT')
+
+    def release(self):
+        self.remove_from_connection()
+
+    @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='s')
+    def GetIp(self):
+        return self.param.ip
+
+    @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='s')
+    def GetMask(self):
+        return self.param.mask
+
+    @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='a(sssb)')
+    def GetClients(self):
+        return []
+        # ret = []
+        # for c in self.param.lanManager.getClients():
+        #     ret.append((c.mac, c.ip, c.hostname, c.bWiredOrWireless))
+        # return ret
+
+
+################################################################################
+# DBus API Docs
+################################################################################
+#
+# ==== Main Application ====
+# Service               org.fpemud.IpForward
+# Interface             org.fpemud.IpForward
+# Object path           /
+#
+# Methods:
+# void                  On()
+# void                  Off()
+#
+
+class DbusIpForwardObject(dbus.service.Object):
+
+    def __init__(self, param):
+        # implement a fake IpForward object, since we always set ip_forward to 1
+        bus_name = dbus.service.BusName('org.fpemud.IpForward', bus=dbus.SystemBus())
+        dbus.service.Object.__init__(self, bus_name, '/org/fpemud/IpForward')
+
+    def release(self):
+        self.remove_from_connection()
+
+    @dbus.service.method('org.fpemud.IpForward')
+    def On(self):
+        pass
+
+    @dbus.service.method('org.fpemud.IpForward')
+    def Off(self):
+        pass
 
 
 ################################################################################
@@ -28,23 +106,6 @@ from wrt_util import WrtUtil
 #             "hostname": "abcd",
 #             "wakeup-mac": "01-02-03-04-05-06",
 #         },
-#     },
-# }
-#
-################################################################################
-# Command: wakeup-host
-################################################################################
-#
-# Request:
-# {
-#     "command": "wakeup-host",
-#     "data": {
-#         "mac": "01-02-03-04-05-06",
-#     },
-# }
-# Response:
-# {
-#     "return": {
 #     },
 # }
 #
@@ -87,6 +148,76 @@ from wrt_util import WrtUtil
 #     ],
 # }
 #
+################################################################################
+# Command: register-subhost-owner
+################################################################################
+#
+# Request:
+# {
+#     "command": "register-subhost-owner",
+# }
+# Response:
+# {
+#     "return": {
+#         "start": "192.168.1.100",
+#         "end": "192.168.1.200",
+#     },
+# }
+#
+################################################################################
+# Command: add-subhost
+################################################################################
+#
+# Request:
+# {
+#     "command": "add-subhost",
+#     "data": {
+#         "1.2.3.4": {
+#             "hostname": "abcd",
+#             "wakeup-mac": "01-02-03-04-05-06",
+#         },
+#     }
+# }
+# Response:
+# {
+#     "return": {
+#     },
+# }
+#
+################################################################################
+# Command: remove-subhost
+################################################################################
+#
+# Request:
+# {
+#     "command": "remove-subhost",
+#     "data": [
+#         "1.2.3.4",
+#     ]
+# }
+# Response:
+# {
+#     "return": {
+#     },
+# }
+#
+################################################################################
+# Command: wakeup-host
+################################################################################
+#
+# Request:
+# {
+#     "command": "wakeup-host",
+#     "data": {
+#         "mac": "01-02-03-04-05-06",
+#     },
+# }
+# Response:
+# {
+#     "return": {
+#     },
+# }
+#
 
 class WrtApiServer:
 
@@ -99,14 +230,15 @@ class WrtApiServer:
         self.serverSock.setblocking(0)
         self.serverSourceId = GLib.io_add_watch(self.serverSock, GLib.IO_IN | _flagError, self._onServerAccept)
 
+        self.globalLock = threading.Lock()
         self.threadDict = dict()
-        self.threadDictLock = threading.Lock()
+        self.subhostOwnerDict = dict()
 
     def dispose(self):
         GLib.source_remove(self.serverSourceId)
         self.serverSock.close()
 
-        with self.threadDictLock:
+        with self.globalLock:
             for tRecv, tSend in self.threadDict:
                 if tRecv is not None:
                     tRecv.sock.shutdown(socket.SHUT_WR)
@@ -120,7 +252,7 @@ class WrtApiServer:
 
         try:
             new_sock, addr = source.accept()
-            with self.threadDictLock:
+            with self.globalLock:
                 sendLock = threading.Lock()
                 tRecv = _CommandThread(self, new_sock, addr[0], sendLock)
                 tSend = _NotifyThread(self, new_sock, addr[0], sendLock)
@@ -142,7 +274,7 @@ class WrtApiServer:
         if wakeupMac is not None:
             jsonObj["data"][ip]["wakeup-mac"] = wakeupMac
 
-        with self.threadDictLock:
+        with self.globalLock:
             for tRecv, tSend in self.threadDict:
                 if tSend is not None:
                     tSend.queue.put(jsonObj)
@@ -152,7 +284,7 @@ class WrtApiServer:
         jsonObj["notify"] = "host-disappear"
         jsonObj["data"] = [ip]
 
-        with self.threadDictLock:
+        with self.globalLock:
             for tRecv, tSend in self.threadDict:
                 if tSend is not None:
                     tSend.queue.put(jsonObj)
@@ -189,6 +321,12 @@ class _CommandThread(threading.Thread):
 
         if jsonObj["command"] == "get-host-list":
             self._cmdGetHostList()
+        elif jsonObj["command"] == "register-subhost-owner":
+            self._registerSubhostOwner()
+        elif jsonObj["command"] == "add-subhost":
+            self._addSubhost(jsonObj["data"])
+        elif jsonObj["command"] == "remove-subhost":
+            self._removeSubhost(jsonObj["data"])
         elif jsonObj["command"] == "wakeup-host":
             self._cmdWakeupHost(jsonObj["data"])
         else:
@@ -209,6 +347,64 @@ class _CommandThread(threading.Thread):
             self.sock.send(json.dumps({
                 "return": dataDict,
             }).encode("utf-8"))
+
+    def _cmdRegisterSubhostOwner(self, jsonObj):
+        # validate source ip
+        found = False
+        for r in WrtUtil.readDnsmasqLeaseFile(os.path.join(self.param.tmpDir, "dnsmasq.leases")):
+            if r[1] == self.addr:
+                found = True
+                break
+        if not found:
+            self.sock.send(json.dumps({
+                "result": "error",
+                "error": "invalid source address",
+            }).encode("utf-8"))
+            return
+
+        # add subhost-owner
+        with self.pObj.globalLock:
+            if self.sock in self.pObj.subhostOwnerDict:
+                # delete subhost file  --fixme
+                start = self.pObj.subhostOwnerDict[self.sock]
+            else:
+                start = None
+                for s in range(self.param.subHostRangeStart, self.param.subHostRangeEnd + 1, self.param.subHostBlockSize):
+                    if s in self.pObj.subhostOwnerDict.values():
+                        continue
+                    start = s
+                    break
+                if start is None:
+                    self.sock.send(json.dumps({
+                        "result": "error",
+                        "error": "too many sub-host owners",
+                    }).encode("utf-8"))
+                    return
+            self.pObj.subhostOwnerDict[self.sock] = start
+
+        # send response
+        ipstart = ".".join(self.addr.split(".")[:-1] + [str(start)])
+        ipend = ".".join(self.addr.split(".")[:-1] + [str(start + self.param.subHostBlockSize)])
+        self.sock.send(json.dumps({
+            "result": "success",
+            "start": ipstart,
+            "end": ipend,
+        }).encode("utf-8"))
+
+    def _updateSubhost(self, jsonObj):
+        # check
+        if self.sock not in self.pObj.subhostOwnerDict:
+            self.sock.send(json.dumps({
+                "result": "error",
+                "error": "invalid source address",
+            }).encode("utf-8"))
+            return
+
+
+
+
+    def _removeSubhost(self, jsonObj):
+        pass
 
     def _cmdWakeupHost(self, mac):
         WrtUtil.shell("/usr/bin/wakeonlan -i %s %s" % (self.param.baddr, mac))
@@ -257,11 +453,33 @@ class _NotifyThread(threading.Thread):
 
 
 def _disposeClient(pobj, sock, elem_id):
-    with pobj.threadDictLock:
+    with pobj.globalLock:
         pobj.threadDict[sock][elem_id] = None
         if all(x is None for x in pobj.threadDict[sock]):
             del pobj.threadDict[sock]
             sock.close()
+
+
+class WrtApiClient:
+
+    def __init__(self, ip, port):
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            self.sock.connect((remoteIp, port))
+            self.sock.send(json.dumps({
+                "command": ""register-subhost-owner",
+            }).encode("utf-8"))
+            buf = WrtUtil.recvLine(sock).decode("utf-8")
+            jsonObj = json.loads(buf)
+            if jsonObj["result"] == "error":
+                raise Exception(jsonObj["error"])
+            for i in range(0, jsonObj["count"]):
+                t = self.vpnPlugin.get_remote_ip().split(".")
+                t[3] = str(jsonObj["start"] + i)
+                self.subHostDict[".".join(t)] = None
+        finally:
+            sock.close()
+
 
 
 _flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL

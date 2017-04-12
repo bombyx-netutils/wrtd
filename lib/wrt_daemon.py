@@ -36,9 +36,6 @@ class WrtDaemon:
             logging.getLogger().setLevel(WrtUtil.getLoggingLevel(self.param.logLevel))
             logging.info("Program begins.")
 
-            # clean up /etc/hosts
-            WrtCommon.cleanupEtcHosts()
-
             # create main loop
             DBusGMainLoop(set_as_default=True)
             self.param.mainloop = GLib.MainLoop()
@@ -86,7 +83,6 @@ class WrtDaemon:
             if self.param.wanManager is not None:
                 self.param.wanManager.dispose()
             WrtUtil.shell('/sbin/nft delete table wrtd')
-            WrtCommon.cleanupEtcHosts()
             logging.shutdown()
             shutil.rmtree(self.param.tmpDir)
 
