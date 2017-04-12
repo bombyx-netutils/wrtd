@@ -33,8 +33,8 @@ class WrtWanManager:
             cfgObj = None
             with open(cfgfile, "r") as f:
                 cfgObj = json.load(f)
-            self.wanConnPlugin = self.param.pluginManager.getWanConnTypePlugin(cfgObj["plugin"])
-            tdir = os.path.join(self.param.tmpDir, "wconn")
+            self.wanConnPlugin = self.param.pluginManager.getWanConnectionPlugin(cfgObj["plugin"])
+            tdir = os.path.join(self.param.tmpDir, "wconn-%s" % (cfgObj["plugin"]))
             os.mkdir(tdir)
             self.wanConnPlugin.init2(cfgObj, tdir, self.param.ownResolvConf)
             self.wanConnPlugin.start()
@@ -53,7 +53,7 @@ class WrtWanManager:
             with open(cfgfile, "r") as f:
                 cfgObj = json.load(f)
             self.vpnPlugin = self.param.pluginManager.getVpnPlugin(cfgObj["plugin"])
-            tdir = os.path.join(self.param.tmpDir, "wvpn")
+            tdir = os.path.join(self.param.tmpDir, "wvpn-%s" % (cfgObj["plugin"]))
             os.mkdir(tdir)
             self.vpnPlugin.init2(cfgObj, self.param.vpnIntf, tdir)
             self.vpnTimer = GObject.timeout_add_seconds(10, self._vpnTimerCallback)

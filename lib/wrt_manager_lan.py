@@ -2,11 +2,11 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
+import glob
 import dbus
 import json
 import shutil
 import socket
-import netifaces
 import subprocess
 import logging
 from wrt_util import WrtUtil
@@ -17,43 +17,13 @@ class WrtLanManager:
 
     def __init__(self, param):
         self.param = param
-        self.wifiNetworks = []
-
-        # load config
-        cfgFile = os.path.join(self.param.etcDir, "lan-wifi.json")
-        if os.path.exists(cfgFile):
-            with open(self.param.cfgFile, "r") as f:
-                for o in json.load(f):
-                    t = WrtConfigWifiNetwork()
-                    t.ssid = o["ssid"]
-                    if "password" in o:
-                        t.password = o["password"]
-                    else:
-                        t.password = ""
-                    self.wifiNetworks.append(t)
-
-        # get all LAN interfaces
-        self.intfList = netifaces.interfaces()
-        self.intfList = [x for x in self.intfList if x.startswith("en") or x.startswith("wl")]
-        if hasattr(self.param.wanManager, "wanConnPlugin"):
-            self.intfList.remove(self.param.wanManager.wanConnPlugin.getOutInterface())
-        logging.info("LAN: Got all LAN interfaces [%s]." % (", ".join(self.intfList)))
+        self.pluginList = []
 
         # create bridge interface
-        if True:
-            WrtUtil.addBridge(self.param.brname)
-            WrtUtil.setInterfaceUpDown(self.param.brname, True)
-            WrtUtil.shell('/bin/ifconfig "%s" "%s" netmask "%s"' % (self.param.brname, self.param.ip, self.param.mask))
+        WrtUtil.addBridge(self.param.brname)
+        WrtUtil.setInterfaceUpDown(self.param.brname, True)
+        WrtUtil.shell('/bin/ifconfig "%s" "%s" netmask "%s"' % (self.param.brname, self.param.ip, self.param.mask))
         logging.info("LAN: Bridge interface \"%s\" created with IP address %s/%s." % (self.param.brname, self.param.ip, self.param.mask))
-
-        # add all non-wlan interfaces into bridge
-        # start hostapd for all wlan interfaces, hostapd would add all wlan interface into bridge
-        for ifname in self.intfList:
-            if ifname.startswith("en"):
-                WrtUtil.setInterfaceUpDown(ifname, True)
-                WrtUtil.addInterfaceToBridge(self.param.brname, ifname)
-        self._runHostapd()
-        logging.info("LAN: HostAPd started.")
 
         # start dnsmasq
         self._runDnsmasq()
@@ -65,6 +35,37 @@ class WrtLanManager:
         # start SGW-API server
         self.apiServer = WrtApiServer(self.param)
         logging.info("LAN: SGW-API server started.")
+
+        # start all lan interface plugins
+        for name in self.param.pluginManager.getLanInterfacePluginList(self.param):
+            tlist = []
+            for fn in glob.glob(os.path.join(self.param.etcDir, "lan-interface-%s*.json" % name)):
+                bn = os.path.basename(fn)
+                instanceName = bn[len("lan-interface-%s" % (name)):len(".json") * -1]
+                if instanceName != "":
+                    instanceName = instanceName.lstrip("-")
+                tlist.append((instanceName, fn))
+            if len(tlist) == 0:
+                tlist.append(("", None))
+
+            for instanceName, cfgFile in tlist:
+                cfgObj = dict()
+                if cfgFile is not None:
+                    with open(cfgFile, "r") as f:
+                        cfgObj = json.load(f)
+
+                tdir = os.path.join(self.param.tmpDir, "lif-%s" % (name))
+                if instanceName != "":
+                    tdir += "-%s" % (instanceName)
+                os.mkdir(tdir)
+
+                pi = WrtLanPluginInfo()
+                pi.obj = self.param.pluginManager.getLanInterfacePlugin(name)
+                pi.intfList = []
+                self.pluginList.append(pi)
+
+                pi.obj.init2(instanceName, cfgObj, self.param.brname, tdir)
+                pi.obj.start()
 
         # add CGFW nat rules
         ret = self._addCgfwNatRules()
@@ -81,15 +82,19 @@ class WrtLanManager:
         with open("/etc/resolv.conf", "w") as f:
             f.write("")
         self._removeCgfwNatRules()
+        for pi in self.pluginList:
+            pi.stop()
         self.apiServer.dispose()
         self._stopDnsmasq()
-        self._stopHostapd()
         WrtUtil.setInterfaceUpDown(self.param.brname, False)
         WrtUtil.removeBridge(self.param.brname)
         logging.info("LAN: Terminated.")
 
     def getInterfaceList(self):
-        return self.intfList
+        ret = []
+        for pi in self.pluginList:
+            ret += pi.intfList
+        return ret
 
     def _cgfwVpnConnected(self, bFirstTime):
         if bFirstTime:
@@ -102,77 +107,6 @@ class WrtLanManager:
             self._removeCgfwNatRules()
             self._addCgfwNatRules()
             logging.info("CGFW VPN re-connected.")
-
-    def _runHostapd(self):
-        if len(self.wifiNetworks) == 0:
-            return
-
-        wlanIntfList = [x for x in self.intfList if x.startswith("wl")]
-        if len(wlanIntfList) == 0:
-            return
-        wlanIntfList = self._sortWlanIntfList(wlanIntfList)
-
-        for i in range(0, len(wlanIntfList)):
-            wlanIntf = wlanIntfList[0]
-
-            # generate hostapd configuration file
-            buf = ""
-            buf += "interface=%s\n" % (wlanIntf)
-            buf += "bridge=%s\n" % (self.param.brname)
-            buf += "\n"
-            buf += "# hardware related configuration\n"
-            buf += self._genWlanAdapterHwCfg(wlanIntf, True if i == 0 else False)
-            buf += "\n"
-            for j in range(0, len(self.wifiNetworks)):
-                wifiNet = self.wifiNetworks[j]
-                buf += "# AP %d\n" % (j + 1)
-                if j > 0:
-                    buf += "bss=%s.%d" % (wlanIntf, j + 1)      # new interface that hostapd will create for this AP
-                buf += "ssid=%s\n" % (wifiNet.ssid)
-                if wifiNet.password != "":
-                    buf += "auth_algs=1\n"                      # WPA only, WEP disallowed
-                    buf += "wpa=2\n"                            # WPA2 only
-                    buf += "wpa_key_mgmt=WPA-PSK\n"
-                    buf += "rsn_pairwise=CCMP\n"
-                    buf += "wpa_passphrase=%s\n" % (wifiNet.password)
-            buf += "\n"
-            buf += "eap_server=0\n"
-
-            # write to hostapd configuration file
-            cfgFile = os.path.join(self.param.tmpDir, "hostapd-%s.conf" % (wlanIntf))
-            with open(cfgFile, "w") as f:
-                f.write(buf)
-
-        # run hostapd process
-        cmd = "/usr/sbin/hostapd"
-        cmd += " -P %s" % (os.path.join(self.param.tmpDir, "hostapd-%s.pid" % (wlanIntf)))
-        cmd += " %s" % (os.path.join(self.param.tmpDir, "hostapd-*.conf"))
-        self.hostapdProc = subprocess.Popen(cmd, shell=True, universal_newlines=True)
-
-    def _stopHostapd(self):
-        if self.hostapdProc is not None:
-            self.hostapdProc.terminate()
-            self.hostapdProc.wait()
-            self.hostapdProc = None
-        WrtUtil.shell("/bin/rm -f %s/hostapd-*" % (self.param.tmpDir))
-
-    def _sortWlanIntfList(self, wlanIntfList):
-        return wlanIntfList
-
-    def _genWlanAdapterHwCfg(self, wlanIntf, highOrLow):
-        buf = ""
-        buf += "driver=nl80211\n"
-        # if highOrLow:
-        #     buf += "hw_mode=a\n"                        # 5GHz
-        # else:
-        #     buf += "hw_mode=g\n"                        # 2.4GHz
-        if True:
-            buf += "hw_mode=g\n"                        # 2.4GHz
-            buf += "channel=1\n"                        # it sucks that channel=0 (ACS) has bug
-        buf += "ieee80211n=1\n"
-        buf += "ieee80211ac=1\n"
-        buf += "wmm_enabled=1\n"
-        return buf
 
     def _addCgfwNatRules(self):
         self.cgfwNatRuleHandle = None
@@ -255,8 +189,8 @@ class WrtLanManager:
         shutil.rmtree(os.path.join(self.param.tmpDir, "hosts.d"))
 
 
-class WrtConfigWifiNetwork:
+class WrtLanPluginInfo:
 
     def __init__(self):
-        self.ssid = None
-        self.password = None
+        self.obj = None
+        self.intfList = []

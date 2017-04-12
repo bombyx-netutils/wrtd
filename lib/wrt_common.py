@@ -72,22 +72,31 @@ class WrtCommon:
             f.write("\n".join(lineList))
             f.write("\n")
 
-    def getWanConnTypePluginList(param):
-        return WrtCommon._getPluginList(param, "wan_conn_type")
+    def getWanConnectionPluginList(param):
+        return WrtCommon._getPluginList(param, "wconn")
 
-    def getWanConnTypePlugin(param, name):
-        ret = WrtCommon._getPlugin(param, "wan_conn_type", name)
+    def getWanConnectionPlugin(param, name):
+        ret = WrtCommon._getPlugin(param, "wconn", name)
         if ret is None:
             raise Exception("wan connection type plugin %s does not exists" % (name))
         return ret
 
     def getWanVpnPluginList(param):
-        return WrtCommon._getPluginList(param, "wan_vpn")
+        return WrtCommon._getPluginList(param, "wvpn")
 
     def getWanVpnPlugin(param, name):
-        ret = WrtCommon._getPlugin(param, "wan_vpn", name)
+        ret = WrtCommon._getPlugin(param, "wvpn", name)
         if ret is None:
             raise Exception("wan vpn plugin %s does not exists" % (name))
+        return ret
+
+    def getLanInterfacePluginList(param):
+        return WrtCommon._getPluginList(param, "lif")
+
+    def getLanInterfacePlugin(param, name):
+        ret = WrtCommon._getPlugin(param, "lif", name)
+        if ret is None:
+            raise Exception("lan interface plugin %s does not exists" % (name))
         return ret
 
     def _getPluginList(param, prefix):
@@ -127,11 +136,14 @@ class DnsMasqHostFilesLock:
         self.lockFd = None
 
 
-class PluginTemplateWanConnectionType:
+"""
+plugin module name: plugins.wconn_*
+config file: ${ETC}/wan-connection.json
+only allow one plugin be loaded
+"""
 
-    """
-    module name: plugins.wan_conn_type_*
-    """
+
+class PluginTemplateWanConnection:
 
     def init2(self, tmpDir, ownResolvConf):
         assert False
@@ -143,11 +155,14 @@ class PluginTemplateWanConnectionType:
         assert False
 
 
-class PluginTemplateVpn:
+"""
+plugin module name: plugins.wvpn_*
+config file: ${ETC}/wan-vpn.json
+only allow one plugin be loaded
+"""
 
-    """
-    module name: plugins.wan_vpn_*
-    """
+
+class PluginTemplateWanVpn:
 
     def init2(self, vpnIntf, tmpDir):
         assert False
@@ -169,3 +184,29 @@ class PluginTemplateVpn:
 
     def get_netmask(self):
         assert False
+
+
+"""
+plugin module name: plugins.lif_*
+config file: ${ETC}/lan-interface-(PLUGIN_NAME)-(INSTANCE_NAME).json
+allow multiple plugins be loaded, and one plugin can have multiple instances
+"""
+
+
+class _PluginObjectLanInterface:
+
+    def init2(self, cfg):
+        pass
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
+    def interface_appear(self, ifname):
+        # return True means we take this interface
+        pass
+
+    def interface_disappear(self, ifname):
+        pass
