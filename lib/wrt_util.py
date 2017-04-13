@@ -380,84 +380,222 @@ class NewMountNamespace:
         self.parentfd = None
 
 
-# class HostService(threading.Thread):
+class JsonApiServer:
 
-#     def __init__(self, ip="0.0.0.0", port=2300):
-#         threading.Thread.__init__(self)
+    def __init__(self, ip, port):
+        self.flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
 
-#         self.mainloop = GLib.MainLoop()
+        self.serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.serverSock.bind((ip, port))
+        self.serverSock.listen(5)
+        self.serverSock.setblocking(0)
+        self.serverSourceId = GLib.io_add_watch(self.serverSock, GLib.IO_IN | self.flagError, self._onServerAccept)
 
-#         self.serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#         self.serverSock.bind((ip, port))
-#         self.serverSock.listen(5)
-#         self.serverSock.setblocking(0)
-#         self.serverSourceId = GLib.io_add_watch(self.serverSock, GLib.IO_IN | _flagError, self._onServerAccept)
+        self.globalLock = threading.Lock()
+        self.threadDict = dict()
 
-#         self.threadSet = set()
-#         self.threadSetLock = threading.Lock()
+        self.commandDict = dict()
+        self.notifyList = []
 
-#         self.remoteIp = remoteIp
+    def addCommand(self, command, func):
+        assert command not in self.commandDict
+        self.commandDict[command] = func
 
-#     def stop(self):
-#         self.mainloop.quit()
-#         self.join()
-#         GLib.source_remove(self.serverSourceId)
-#         self.serverSock.close()
+    def addNotify(self, notify):
+        assert notify not in self.notifyList
+        self.notifyList.append(notify)
 
-#     def _onServerAccept(self, source, cb_condition):
-#         assert not (cb_condition & _flagError)
+    def dispose(self):
+        GLib.source_remove(self.serverSourceId)
+        self.serverSock.close()
 
-#         try:
-#             new_sock, addr = source.accept()
-#             with self.threadSetLock:
-#                 th = _SubHostProcessThread(self, new_sock)
-#                 self.threadSet.add(th)
-#                 th.start()
-#             return True
-#         except socket.error as e:
-#             logging.debug("_SubHostListener._onServerAccept: Failed, %s, %s", e.__class__, e)
-#             return True
+        with self.globalLock:
+            for tRecv, tSend in self.threadDict:
+                if tRecv is not None:
+                    tRecv.sock.shutdown(socket.SHUT_WR)
+                if tSend is not None:
+                    tSend.bStop = True
+        while len(self.threadDict) > 0:
+            time.sleep(1.0)
+
+    def sendNotify(self, notify, data):
+        assert notify in self.notifyList
+
+        jsonObj = dict()
+        jsonObj["notify"] = notify
+        if data is not None:
+            jsonObj["data"] = data
+
+        with self.globalLock:
+            for tRecv, tSend in self.threadDict:
+                if tSend is not None:
+                    tSend.queue.put(jsonObj)
+
+    def _onServerAccept(self, source, cb_condition):
+        assert not (cb_condition & self.flagError)
+
+        try:
+            new_sock, addr = source.accept()
+            with self.globalLock:
+                sendLock = threading.Lock()
+                tRecv = _CommandThread(self, new_sock, addr[0], sendLock)
+                tSend = _NotifyThread(self, new_sock, addr[0], sendLock)
+                self.threadDict[new_sock] = (tRecv, tSend)
+                tRecv.start()
+                tSend.Start()
+            return True
+        except socket.error as e:
+            logging.debug("JsonApiServer.onServerAccept: Failed, %s, %s", e.__class__, e)
+            return True
+
+    def _disposeClient(sock, elem_id):
+        with self.globalLock:
+            self.threadDict[sock][elem_id] = None
+            if all(x is None for x in self.threadDict[sock]):
+                del self.threadDict[sock]
+                sock.close()
 
 
-# class _SubHostProcessThread(threading.Thread):
+class _CommandThread(threading.Thread):
 
-#     def __init__(self, pObj, sock):
-#         threading.Thread.__init__(self)
-#         self.param = pObj.param
-#         self.pObj = pObj
-#         self.sock = sock
+    def __init__(self, pObj, sock, addr, sendLock):
+        threading.Thread.__init__(self)
+        self.pObj = pObj
+        self.sock = sock
+        self.addr = addr
+        self.sendLock = sendLock
 
-#     def run(self):
-#         fname = os.path.join(self.param.tmpDir, "hosts.d", "hosts.vpn")
-#         try:
-#             buf = WrtUtil.recvUntilEof(self.sock).decode("utf-8")
-#             itemList = self._jsonObj2ItemList(json.loads(buf))
-#             WrtUtil.writeDnsmasqHostFile(fname, itemList)
-#             WrtCommon.syncToEtcHosts(self.param.tmpDir)
-#         finally:
-#             with self.pObj.threadSetLock:
-#                 self.pObj.threadSet.remove(self)
-#             self.sock.close()
+    def run(self):
+        try:
+            while True:
+                buf = WrtUtil.recvLine(self.sock).decode("utf-8")
+                if len(buf) == 0:
+                    break
+                try:
+                    jsonObj = json.loads(buf)
+                    if "command" not in jsonObj:
+                        raise Exception("invalid command")
+                    if jsonObj["command"] not in self.pObj.commandDict:
+                        raise Exception("command %s not supported" % (jsonObj["command"]))
 
-#     def _jsonObj2ItemList(self, jsonObj):
-#         itemList = []
-#         for host in jsonObj:
-#             itemList.append((host["ip"], host["hostname"]))
-#         return itemList
+                    if "data" in jsonObj:
+                        self.pObj.commandDict[jsonObj["command"]]()
+                    else:
+                        self.pObj.commandDict[jsonObj["command"]](jsonObj["data"])
+                    logging.info("Process API command \"%s\" from \"%s\"", jsonObj["command"], self.addr)
+                except Exception as e:
+                    logging.error("Failed to process API command from %s, %s", self.addr, e)
+                    logging.debug("_CommandThread.run: Exception, %s, %s", e.__class__, e)
+        finally:
+            self.pObj._disposeClient(self.sock, 0)
 
 
-# _flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
+class _NotifyThread(threading.Thread):
 
-# @staticmethod
-# def getSubInterfaceByIp(ifname, ipaddr):
-#     for n in netifaces.interfaces():
-#         if re.match("%s:[0-9]+" % (ifname), n) is None:
-#             continue
-#         ret = netifaces.ifaddresses(n)
-#         if 2 not in ret:
-#             continue
-#         if "addr" not in ret[2][0]:
-#             continue
-#         if ret[2][0]["addr"] == ipaddr:
-#             return n
-#     return None
+    def __init__(self, pObj, sock, addr, sendLock):
+        threading.Thread.__init__(self)
+        self.pObj = pObj
+        self.sock = sock
+        self.addr = addr
+        self.sendLock = sendLock
+        self.queue = queue.queue()
+        self.bStop = False
+
+    def run(self):
+        try:
+            while True:
+                if self.bStop:
+                    break
+                try:
+                    jsonObj = self.queue.get(timeout=10)
+                except queue.Empty:
+                    continue
+
+                if self.bStop:
+                    break
+                try:
+                    buf = json.dumps(jsonObj)
+                    with self.sendLock:
+                        self.sock.send(buf)
+                    logging.info("Send notify \"%s\" to \"%s\"", jsonObj["notify"], self.addr)
+                except Exception as e:
+                    logging.error("Failed to send notify to %s, %s", self.addr, e)
+                    logging.debug("_NotifyThread.run: Exception, %s, %s", e.__class__, e)
+                finally:
+                    self.queue.task_done()
+        finally:
+            self.pObj._disposeClient(self.sock, 1)
+
+
+class JsonApiClient:
+
+    def __init__(self, ip, port):
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            self.sock.connect((ip, port))
+            _RecvThread(self).start()
+        except:
+            sock.close()
+            raise
+
+        self.notifyCallbackDict = dict()
+        self.queue = queue.queue()
+
+    def execCommand(self, command, data=None, timeout=None):
+        jsonObj = dict()
+        jsonObj["command"] = command
+        if data is not None:
+            jsonObj["data"] = data
+
+        buf = json.dumps(jsonObj)
+        self.sock.send(buf)
+
+        while True:
+            try:
+                jsonObj = self.queue.get(timeout=10)
+            except queue.Empty:
+                continue
+            try:
+                if "return" in jsonObj:
+                    return jsonObj["return"]
+                else:
+                    raise Exception("fixme")
+            finally:
+                self.queue.task_done()
+
+    def registerNotifyCallback(self, notify, callback):
+        self.notifyCallback[notify] = callback
+
+    def dispose(self):
+        self.sock.close()
+
+
+class _RecvThread(threading.Thread):
+
+    def __init__(self, pObj):
+        threading.Thread.__init__(self)
+        self.pObj = pObj
+
+    def run(self):
+        while True:
+            buf = WrtUtil.recvLine(self.pObj.sock).decode("utf-8")
+            if len(buf) == 0:
+                break
+            try:
+                jsonObj = json.loads(buf)
+                if "notify" in jsonObj:
+                    if jsonObj["notify"] not in self.pObj.notifyCallbackDict:
+                        raise Exception("notify %s not supported" % (jsonObj["notify"]))
+                    self.pObj.notifyCallbackDict[jsonObj["notify"]]()
+                elif "return" in jsonObj:
+                else:
+                    raise Exception("invalid content")
+
+                if "data" in jsonObj:
+                    self.pObj.commandDict[jsonObj["command"]]()
+                else:
+                    self.pObj.commandDict[jsonObj["command"]](jsonObj["data"])
+                logging.info("Process API command \"%s\" from \"%s\"", jsonObj["command"], self.addr)
+            except Exception as e:
+                logging.error("Failed to process API command from %s, %s", self.addr, e)
+                logging.debug("_CommandThread.run: Exception, %s, %s", e.__class__, e)

@@ -223,116 +223,34 @@ class WrtApiServer:
 
     def __init__(self, param):
         self.param = param
-
-        self.serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.serverSock.bind(("0.0.0.0", self.param.apiPort))
-        self.serverSock.listen(5)
-        self.serverSock.setblocking(0)
-        self.serverSourceId = GLib.io_add_watch(self.serverSock, GLib.IO_IN | _flagError, self._onServerAccept)
-
-        self.globalLock = threading.Lock()
-        self.threadDict = dict()
         self.subhostOwnerDict = dict()
 
+        self.realServer = JsonApiServer()
+        self.realServer.addCommand("get-host-list", self._cmdGetHostList)
+        self.realServer.addCommand("register-subhost-owner", self._cmdRegisterSubhostOwner)
+        self.realServer.addCommand("add-subhost", self._addSubhost)
+        self.realServer.addCommand("remove-subhost", self._removeSubhost)
+        self.realServer.addCommand("wakeup-host", self._cmdWakeupHost)
+        self.realServer.addNotify("host-appear")
+        self.realServer.addNotify("host-disappear")
+
     def dispose(self):
-        GLib.source_remove(self.serverSourceId)
-        self.serverSock.close()
-
-        with self.globalLock:
-            for tRecv, tSend in self.threadDict:
-                if tRecv is not None:
-                    tRecv.sock.shutdown(socket.SHUT_WR)
-                if tSend is not None:
-                    tSend.bStop = True
-        while len(self.threadDict) > 0:
-            time.sleep(1.0)
-
-    def _onServerAccept(self, source, cb_condition):
-        assert not (cb_condition & _flagError)
-
-        try:
-            new_sock, addr = source.accept()
-            with self.globalLock:
-                sendLock = threading.Lock()
-                tRecv = _CommandThread(self, new_sock, addr[0], sendLock)
-                tSend = _NotifyThread(self, new_sock, addr[0], sendLock)
-                self.threadDict[new_sock] = (tRecv, tSend)
-                tRecv.start()
-                tSend.Start()
-            return True
-        except socket.error as e:
-            logging.debug("WrtApiServer._onServerAccept: Failed, %s, %s", e.__class__, e)
-            return True
+        self.realServer.dispose()
 
     def notifyAppear(self, ip, hostname, wakeupMac):
-        jsonObj = dict()
-        jsonObj["notify"] = "host-appear"
-        jsonObj["data"] = dict()
-        jsonObj["data"][ip] = dict()
+        data = dict()
+        data[ip] = dict()
         if hostname is not None:
-            jsonObj["data"][ip]["hostname"] = hostname
+            data[ip]["hostname"] = hostname
         if wakeupMac is not None:
-            jsonObj["data"][ip]["wakeup-mac"] = wakeupMac
-
-        with self.globalLock:
-            for tRecv, tSend in self.threadDict:
-                if tSend is not None:
-                    tSend.queue.put(jsonObj)
+            data[ip]["wakeup-mac"] = wakeupMac
+        self.realServer.sendNotify("host-appear", data)
 
     def notifyDisappear(self, ip):
-        jsonObj = dict()
-        jsonObj["notify"] = "host-disappear"
-        jsonObj["data"] = [ip]
+        data = [ip]
+        self.realServer.sendNotify("host-disappear", data)
 
-        with self.globalLock:
-            for tRecv, tSend in self.threadDict:
-                if tSend is not None:
-                    tSend.queue.put(jsonObj)
-
-
-class _CommandThread(threading.Thread):
-
-    def __init__(self, pObj, sock, addr, sendLock):
-        threading.Thread.__init__(self)
-        self.pObj = pObj
-        self.sock = sock
-        self.addr = addr
-        self.sendLock = sendLock
-
-    def run(self):
-        try:
-            while True:
-                buf = WrtUtil.recvLine(self.sock).decode("utf-8")
-                if len(buf) == 0:
-                    break
-                try:
-                    jsonObj = json.loads(buf)
-                    self._processCommand(jsonObj)
-                    logging.info("Process API command \"%s\" from \"%s\"", jsonObj["command"], self.addr)
-                except Exception as e:
-                    logging.error("Failed to process API command from %s, %s", self.addr, e)
-                    logging.debug("_CommandThread.run: Exception, %s, %s", e.__class__, e)
-        finally:
-            _disposeClient(self.pObj, self.sock, 0)
-
-    def _processCommand(self, jsonObj):
-        if "command" not in jsonObj:
-            raise Exception("invalid command")
-
-        if jsonObj["command"] == "get-host-list":
-            self._cmdGetHostList()
-        elif jsonObj["command"] == "register-subhost-owner":
-            self._registerSubhostOwner()
-        elif jsonObj["command"] == "add-subhost":
-            self._addSubhost(jsonObj["data"])
-        elif jsonObj["command"] == "remove-subhost":
-            self._removeSubhost(jsonObj["data"])
-        elif jsonObj["command"] == "wakeup-host":
-            self._cmdWakeupHost(jsonObj["data"])
-        else:
-            raise Exception("invalid command \"%s\"" % (jsonObj["command"]))
-
-    def _cmdGetHostList(self, ostype):
+    def _cmdGetHostList(self):
         dataDict = dict()
         for fn in glob.glob(os.path.join(self.param.tmpDir, "hosts.d", "*")):
             for ip, hostname in WrtUtil.readDnsmasqHostFile(fn):
@@ -391,7 +309,7 @@ class _CommandThread(threading.Thread):
             "end": ipend,
         }).encode("utf-8"))
 
-    def _updateSubhost(self, jsonObj):
+    def _addSubhost(self, jsonObj):
         # check
         if self.sock not in self.pObj.subhostOwnerDict:
             self.sock.send(json.dumps({
@@ -399,9 +317,6 @@ class _CommandThread(threading.Thread):
                 "error": "invalid source address",
             }).encode("utf-8"))
             return
-
-
-
 
     def _removeSubhost(self, jsonObj):
         pass
@@ -415,71 +330,21 @@ class _CommandThread(threading.Thread):
             }).encode("utf-8"))
 
 
-class _NotifyThread(threading.Thread):
-
-    def __init__(self, pObj, sock, addr, sendLock):
-        threading.Thread.__init__(self)
-        self.pObj = pObj
-        self.sock = sock
-        self.addr = addr
-        self.sendLock = sendLock
-        self.queue = queue.queue()
-        self.bStop = False
-
-    def run(self):
-        try:
-            while True:
-                if self.bStop:
-                    break
-                try:
-                    jsonObj = self.queue.get(timeout=10)
-                except queue.Empty:
-                    continue
-
-                if self.bStop:
-                    break
-                try:
-                    buf = json.dumps(jsonObj)
-                    with self.sendLock:
-                        self.sock.send(buf)
-                    logging.info("Send notify \"%s\" to \"%s\"", jsonObj["notify"], self.addr)
-                except Exception as e:
-                    logging.error("Failed to send notify to %s, %s", self.addr, e)
-                    logging.debug("_NotifyThread.run: Exception, %s, %s", e.__class__, e)
-                finally:
-                    self.queue.task_done()
-        finally:
-            _disposeClient(self.pObj, self.sock, 1)
-
-
-def _disposeClient(pobj, sock, elem_id):
-    with pobj.globalLock:
-        pobj.threadDict[sock][elem_id] = None
-        if all(x is None for x in pobj.threadDict[sock]):
-            del pobj.threadDict[sock]
-            sock.close()
-
-
 class WrtApiClient:
 
     def __init__(self, ip, port):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            self.sock.connect((remoteIp, port))
-            self.sock.send(json.dumps({
-                "command": ""register-subhost-owner",
-            }).encode("utf-8"))
-            buf = WrtUtil.recvLine(sock).decode("utf-8")
-            jsonObj = json.loads(buf)
-            if jsonObj["result"] == "error":
-                raise Exception(jsonObj["error"])
-            for i in range(0, jsonObj["count"]):
-                t = self.vpnPlugin.get_remote_ip().split(".")
-                t[3] = str(jsonObj["start"] + i)
-                self.subHostDict[".".join(t)] = None
-        finally:
-            sock.close()
+        self.realClient = JsonApiClient(ip, port)
+        self.realClient.registerNotifyCallback("host-appear", self._notifyHostAppear)
+        self.realClient.registerNotifyCallback("host-disappear", self._notifyHostDisappear)
 
+    def dispose(self):
+        self.realClient.dispose()
 
+    def registerSubhostOwner(self):
+        self.realClient.execCommand("register-subhost-owner")
 
-_flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
+    def _notifyHostAppear(self, data):
+        pass
+
+    def _notifyHostDisappear(self, data):
+        pass

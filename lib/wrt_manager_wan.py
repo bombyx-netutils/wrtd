@@ -131,31 +131,12 @@ class WrtWanManager:
 
         logging.info("Establishing VPN connection.")
 
-        self.subHostListener = None
         self.subHostDict = dict()
         try:
             self.vpnPlugin.start()
 
-            # create listener and register sub-host owner
-            self.subHostListener = _SubHostListener(self, self.vpnPlugin.get_local_ip(), self.vpnPlugin.get_remote_ip())
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            try:
-                sock.connect((self.vpnPlugin.get_remote_ip(), self.param.apiPort))
-                sock.send(("register-subhosts-owner %d" % (self.subHostListener.port)).encode("utf-8"))
-                sock.shutdown(socket.SHUT_WR)
-                buf = WrtUtil.recvUntilEof(sock).decode("utf-8")
-                jsonObj = json.loads(buf)
-                if jsonObj["result"] == "error":
-                    raise Exception(jsonObj["error"])
-                for i in range(0, jsonObj["count"]):
-                    t = self.vpnPlugin.get_remote_ip().split(".")
-                    t[3] = str(jsonObj["start"] + i)
-                    self.subHostDict[".".join(t)] = None
-            finally:
-                sock.close()
-
-            # update sub-hosts
-            self._setSubHosts()
+            self.apiClient = WrtApiClient(self.vpnPlugin.get_remote_ip(), self.param.apiPort)
+            self.apiClient.registerSubhostOwner()
 
             self.vpnRestartCountDown = None
             logging.info("VPN connected.")
@@ -169,10 +150,9 @@ class WrtWanManager:
     def _stopVpn(self):
         if hasattr(self, "subHostDict"):
             del self.subHostDict
-        if hasattr(self, "subHostListener"):
-            if self.subHostListener is not None:
-                self.subHostListener.dispose()
-            del self.subHostListener
+        if hasattr(self, "apiClient"):
+            self.apiClient.dispose()
+            del self.apiClient
         self.vpnPlugin.stop()
 
     def _setSubHosts(self):
