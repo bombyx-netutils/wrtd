@@ -38,3 +38,4 @@ class WrtParam:
         self.config = None
         self.lanManager = None
         self.wanManager = None
+        self.apiServer = None

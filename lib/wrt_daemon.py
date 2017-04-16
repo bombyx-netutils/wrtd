@@ -24,7 +24,6 @@ class WrtDaemon:
     def __init__(self, param):
         self.param = param
         self.mainloop = None
-        self.apiServer = None
         self.interfaceDict = dict()
         self.interfaceTimer = None
 
@@ -63,7 +62,7 @@ class WrtDaemon:
             self.interfaceTimer = GObject.timeout_add_seconds(10, self._interfaceTimerCallback)
 
             # start API server
-            self.apiServer = WrtApiServer(self.param)
+            self.param.apiServer = WrtApiServer(self.param)
             logging.info("API server started.")
 
             # start main loop
@@ -74,8 +73,8 @@ class WrtDaemon:
             self.param.mainloop.run()
             logging.info("Mainloop exits.")
         finally:
-            if self.apiServer is not None:
-                self.apiServer.dispose()
+            if self.param.apiServer is not None:
+                self.param.apiServer.dispose()
             if self.interfaceTimer is not None:
                 GLib.source_remove(self.interfaceTimer)
             if self.param.lanManager is not None:

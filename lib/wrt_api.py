@@ -238,17 +238,23 @@ class WrtApiServer:
         self.realServer.dispose()
 
     def notifyAppear(self, ip, hostname, wakeupMac):
-        data = dict()
-        data[ip] = dict()
+        ipDataDict = dict()
+        ipDataDict[ip] = dict()
         if hostname is not None:
-            data[ip]["hostname"] = hostname
+            ipDataDict[ip]["hostname"] = hostname
         if wakeupMac is not None:
-            data[ip]["wakeup-mac"] = wakeupMac
-        self.realServer.sendNotify("host-appear", data)
+            ipDataDict[ip]["wakeup-mac"] = wakeupMac
+        self.realServer.sendNotify("host-appear", ipDataDict)
 
     def notifyDisappear(self, ip):
-        data = [ip]
-        self.realServer.sendNotify("host-disappear", data)
+        ipList = [ip]
+        self.realServer.sendNotify("host-disappear", ipList)
+
+    def notifyAppear2(self, ipDataDict):
+        self.realServer.sendNotify("host-appear", ipDataDict)
+
+    def notifyDisappear2(self, ipList):
+        self.realServer.sendNotify("host-disappear", ipList)
 
     def _cmdGetHostList(self):
         dataDict = dict()
@@ -266,19 +272,10 @@ class WrtApiServer:
                 "return": dataDict,
             }).encode("utf-8"))
 
-    def _cmdRegisterSubhostOwner(self, jsonObj):
+    def _cmdRegisterSubhostOwner(self):
         # validate source ip
-        found = False
-        for r in WrtUtil.readDnsmasqLeaseFile(os.path.join(self.param.tmpDir, "dnsmasq.leases")):
-            if r[1] == self.addr:
-                found = True
-                break
-        if not found:
-            self.sock.send(json.dumps({
-                "result": "error",
-                "error": "invalid source address",
-            }).encode("utf-8"))
-            return
+        if self.addr not in self.param.lanManager.get_clients():
+            throw Exception("invalid source address")
 
         # add subhost-owner
         with self.pObj.globalLock:
@@ -342,6 +339,12 @@ class WrtApiClient:
 
     def registerSubhostOwner(self):
         self.realClient.execCommand("register-subhost-owner")
+
+    def addSubhost(self, ipDataDict):
+        pass
+
+    def removeSubhost(self, ipList):
+        pass
 
     def _notifyHostAppear(self, data):
         pass

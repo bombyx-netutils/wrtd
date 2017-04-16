@@ -84,6 +84,51 @@ class DnsMasqHostFilesLock:
         self.lockFd = None
 
 
+class TemplateBridge:
+
+    def start(self):
+        assert False
+
+    def stop(self):
+        assert False
+
+    def get_ip(self):
+        assert False
+
+    def get_netmask(self):
+        assert False
+
+    def get_subhost_ip_range(self):
+        # return (start_ip, end_ip)
+        assert False
+
+    def on_bridge_created(self, ip):
+        assert False
+
+    def on_bridge_destroyed(self, ip):
+        assert False
+
+    def on_upstream_connected(self, ip):
+        assert False
+
+    def on_upstream_disconnected(self, ip):
+        assert False
+
+    def on_host_appear(self, ownerName, ipDataDict):
+        assert False
+
+    def on_host_disappear(self, ownerName, ipList):
+        assert False
+
+    def hosts_changed(self):
+        assert False                # fixme
+
+    def domain_nameserver_changed(self):
+        assert False                # fixme
+
+
+
+
 # plugin module name: plugins.wconn_*
 # config file: ${ETC}/wan-connection.json
 # only allow one plugin be loaded
@@ -103,10 +148,12 @@ class PluginTemplateWanConnection:
 
     def interface_appear(self, ifname):
         # return True means we take this interface
-        pass
+        # must be call after start()
+        assert False
 
     def interface_disappear(self, ifname):
-        pass
+        # must be call after start()
+        assert False
 
 
 # plugin module name: plugins.wvpn_*
@@ -142,20 +189,27 @@ class PluginTemplateWanVpn:
 # plugin module name: plugins.lif_*
 # config file: ${ETC}/lan-interface-(PLUGIN_NAME)-(INSTANCE_NAME).json
 # allow multiple plugins be loaded, and one plugin can have multiple instances
-class _PluginObjectLanInterface:
+class TemplatePluginLanInterface:
 
     def init2(self, instanceName, cfg, brname, tmpDir):
-        pass
+        assert False
 
     def start(self):
-        pass
+        assert False
 
     def stop(self):
-        pass
+        assert False
+
+    def get_bridge(self):
+        # return None means using default bridge
+        # must be call after start()
+        assert False
 
     def interface_appear(self, ifname):
         # return True means we take this interface
-        pass
+        # must be call after start()
+        assert False
 
     def interface_disappear(self, ifname):
-        pass
+        # must be call after start()
+        assert False

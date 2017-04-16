@@ -85,6 +85,42 @@ class WrtWanManager:
             logging.info("WAN: Internet connection deactivated.")
         logging.info("WAN: Terminated.")
 
+    def on_host_appear(self, ipDataDict):
+        if self.vpnPlugin is None:
+            return
+        if not hasattr(self, "apiClient"):
+            return
+
+        ipDataDict2 = dict()
+        for ip, data in ipDataDict.items():
+            empty = None
+            for k, v in self.subHostDict.items():
+                if v is None and empty is None:
+                    empty = k
+                    break
+            WrtUtil.shell("/bin/ifconfig %s add %s" % (self.vpnPlugin.get_interface(), empty))
+            self._addNftRuleVpnSubHost(ip, empty)
+            self.subHostDict[empty] = ip
+            ipDataDict2[empty] = data
+        self.apiClient.addSubhost(ipDataDict2)
+
+    def on_host_disappear(self, ipList):
+        if self.vpnPlugin is None:
+            return
+        if not hasattr(self, "apiClient"):
+            return
+
+        ipList2 = []
+        for ip in ipList:
+            for k, v in self.subHostDict.items():
+                if v == ip:
+                    self.subHostDict[k] = None
+                    self._removeNftRuleSubHost(v, k)
+                    WrtUtil.shell("/bin/ifconfig %s del %s" % (self.vpnPlugin.get_interface(), k))
+                    ipList2.append(k)
+                    break
+        self.apiClient.removeSubhost(ipList2)
+
     def _addNftRuleWan(self):
         intf = self.wanConnPlugin.get_out_interface()
         WrtUtil.shell('/sbin/nft add rule wrtd natpost oifname %s masquerade' % (intf))
@@ -110,13 +146,6 @@ class WrtWanManager:
     def _vpnTimerCallback(self):
         if self.vpnRestartCountDown is None:
             if self.vpnPlugin.is_alive():
-                # vpn is in good state
-                try:
-                    self._setSubHosts()
-                except Exception as e:
-                    self._stopVpn()
-                    self.vpnRestartCountDown = 6
-                    logging.error("VPN disconnected, %s", e)
                 return True
             else:
                 # vpn is in bad state, stop it now, restart it in the next cycle
@@ -131,13 +160,11 @@ class WrtWanManager:
 
         logging.info("Establishing VPN connection.")
 
-        self.subHostDict = dict()
         try:
             self.vpnPlugin.start()
-
             self.apiClient = WrtApiClient(self.vpnPlugin.get_remote_ip(), self.param.apiPort)
             self.apiClient.registerSubhostOwner()
-
+            self.subHostDict = dict()
             self.vpnRestartCountDown = None
             logging.info("VPN connected.")
         except Exception as e:
@@ -154,152 +181,3 @@ class WrtWanManager:
             self.apiClient.dispose()
             del self.apiClient
         self.vpnPlugin.stop()
-
-    def _setSubHosts(self):
-        clientList = []
-        if True:
-            class _Tmp:
-                pass
-            leaseFile = os.path.join(self.param.tmpDir, "dnsmasq.leases")
-            for mac, ip, hostname in WrtUtil.readDnsmasqLeaseFile(leaseFile):
-                client = _Tmp()
-                client.mac = mac
-                client.ip = ip
-                client.hostname = hostname
-                clientList.append(client)
-        changed = False
-
-        # check for remove/change
-        for k, v in self.subHostDict.items():
-            if v is None:
-                continue
-            if not any(x.ip == v[0] and x.hostname == v[1] for x in clientList):
-                print("debugr", self.subHostDict, k, v[0])
-                self._removeNftRuleSubHost(v[0], k)
-                WrtUtil.shell("/bin/ifconfig %s del %s" % (self.vpnPlugin.get_interface(), k))
-                self.subHostDict[k] = None
-                changed = True
-
-        # check for addtion
-        for client in clientList:
-            found = False
-            empty = None
-            for k, v in self.subHostDict.items():
-                if v is None:
-                    if empty is None:
-                        empty = k
-                else:
-                    if client.ip == v[0] and client.hostname == v[1]:
-                        found = True
-                        break
-            if not found and empty is not None:
-                print("debug", self.subHostDict, empty, client.ip, client.hostname)
-                WrtUtil.shell("/bin/ifconfig %s add %s" % (self.vpnPlugin.get_interface(), empty))
-                self._addNftRuleVpnSubHost(client.ip, empty)
-                self.subHostDict[empty] = (client.ip, client.hostname)
-                changed = True
-
-        # no change
-        if not changed:
-            return
-
-        # convert to json object
-        jsonObj = []
-        for k, v in self.subHostDict.items():
-            if v is None:
-                continue
-            if v[1] == "":
-                continue        # not giving hostname to us, ignore it
-            jsonObj.append({
-                "ip": k,
-                "hostname": v[1],
-            })
-
-        # update sub-hosts
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            sock.connect((self.vpnPlugin.get_remote_ip(), self.param.apiPort))
-            sock.send(("update-subhosts %s" % (json.dumps(jsonObj))).encode("utf-8"))
-            sock.shutdown(socket.SHUT_WR)
-            buf = WrtUtil.recvUntilEof(sock).decode("utf-8")
-            jsonObj = json.loads(buf)
-            if jsonObj["result"] == "error":
-                raise Exception(jsonObj["error"])
-            logging.info("Sub-hosts updated.")
-            logging.debug("Sub-hosts update: %s", json.dumps(jsonObj))
-        finally:
-            sock.close()
-
-
-class _SubHostListener:
-
-    def __init__(self, pObj, localIp, remoteIp):
-        self.param = pObj.param
-        self.pObj = pObj
-        self.port = WrtUtil.getFreeSocketPort("tcp")
-
-        self.serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.serverSock.bind((localIp, self.port))
-        self.serverSock.listen(5)
-        self.serverSock.setblocking(0)
-        self.serverSourceId = GLib.io_add_watch(self.serverSock, GLib.IO_IN | _flagError, self._onServerAccept)
-
-        self.threadSet = set()
-        self.threadSetLock = threading.Lock()
-
-        self.remoteIp = remoteIp
-
-    def dispose(self):
-        GLib.source_remove(self.serverSourceId)
-        self.serverSock.close()
-        while len(self.threadSet) > 0:
-            time.sleep(1.0)
-
-    def _onServerAccept(self, source, cb_condition):
-        assert not (cb_condition & _flagError)
-
-        try:
-            new_sock, addr = source.accept()
-            with self.threadSetLock:
-                th = _SubHostProcessThread(self, new_sock)
-                self.threadSet.add(th)
-                th.start()
-            return True
-        except socket.error as e:
-            logging.debug("_SubHostListener._onServerAccept: Failed, %s, %s", e.__class__, e)
-            return True
-
-
-class _SubHostProcessThread(threading.Thread):
-
-    def __init__(self, pObj, sock):
-        threading.Thread.__init__(self)
-        self.param = pObj.param
-        self.pObj = pObj
-        self.sock = sock
-
-    def run(self):
-        fname = os.path.join(self.param.tmpDir, "hosts.d", "hosts.vpn")
-        try:
-            buf = WrtUtil.recvUntilEof(self.sock).decode("utf-8")
-            itemList = self._jsonObj2ItemList(json.loads(buf))
-            WrtUtil.writeDnsmasqHostFile(fname, itemList)
-            self._dnsmasqReloadHosts()                          # bad design. dnsmasq belongs to LanManager. we should notify the LanManager to do dnsmasq reloading
-        finally:
-            with self.pObj.threadSetLock:
-                self.pObj.threadSet.remove(self)
-            self.sock.close()
-
-    def _dnsmasqReloadHosts(self):
-        with open(os.path.join(self.param.tmpDir, "dnsmasq.pid"), "r") as f:
-            pid = int(f.read().rstrip("\n"))
-            os.kill(pid, signal.SIGHUP)
-
-    def _jsonObj2ItemList(self, jsonObj):
-        itemList = []
-        for host in jsonObj:
-            itemList.append((host["ip"], host["hostname"]))
-        return itemList
-
-
-_flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
