@@ -159,7 +159,6 @@ class WrtWanManager:
             return True
 
         logging.info("Establishing VPN connection.")
-
         try:
             self.vpnPlugin.start()
             self.apiClient = WrtApiClient(self.vpnPlugin.get_remote_ip(), self.param.apiPort)

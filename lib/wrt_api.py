@@ -341,10 +341,10 @@ class WrtApiClient:
         self.realClient.execCommand("register-subhost-owner")
 
     def addSubhost(self, ipDataDict):
-        pass
+        self.realClient.execCommand("add-subhost", ipDataDict)
 
     def removeSubhost(self, ipList):
-        pass
+        self.realClient.execCommand("remove-subhost", ipList)
 
     def _notifyHostAppear(self, data):
         pass
