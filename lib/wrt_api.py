@@ -237,6 +237,12 @@ class WrtApiServer:
     def dispose(self):
         self.realServer.dispose()
 
+    def addClientIp(self, ip):
+        self.realServer.addClientIp(ip)
+
+    def removeClientIp(self, ip):
+        self.realServer.removeClientIp(ip)
+
     def notifyAppear(self, ip, hostname, wakeupMac):
         ipDataDict = dict()
         ipDataDict[ip] = dict()

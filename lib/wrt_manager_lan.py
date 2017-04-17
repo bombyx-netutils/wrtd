@@ -77,8 +77,12 @@ class WrtLanManager:
     def get_clients(self):
         return self.clientDict.keys()
 
-    def on_client_appear(self, sourceId, ipDataDict):
+    def on_client_appear(self, sourceBridgeId, ipDataDict):
         assert all(ip not in self.clientDict for ip in ipDataDict.keys())
+
+        # notify api server
+        for ip in ipDataDict.keys():
+            self.param.apiServer.addClientIp(ip)
 
         # notify all bridges
         # note: 1. multiple plugin can share one bridge
@@ -89,7 +93,7 @@ class WrtLanManager:
             if bridge is None:
                 bridge = self.defaultBridge
             if bridge not in doneList:
-                bridge.on_host_appear(sourceId, ipDataDict)
+                bridge.on_host_appear(sourceBridgeId, ipDataDict)
                 doneList.append(bridge)
 
         # notify downstream
@@ -103,8 +107,12 @@ class WrtLanManager:
         for ip, data in ipDataDict.items():
             self.clientDict[ip] = data
 
-    def on_client_disappear(self, sourceId, ipList):
+    def on_client_disappear(self, sourceBridgeId, ipList):
         assert all(ip in self.clientDict for ip in ipDataDict.keys())
+
+        # notify api server
+        for ip in ipList:
+            self.param.apiServer.removeClientIp(ip)
 
         # notify all bridges
         # note: 1. multiple plugin can share one bridge
@@ -115,7 +123,7 @@ class WrtLanManager:
             if bridge is None:
                 bridge = self.defaultBridge
             if bridge not in doneList:
-                bridge.on_host_disappear(sourceId, ipList)
+                bridge.on_host_disappear(sourceBridgeId, ipList)
                 doneList.append(bridge)
 
         # notify downstream

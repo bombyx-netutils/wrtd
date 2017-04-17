@@ -394,8 +394,15 @@ class JsonApiServer:
         self.globalLock = threading.Lock()
         self.threadDict = dict()
 
+        self.clientIpSet = set()
         self.commandDict = dict()
         self.notifyList = []
+
+    def addClientIp(self, ip):
+        self.clientIpSet.add(ip)
+
+    def removeClientIp(self, ip):
+        self.clientIpSet.remove(ip)
 
     def addCommand(self, command, func):
         assert command not in self.commandDict
@@ -434,19 +441,29 @@ class JsonApiServer:
     def _onServerAccept(self, source, cb_condition):
         assert not (cb_condition & self.flagError)
 
+        # accept connection
+        new_sock = None
+        addr = None
         try:
             new_sock, addr = source.accept()
-            with self.globalLock:
-                sendLock = threading.Lock()
-                tRecv = _CommandThread(self, new_sock, addr[0], sendLock)
-                tSend = _NotifyThread(self, new_sock, addr[0], sendLock)
-                self.threadDict[new_sock] = (tRecv, tSend)
-                tRecv.start()
-                tSend.Start()
-            return True
         except socket.error as e:
             logging.debug("JsonApiServer.onServerAccept: Failed, %s, %s", e.__class__, e)
             return True
+
+        # check client ip address
+        if addr[0] not in self.clientIpSet:
+            logging.debug("JsonApiServer.onServerAccept: Reject, invalid client IP address %s" % (addr[0]))
+            return True
+
+        # create threads
+        with self.globalLock:
+            sendLock = threading.Lock()
+            tRecv = _CommandThread(self, new_sock, addr[0], sendLock)
+            tSend = _NotifyThread(self, new_sock, addr[0], sendLock)
+            self.threadDict[new_sock] = (tRecv, tSend)
+            tRecv.start()
+            tSend.Start()
+        return True
 
     def _disposeClient(sock, elem_id):
         with self.globalLock:
