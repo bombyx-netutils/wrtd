@@ -92,6 +92,9 @@ class TemplateBridge:
     def stop(self):
         assert False
 
+    def get_bridge_id(self):
+        assert False
+
     def get_ip(self):
         assert False
 

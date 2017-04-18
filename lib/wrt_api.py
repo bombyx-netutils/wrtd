@@ -273,17 +273,12 @@ class WrtApiServer:
             if r[2] != "":
                 dataDict[ip]["hostname"] = r[2]
 
-        with self.sendLock:
-            self.sock.send(json.dumps({
-                "return": dataDict,
-            }).encode("utf-8"))
+        return dataDict
 
     def _cmdRegisterSubhostOwner(self):
-        # validate source ip
         if self.addr not in self.param.lanManager.get_clients():
             throw Exception("invalid source address")
 
-        # add subhost-owner
         with self.pObj.globalLock:
             if self.sock in self.pObj.subhostOwnerDict:
                 # delete subhost file  --fixme
@@ -296,30 +291,19 @@ class WrtApiServer:
                     start = s
                     break
                 if start is None:
-                    self.sock.send(json.dumps({
-                        "result": "error",
-                        "error": "too many sub-host owners",
-                    }).encode("utf-8"))
-                    return
+                    throw Exception("too many sub-host owners")
             self.pObj.subhostOwnerDict[self.sock] = start
 
-        # send response
         ipstart = ".".join(self.addr.split(".")[:-1] + [str(start)])
         ipend = ".".join(self.addr.split(".")[:-1] + [str(start + self.param.subHostBlockSize)])
-        self.sock.send(json.dumps({
-            "result": "success",
+        return {
             "start": ipstart,
             "end": ipend,
-        }).encode("utf-8"))
+        }
 
     def _addSubhost(self, jsonObj):
-        # check
         if self.sock not in self.pObj.subhostOwnerDict:
-            self.sock.send(json.dumps({
-                "result": "error",
-                "error": "invalid source address",
-            }).encode("utf-8"))
-            return
+            throw Exception("invalid source address")
 
     def _removeSubhost(self, jsonObj):
         pass
@@ -333,12 +317,21 @@ class WrtApiServer:
             }).encode("utf-8"))
 
 
+class _WrtSubhostOwnerData:
+
+    def __init__(self):
+        self.subhostDict = dict()
+
+
+
 class WrtApiClient:
 
-    def __init__(self, ip, port):
+    def __init__(self, param, ip, port):
+        self.param = param
         self.realClient = JsonApiClient(ip, port)
         self.realClient.registerNotifyCallback("host-appear", self._notifyHostAppear)
         self.realClient.registerNotifyCallback("host-disappear", self._notifyHostDisappear)
+        self.upstreamId = "vpn-%s" % (self.realClient.get_server_ip())
 
     def dispose(self):
         self.realClient.dispose()
@@ -352,8 +345,18 @@ class WrtApiClient:
     def removeSubhost(self, ipList):
         self.realClient.execCommand("remove-subhost", ipList)
 
-    def _notifyHostAppear(self, data):
-        pass
+    def _notifyHostAppear(self, ipDataDict):
+        # notify all bridges
+        for bridge in self.param.lanManager.get_bridges():
+            bridge.on_host_appear(self.upstreamId, ipDataDict)
 
-    def _notifyHostDisappear(self, data):
-        pass
+        # notify downstream
+        self.param.apiServer.notifyAppear2(ipDataDict)
+
+    def _notifyHostDisappear(self, ipList):
+        # notify all bridges
+        for bridge in self.param.lanManager.get_bridges():
+            bridge.on_host_disappear(self.upstreamId, ipList)
+
+        # notify downstream
+        self.param.apiServer.notifyDisappear2(ipList)
