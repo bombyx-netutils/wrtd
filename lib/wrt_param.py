@@ -36,6 +36,8 @@ class WrtParam:
         self.pidFile = os.path.join(self.runDir, "wrtd.pid")
         self.logLevel = None
         self.config = None
+
+        self.trafficManager = None
         self.lanManager = None
         self.wanManager = None
         self.apiServer = None

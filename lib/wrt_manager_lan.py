@@ -27,7 +27,7 @@ class WrtLanManager:
             # create default bridge
             tmpdir = os.path.join(self.param.tmpDir, "bridge-default")
             os.mkdir(tmpdir)
-            self.defaultBridge = _DefaultBridge(tmpdir, self.param.ownResolvConf)
+            self.defaultBridge = _DefaultBridge(tmpdir, self.param.trafficManager.get_l2_nameserver_port())
             self.defaultBridge.start()
             logging.info("LAN: Default bridge established.")
 
@@ -140,9 +140,9 @@ class WrtLanManager:
 
 class _DefaultBridge:
 
-    def __init__(self, tmpDir, ownResolvConf, clientAppearFunc, clientChangeFunc, clientDisappearFunc):
+    def __init__(self, tmpDir, l2DnsPort, clientAppearFunc, clientChangeFunc, clientDisappearFunc):
         self.tmpDir = tmpDir
-        self.ownResolvConf = ownResolvConf
+        self.l2DnsPort = l2DnsPort
         self.clientAppearFunc = clientAppearFunc
         self.clientChangeFunc = clientChangeFunc
         self.clientDisappearFunc = clientDisappearFunc
@@ -270,7 +270,7 @@ class _DefaultBridge:
         buf += "domain-needed\n"
         buf += "bogus-priv\n"
         buf += "no-hosts\n"
-        buf += "resolv-file=%s\n" % (self.ownResolvConf)
+        buf += "server=127.0.0.1#%d\n" % (self.l2DnsPort)
         buf += "addn-hosts=%s\n" % (self.hostsDir)                       # "hostsdir=" only adds record, no deletion, so not usable
         buf += "addn-hosts=%s\n" % (self.myhostnameFile)                 # we use addn-hosts which has no inotify, and we send SIGHUP to dnsmasq when host file changes
         buf += "\n"

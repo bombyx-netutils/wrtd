@@ -57,6 +57,7 @@ class WrtDaemon:
                 f.write("")
 
             # business initialize
+            self.param.trafficManager = WrtTrafficCop(self.param)
             self.param.wanManager = WrtWanManager(self.param)
             self.param.lanManager = WrtLanManager(self.param)
             self.interfaceTimer = GObject.timeout_add_seconds(10, self._interfaceTimerCallback)

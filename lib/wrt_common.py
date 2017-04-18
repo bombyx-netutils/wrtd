@@ -86,6 +86,9 @@ class DnsMasqHostFilesLock:
 
 class TemplateBridge:
 
+    def __init__(self, tmpDir, l2DnsPort, clientAppearFunc, clientChangeFunc, clientDisappearFunc):
+        assert False
+
     def start(self):
         assert False
 
@@ -119,13 +122,6 @@ class TemplateBridge:
 
     def on_host_disappear(self, ownerName, ipList):
         assert False
-
-    def hosts_changed(self):
-        assert False                # fixme
-
-    def domain_nameserver_changed(self):
-        assert False                # fixme
-
 
 
 
