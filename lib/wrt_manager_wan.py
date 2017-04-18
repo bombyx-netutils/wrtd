@@ -28,7 +28,11 @@ class WrtWanManager:
     def __init__(self, param):
         self.param = param
         self.wanConnPlugin = None
+
         self.vpnPlugin = None
+        self.apiClient = None
+        self.subHostDict = None                 # dict<upstream-ip, subhost-ip>
+        self.vpnRestartCountDown = None
 
         logging.info("WAN: Start.")
         try:
@@ -88,7 +92,7 @@ class WrtWanManager:
     def on_host_appear(self, ipDataDict):
         if self.vpnPlugin is None:
             return
-        if not hasattr(self, "apiClient"):
+        if self.apiClient is None:
             return
 
         ipDataDict2 = dict()
@@ -107,7 +111,7 @@ class WrtWanManager:
     def on_host_disappear(self, ipList):
         if self.vpnPlugin is None:
             return
-        if not hasattr(self, "apiClient"):
+        if self.apiClient is None:
             return
 
         ipList2 = []
@@ -164,7 +168,6 @@ class WrtWanManager:
             self.apiClient = WrtApiClient(self.vpnPlugin.get_remote_ip(), self.param.apiPort)
             self.apiClient.registerSubhostOwner()
             self.subHostDict = dict()
-            self.vpnRestartCountDown = None
             logging.info("VPN connected.")
         except Exception as e:
             self._stopVpn()
@@ -174,9 +177,10 @@ class WrtWanManager:
         return True
 
     def _stopVpn(self):
-        if hasattr(self, "subHostDict"):
-            del self.subHostDict
-        if hasattr(self, "apiClient"):
+        self.vpnRestartCountDown = None
+        self.subHostDict = None
+        if self.apiClient is not None:
             self.apiClient.dispose()
-            del self.apiClient
+            self.apiClient = None
         self.vpnPlugin.stop()
+        self.vpnPlugin = None

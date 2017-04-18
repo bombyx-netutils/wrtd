@@ -77,6 +77,16 @@ class WrtLanManager:
     def get_clients(self):
         return self.clientDict.keys()
 
+    def get_bridges(self)):
+        ret = set()
+        for plugin in self.pluginList:
+            bridge = plugin.get_bridge()
+            if bridge is None:
+                ret.add(self.defaultBridge)
+            else:
+                ret.add(bridge)
+        return list(ret)
+
     def on_client_appear(self, sourceBridgeId, ipDataDict):
         assert all(ip not in self.clientDict for ip in ipDataDict.keys())
 
@@ -87,18 +97,11 @@ class WrtLanManager:
         # notify all bridges
         # note: 1. multiple plugin can share one bridge
         #       2. the source bridge is notified either
-        doneList = []
-        for plugin in self.pluginList:
-            bridge = plugin.get_bridge()
-            if bridge is None:
-                bridge = self.defaultBridge
-            if bridge not in doneList:
-                bridge.on_host_appear(sourceBridgeId, ipDataDict)
-                doneList.append(bridge)
+        for bridge in self.get_bridges():
+            bridge.on_host_appear(sourceBridgeId, ipDataDict)
 
         # notify downstream
-        if self.param.apiServer is not None:
-            self.param.apiServer.notifyAppear2(ipDataDict)
+        self.param.apiServer.notifyAppear2(ipDataDict)
 
         # notify upstream
         self.param.wanManager.on_host_appear(ipDataDict)
@@ -117,18 +120,11 @@ class WrtLanManager:
         # notify all bridges
         # note: 1. multiple plugin can share one bridge
         #       2. the source bridge is notified either
-        doneList = []
-        for plugin in self.pluginList:
-            bridge = plugin.get_bridge()
-            if bridge is None:
-                bridge = self.defaultBridge
-            if bridge not in doneList:
-                bridge.on_host_disappear(sourceBridgeId, ipList)
-                doneList.append(bridge)
+        for bridge in self.get_bridges():
+            bridge.on_host_disappear(sourceBridgeId, ipList)
 
         # notify downstream
-        if self.param.apiServer is not None:
-            self.param.apiServer.notifyDisappear2(ipList)
+        self.param.apiServer.notifyDisappear2(ipList)
 
         # notify upstream
         self.param.wanManager.on_host_disappear(ipList)
@@ -179,6 +175,9 @@ class _DefaultBridge:
         WrtUtil.setInterfaceUpDown(self.brname, False)
         WrtUtil.removeBridge(self.brname)
 
+    def get_bridge_id(self):
+        return "bridge-" + self.ip
+
     def get_ip(self):
         return self.ip
 
@@ -204,9 +203,6 @@ class _DefaultBridge:
         os.unlink(os.path.join(self.hostsDir, id))
 
     def on_host_appear(self, sourceId, ipDataDict):
-        if sourceId == self._my_id():
-            return
-
         bChanged = False
         fn = os.path.join(self.hostsDir, sourceId)
         with open(fn, "a") as f:
@@ -219,9 +215,6 @@ class _DefaultBridge:
             self.dnsmasqProc.send_signal(signal.SIGHUP)
 
     def on_host_disappear(self, sourceId, ipList):
-        if sourceId == self._my_id():
-            return
-
         fn = os.path.join(self.hostsDir, sourceId)
         bChanged = False
 
@@ -309,7 +302,7 @@ class _DefaultBridge:
             # host disappear
             setDisappear = self.lastScanRecord - ret
             ipList = [x[1] for x in setDisappear]
-            self.clientDisappearFunc(ipList, self._my_id())
+            self.clientDisappearFunc(ipList, self.get_bridge_id())
 
             # host appear
             setAppear = ret - self.lastScanRecord
@@ -319,11 +312,8 @@ class _DefaultBridge:
                 ipDataDict[ip]["wakeup-mac"] = mac
                 if hostname != "":
                     ipDataDict[ip]["hostname"] = hostname
-            self.clientAppearFunc(ipDataDict, self._my_id())
+            self.clientAppearFunc(ipDataDict, self.get_bridge_id())
 
             self.lastScanRecord = ret
         finally:
             return True
-
-    def _my_id(self):
-        return "bridge-" + self.ip

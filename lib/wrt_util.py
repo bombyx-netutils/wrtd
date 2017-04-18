@@ -558,6 +558,9 @@ class JsonApiClient:
         self.notifyCallbackDict = dict()
         self.queue = queue.queue()
 
+    def get_server_ip(self):
+        return self.sock.getpeername()[0]
+
     def execCommand(self, command, data=None, timeout=None):
         jsonObj = dict()
         jsonObj["command"] = command
