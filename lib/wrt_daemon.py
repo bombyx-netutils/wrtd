@@ -57,15 +57,15 @@ class WrtDaemon:
             with open(self.param.ownResolvConf, "w") as f:
                 f.write("")
 
-            # start SGW API server
-            self.param.sgwApiServer = WrtSgwApiServer(self.param)
-            logging.info("API server started.")
-
             # business initialize
             self.param.trafficManager = WrtTrafficManager(self.param)
             self.param.wanManager = WrtWanManager(self.param)
             self.param.lanManager = WrtLanManager(self.param)
             self.interfaceTimer = GObject.timeout_add_seconds(10, self._interfaceTimerCallback)
+
+            # start SGW API server
+            self.param.sgwApiServer = WrtSgwApiServer(self.param)
+            logging.info("SGW-API server started.")
 
             # start main loop
             logging.info("Mainloop begins.")

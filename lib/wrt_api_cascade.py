@@ -68,7 +68,11 @@ class WrtCascadeApiServer:
         self.param = param
         self.subhostOwnerDict = dict()
 
-        self.realServer = JsonApiServer("0.0.0.0", self.param.sgwApiPort)
+        ipList = []
+        for bridge in self.param.lanManager.get_bridges():
+            ipList.append(bridget.get_ip())
+
+        self.realServer = JsonApiServer(ipList, self.param.cascadeApiPort)
         self.realServer.addCommand("register", self._cmdRegister)
         self.realServer.addCommand("add-subhost", self._addSubhost)
         self.realServer.addCommand("remove-subhost", self._removeSubhost)

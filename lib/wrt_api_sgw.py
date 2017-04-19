@@ -95,7 +95,11 @@ class WrtSgwApiServer:
         self.param = param
         self.subhostOwnerDict = dict()
 
-        self.realServer = JsonApiServer("0.0.0.0", self.param.sgwApiPort)
+        ipList = ["127.0.0.1"]
+        for bridge in self.param.lanManager.get_bridges():
+            ipList.append(bridget.get_ip())
+
+        self.realServer = JsonApiServer(ipList, self.param.sgwApiPort)
         self.realServer.addCommand("get-host-list", self._cmdGetHostList)
         self.realServer.addCommand("wakeup-host", self._cmdWakeupHost)
         self.realServer.addNotify("host-appear")

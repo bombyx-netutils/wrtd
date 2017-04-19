@@ -382,14 +382,10 @@ class NewMountNamespace:
 
 class JsonApiServer:
 
-    def __init__(self, ip, port):
+    def __init__(self, ipList, port):
         self.flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
 
-        self.serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.serverSock.bind((ip, port))
-        self.serverSock.listen(5)
-        self.serverSock.setblocking(0)
-        self.serverSourceId = GLib.io_add_watch(self.serverSock, GLib.IO_IN | self.flagError, self._onServerAccept)
+        self.serverSockList = []
 
         self.globalLock = threading.Lock()
         self.threadDict = dict()
@@ -397,6 +393,19 @@ class JsonApiServer:
         self.clientIpSet = set()
         self.commandDict = dict()
         self.notifyList = []
+
+        try:
+            for ip in ipList:
+                serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                serverSock.bind((ip, port))
+                serverSock.listen(5)
+                serverSock.setblocking(0)
+                serverSourceId = GLib.io_add_watch(serverSock, GLib.IO_IN | self.flagError, self._onServerAccept)
+                self.serverSockList.append((serverSock, serverSourceId))
+        except:
+            for serverSock, serverSourceId in self.serverSockList:
+                GLib.source_remove(serverSourceId)
+                serverSock.close()
 
     def addClientIp(self, ip):
         self.clientIpSet.add(ip)
@@ -413,8 +422,9 @@ class JsonApiServer:
         self.notifyList.append(notify)
 
     def dispose(self):
-        GLib.source_remove(self.serverSourceId)
-        self.serverSock.close()
+        for serverSock, serverSourceId in self.serverSockList:
+            GLib.source_remove(serverSourceId)
+            serverSock.close()
 
         with self.globalLock:
             for tRecv, tSend in self.threadDict:
