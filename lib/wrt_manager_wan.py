@@ -165,9 +165,18 @@ class WrtWanManager:
         logging.info("Establishing VPN connection.")
         try:
             self.vpnPlugin.start()
-            self.apiClient = WrtApiClient(self.vpnPlugin.get_remote_ip(), self.param.apiPort)
-            self.apiClient.registerSubhostOwner()
+
+            self.apiClient = WrtCascadeApiClient(self.vpnPlugin.get_remote_ip(), self.param.apiPort)
+            initData = self.apiClient.connect()
+
             self.subHostDict = dict()
+            if True:
+                ip = initData["start"]
+                while ip != initData["end"]:
+                    self.subHostDict[ip] = None
+                    ip = str(IPv4Address(ip) + 1)
+                self.subHostDict[ip] = None
+
             logging.info("VPN connected.")
         except Exception as e:
             self._stopVpn()

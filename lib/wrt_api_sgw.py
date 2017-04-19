@@ -96,10 +96,9 @@ class WrtSgwApiServer:
         self.subhostOwnerDict = dict()
 
         ipList = ["127.0.0.1"]
-        for bridge in self.param.lanManager.get_bridges():
-            ipList.append(bridget.get_ip())
-
+        ipList += [x.get_ip() for x in self.param.lanManager.get_bridges()]
         self.realServer = JsonApiServer(ipList, self.param.sgwApiPort)
+
         self.realServer.addCommand("get-host-list", self._cmdGetHostList)
         self.realServer.addCommand("wakeup-host", self._cmdWakeupHost)
         self.realServer.addNotify("host-appear")
@@ -107,12 +106,6 @@ class WrtSgwApiServer:
 
     def dispose(self):
         self.realServer.dispose()
-
-    def addClientIp(self, ip):
-        self.realServer.addClientIp(ip)
-
-    def removeClientIp(self, ip):
-        self.realServer.removeClientIp(ip)
 
     def notifyAppear(self, ip, hostname, wakeupMac):
         ipDataDict = dict()
@@ -133,7 +126,7 @@ class WrtSgwApiServer:
     def notifyDisappear2(self, ipList):
         self.realServer.sendNotify("host-disappear", ipList)
 
-    def _cmdGetHostList(self):
+    def _cmdGetHostList(self, addr):
         dataDict = dict()
         for fn in glob.glob(os.path.join(self.param.tmpDir, "hosts.d", "*")):
             for ip, hostname in WrtUtil.readDnsmasqHostFile(fn):
@@ -146,6 +139,6 @@ class WrtSgwApiServer:
 
         return dataDict
 
-    def _cmdWakeupHost(self, mac):
+    def _cmdWakeupHost(self, addr, mac):
         WrtUtil.shell("/usr/bin/wakeonlan -i %s %s" % (self.param.baddr, mac))
         return {}

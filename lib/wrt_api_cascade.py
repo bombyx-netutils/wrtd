@@ -8,16 +8,11 @@
 
 
 ################################################################################
-# Command: register
+# Init
 ################################################################################
 #
-# Request:
 # {
-#     "command": "register",
-# }
-# Response:
-# {
-#     "return": {
+#     "init": {
 #         "start": "192.168.1.100",
 #         "end": "192.168.1.200",
 #     },
@@ -60,107 +55,109 @@
 #     },
 # }
 #
-
+################################################################################
+# Notify: host-refresh
+################################################################################
+#
+# {
+#     "notify": "hosts-refresh",
+#     "data": {
+#         "1.2.3.4": {
+#             "hostname": "abcd",
+#             "wakeup-mac": "01-02-03-04-05-06",
+#         },
+#     },
+# }
+#
+# Note: Hosts belong to myself is excluded.
+#
 
 class WrtCascadeApiServer:
 
-    def __init__(self, param):
+    def __init__(self, param, bridge):
         self.param = param
+        self.bridge = bridge
+
+        self.globalLock = lock()
+        self.freeIpRange = self.bridge.get_subhost_ip_range()
         self.subhostOwnerDict = dict()
 
-        ipList = []
-        for bridge in self.param.lanManager.get_bridges():
-            ipList.append(bridget.get_ip())
+        self.realServer = JsonApiServer([bridge.get_ip()], self.param.cascadeApiPort)
 
-        self.realServer = JsonApiServer(ipList, self.param.cascadeApiPort)
-        self.realServer.addCommand("register", self._cmdRegister)
+        self.realServer.setValidClient(True)
+        self.realServer.setOneClientPerIp(True)
+
+        self.realServer.setClientInitCallback(self._clientInitCallback)
+        self.realServer.setClientTerminateCallback(self._clientTerminateCallback)
+
         self.realServer.addCommand("add-subhost", self._addSubhost)
         self.realServer.addCommand("remove-subhost", self._removeSubhost)
-        self.realServer.addNotify("host-appear")
-        self.realServer.addNotify("host-disappear")
+
+        self.realServer.addNotify("host-refresh")
 
     def dispose(self):
         self.realServer.dispose()
 
-    def addClientIp(self, ip):
-        self.realServer.addClientIp(ip)
+    def addValidClientIp(self, ip):
+        self.realServer.addValidClientIp(ip)
 
-    def removeClientIp(self, ip):
-        self.realServer.removeClientIp(ip)
+    def removeValidClientIp(self, ip):
+        self.realServer.removeValidClientIp(ip)
 
-    def notifyAppear(self, ip, hostname, wakeupMac):
-        ipDataDict = dict()
-        ipDataDict[ip] = dict()
-        if hostname is not None:
-            ipDataDict[ip]["hostname"] = hostname
-        if wakeupMac is not None:
-            ipDataDict[ip]["wakeup-mac"] = wakeupMac
-        self.realServer.sendNotify("host-appear", ipDataDict)
+    def notifyHostRefresh(self, ipDataDict):
+        self.realServer.sendNotify("host-refresh", ipDataDict)
 
-    def notifyDisappear(self, ip):
-        ipList = [ip]
-        self.realServer.sendNotify("host-disappear", ipList)
+    def _clientInitCallback(self, addr):
+        with self.globalLock:
+            if len(self.freeIpRange) == 0:
+                throw Exception("too many sub-host owners")
+            self.subhostOwnerDict[addr] = _WrtSubhostOwnerData()
+            self.subhostOwnerDict[addr].ipRange = self.freeIpRange.pop(0)
 
-    def notifyAppear2(self, ipDataDict):
-        self.realServer.sendNotify("host-appear", ipDataDict)
+        self.bridge.on_subhost_owner_connected(self._source_id(addr))
 
-    def notifyDisappear2(self, ipList):
-        self.realServer.sendNotify("host-disappear", ipList)
-
-    def _cmdRegister(self):
-        if self.addr not in self.param.lanManager.get_clients():
-            throw Exception("invalid source address")
-
-        with self.pObj.globalLock:
-            if self.sock in self.pObj.subhostOwnerDict:
-                # delete subhost file  --fixme
-                start = self.pObj.subhostOwnerDict[self.sock]
-            else:
-                start = None
-                for s in range(self.param.subHostRangeStart, self.param.subHostRangeEnd + 1, self.param.subHostBlockSize):
-                    if s in self.pObj.subhostOwnerDict.values():
-                        continue
-                    start = s
-                    break
-                if start is None:
-                    throw Exception("too many sub-host owners")
-            self.pObj.subhostOwnerDict[self.sock] = start
-
-        ipstart = ".".join(self.addr.split(".")[:-1] + [str(start)])
-        ipend = ".".join(self.addr.split(".")[:-1] + [str(start + self.param.subHostBlockSize)])
         return {
-            "start": ipstart,
-            "end": ipend,
+            "start": self.subhostOwnerDict[addr].ipRange[0],
+            "end": self.subhostOwnerDict[addr].ipRange[1],
         }
 
-    def _addSubhost(self, jsonObj):
-        if self.sock not in self.pObj.subhostOwnerDict:
-            throw Exception("invalid source address")
+    def _clientTerminateCallback(self, addr):
+        self.bridge.on_subhost_owner_disconnected(self._source_id(addr))
 
-    def _removeSubhost(self, jsonObj):
-        pass
+        with self.globalLock:
+            self.freeIpRange.append(self.subhostOwnerDict[addr].ipRange)
+            del self.subhostOwnerDict[addr]
 
-    def _cmdWakeupHost(self, mac):
-        WrtUtil.shell("/usr/bin/wakeonlan -i %s %s" % (self.param.baddr, mac))
+    def _addSubhost(self, addr, ipDataDict):
+        # record
+        for ip, data in ipDataDict:
+            self.subhostOwnerDict[addr].ipDataDict[ip] = data
 
-        with self.sendLock:
-            self.sock.send(json.dumps({
-                "return": {},
-            }).encode("utf-8"))
+        # notify my bridge
+        self.bridge.on_host_appear(self._source_id(addr), ipDataDict)
 
+        # notify other bridges
+        for bridge in self.param.lanManager.get_bridges():
+            if bridge == self.bridge:
+                continue
+            bridge.on_host_appear(self.bridge.get_bridge_id(), ipDataDict)
 
-class _WrtSubhostOwnerData:
+    def _removeSubhost(self, addr, ipList):
+        # record
+        for ip in ipList:
+            del self.subhostOwnerDict[addr].ipDataDict[ip]
 
-    def __init__(self):
-        self.subhostDict = dict()
+        # notify my bridge
+        self.bridge.on_host_disappear(self._source_id(addr), ipList)
 
+        # notify other bridges
+        for bridge in self.param.lanManager.get_bridges():
+            if bridge == self.bridge:
+                continue
+            bridge.on_host_disappear(self.bridge.get_bridge_id(), ipList)
 
-
-
-
-
-
-
+    def _source_id(self, addr):
+        return "subhost-%s" % (addr[0])
 
 
 class WrtCascadeApiClient:
@@ -168,15 +165,14 @@ class WrtCascadeApiClient:
     def __init__(self, param, ip, port):
         self.param = param
         self.realClient = JsonApiClient(ip, port)
-        self.realClient.registerNotifyCallback("host-appear", self._notifyHostAppear)
-        self.realClient.registerNotifyCallback("host-disappear", self._notifyHostDisappear)
-        self.upstreamId = "vpn-%s" % (self.realClient.get_server_ip())
+        self.realClient.registerNotifyCallback("host-refresh", self._notifyHostRefresh)
+        self.upstreamId = "upstream-%s" % (self.realClient.get_server_ip())
+
+    def connect(self):
+        return self.realClient.connect(bHasInit=True)
 
     def dispose(self):
         self.realClient.dispose()
-
-    def registerSubhostOwner(self):
-        self.realClient.execCommand("register-subhost-owner")
 
     def addSubhost(self, ipDataDict):
         self.realClient.execCommand("add-subhost", ipDataDict)
@@ -184,19 +180,19 @@ class WrtCascadeApiClient:
     def removeSubhost(self, ipList):
         self.realClient.execCommand("remove-subhost", ipList)
 
-    def _notifyHostAppear(self, ipDataDict):
+    def _notifyHostRefresh(self, ipDataDict):
         # notify all bridges
         for bridge in self.param.lanManager.get_bridges():
-            bridge.on_host_appear(self.upstreamId, ipDataDict)
+            bridge.on_host_refresh(self.upstreamId, ipDataDict)
 
-        # notify downstream
-        self.param.apiServer.notifyAppear2(ipDataDict)
+        # notify subhost owners
+        for s in self.param.cascadeApiServerList:
+            # fixme
+            s.notifyHostRefresh(ipDataDict)
 
-    def _notifyHostDisappear(self, ipList):
-        # notify all bridges
-        for bridge in self.param.lanManager.get_bridges():
-            bridge.on_host_disappear(self.upstreamId, ipList)
 
-        # notify downstream
-        self.param.apiServer.notifyDisappear2(ipList)
+class _WrtSubhostOwnerData:
 
+    def __init__(self):
+        self.ipRange = []
+        self.ipDataDict = dict()

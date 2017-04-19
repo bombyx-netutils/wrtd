@@ -390,7 +390,14 @@ class JsonApiServer:
         self.globalLock = threading.Lock()
         self.threadDict = dict()
 
+        self.bValidClient = False
         self.clientIpSet = set()
+
+        self.bOneClientPerIp = False
+
+        self.clientInitCallback = None
+        self.clientTerminateCallback = None
+
         self.commandDict = dict()
         self.notifyList = []
 
@@ -407,11 +414,27 @@ class JsonApiServer:
                 GLib.source_remove(serverSourceId)
                 serverSock.close()
 
-    def addClientIp(self, ip):
+    def setValidClient(self, value):
+        assert isinstance(value, bool)
+        self.bValidClient = value
+
+    def addValidClientIp(self, ip):
         self.clientIpSet.add(ip)
 
-    def removeClientIp(self, ip):
+    def removeValidClientIp(self, ip):
         self.clientIpSet.remove(ip)
+
+    def setOneClientPerIp(self, value)
+        assert isinstance(value, bool)
+        self.bOneClientPerIp = value
+
+    def setClientInitCallback(self, func):
+        assert self.clientInitCallback is None
+        self.clientInitCallback = func
+
+    def setClientTerminateCallback(self, func):
+        assert self.clientTerminateCallback is None
+        self.clientTerminateCallback = func
 
     def addCommand(self, command, func):
         assert command not in self.commandDict
@@ -427,15 +450,13 @@ class JsonApiServer:
             serverSock.close()
 
         with self.globalLock:
-            for tRecv, tSend in self.threadDict:
-                if tRecv is not None:
-                    tRecv.sock.shutdown(socket.SHUT_WR)
-                if tSend is not None:
-                    tSend.bStop = True
+            for sock in self.threadDict.keys():
+                self._stopClient(sock)
         while len(self.threadDict) > 0:
             time.sleep(1.0)
 
-    def sendNotify(self, notify, data):
+    def sendNotify(self, notify, data, include=None, exclude=None):
+        assert include is None or exlude is None
         assert notify in self.notifyList
 
         jsonObj = dict()
@@ -444,7 +465,16 @@ class JsonApiServer:
             jsonObj["data"] = data
 
         with self.globalLock:
-            for tRecv, tSend in self.threadDict:
+            tSendList = []
+            for k, v in self.threadDict.items():
+                if include is not None:
+                    if k.getpeeraddr() not in include:
+                        continue
+                elif exclude is not None:
+                    if k.getpeeraddr() in exclude:
+                        continue
+                tSendList.append(v[1])
+            for tSend in tSendList:
                 if tSend is not None:
                     tSend.queue.put(jsonObj)
 
@@ -461,9 +491,27 @@ class JsonApiServer:
             return True
 
         # check client ip address
-        if addr[0] not in self.clientIpSet:
-            logging.debug("JsonApiServer.onServerAccept: Reject, invalid client IP address %s" % (addr[0]))
-            return True
+        if self.bValidClient:
+            if addr[0] not in self.clientIpSet:
+                logging.debug("JsonApiServer.onServerAccept: Reject, invalid client IP address %s" % (addr[0]))
+                return True
+
+        # if only one client per ip address
+        if self.bOneClientPerIp:
+            sockList = []
+            with self.globalLock:
+                for sock in self.threadDict.keys():
+                    if sock.getpeeraddr[0] == addr[0]:
+                        sockList.append(sock)
+            for sock in sockList:
+                self._stopClient(sock)
+            while len(sockList) > 0:
+                time.sleep(1.0)
+                sockList2 = []
+                for sock in sockList:
+                    if sock in self.threadDict:
+                        sockList2.append(sock)
+                sockList = sockList2
 
         # create threads
         with self.globalLock:
@@ -473,12 +521,30 @@ class JsonApiServer:
             self.threadDict[new_sock] = (tRecv, tSend)
             tRecv.start()
             tSend.Start()
+
+        # send init object
+        if self.clientInitCallback is not None:
+            data = self.clientInitCallback(new_sock.getpeeraddr())
+            if data is not None:
+                jsonObj = dict()
+                jsonObj["init"] = data
+                tSend.queue.put(jsonObj)
+
         return True
+
+    def _stopClient(sock):
+        tRecv, tSend = self.threadDict[sock]:
+        if tRecv is not None:
+            tRecv.sock.shutdown(socket.SHUT_WR)
+        if tSend is not None:
+            tSend.bStop = True
 
     def _disposeClient(sock, elem_id):
         with self.globalLock:
             self.threadDict[sock][elem_id] = None
             if all(x is None for x in self.threadDict[sock]):
+                if self.clientTerminateCallback is not None:
+                    self.clientTerminateCallback(sock.getpeeraddr())
                 del self.threadDict[sock]
                 sock.close()
 
@@ -506,9 +572,9 @@ class _CommandThread(threading.Thread):
                         raise Exception("command %s not supported" % (jsonObj["command"]))
 
                     if "data" in jsonObj:
-                        self.pObj.commandDict[jsonObj["command"]]()
+                        self.pObj.commandDict[jsonObj["command"]](self.addr)
                     else:
-                        self.pObj.commandDict[jsonObj["command"]](jsonObj["data"])
+                        self.pObj.commandDict[jsonObj["command"]](self.addr, jsonObj["data"])
                     logging.info("Process API command \"%s\" from \"%s\"", jsonObj["command"], self.addr)
                 except Exception as e:
                     logging.error("Failed to process API command from %s, %s", self.addr, e)
@@ -557,16 +623,33 @@ class _NotifyThread(threading.Thread):
 class JsonApiClient:
 
     def __init__(self, ip, port):
+        self.sock = None
+        self.notifyCallbackDict = dict()
+        self.queue = queue.queue()
+
+    def connect(self, bHasInit=False):
+        ret = None
+
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             self.sock.connect((ip, port))
+
+            # receive init data
+            if bHasInit:
+                buf = WrtUtil.recvLine(self.sock).decode("utf-8")
+                if len(buf) == 0:
+                    raise Exception("no init data received")
+                jsonObj = json.loads(buf)
+                if "init" not in jsonObj:
+                    raise Exception("no init data received")
+                ret = jsonObj["init"]
+
             _RecvThread(self).start()
         except:
             sock.close()
             raise
 
-        self.notifyCallbackDict = dict()
-        self.queue = queue.queue()
+        return ret
 
     def get_server_ip(self):
         return self.sock.getpeername()[0]

@@ -105,7 +105,7 @@ class TemplateBridge:
         assert False
 
     def get_subhost_ip_range(self):
-        # return (start_ip, end_ip)
+        # return list(start_ip, end_ip)
         assert False
 
     def on_bridge_created(self, ip):
@@ -120,10 +120,13 @@ class TemplateBridge:
     def on_upstream_disconnected(self, ip):
         assert False
 
-    def on_host_appear(self, ownerName, ipDataDict):
+    def on_host_appear(self, sourceId, ipDataDict):
         assert False
 
-    def on_host_disappear(self, ownerName, ipList):
+    def on_host_disappear(self, sourceId, ipList):
+        assert False
+
+    def on_host_refresh(self, sourceId, ipDataDict):
         assert False
 
 

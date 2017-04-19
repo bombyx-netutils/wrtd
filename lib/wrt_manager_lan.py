@@ -90,25 +90,32 @@ class WrtLanManager:
     def on_client_appear(self, sourceBridgeId, ipDataDict):
         assert all(ip not in self.clientDict for ip in ipDataDict.keys())
 
+        # record
+        for ip, data in ipDataDict.items():
+            self.clientDict[ip] = data
+
         # notify all bridges
         for bridge in self.get_bridges():
             if sourceBridgeId == bridge.get_bridge_id():
                 continue
             bridge.on_host_appear(sourceBridgeId, ipDataDict)
 
-        # notify downstream
-        if self.param.apiServer is not None:
-            self.param.apiServer.notifyAppear2(ipDataDict)
+        # notify my clients
+        if self.param.sgwApiServer is not None:
+            self.param.sgwApiServer.notifyAppear2(ipDataDict)
+
+        # notify subhost owners
+        pass
 
         # notify upstream
         self.param.wanManager.on_host_appear(ipDataDict)
 
-        # record
-        for ip, data in ipDataDict.items():
-            self.clientDict[ip] = data
-
     def on_client_disappear(self, sourceBridgeId, ipList):
         assert all(ip in self.clientDict for ip in ipDataDict.keys())
+
+        # record
+        for ip in ipList:
+            del self.clientDict[ip]
 
         # notify all bridges
         for bridge in self.get_bridges():
@@ -116,16 +123,16 @@ class WrtLanManager:
                 continue
             bridge.on_host_disappear(sourceBridgeId, ipList)
 
-        # notify downstream
-        if self.param.apiServer is not None:
-            self.param.apiServer.notifyDisappear2(ipList)
+        # notify my clients
+        if self.param.sgwApiServer is not None:
+            self.param.sgwApiServer.notifyDisappear2(ipList)
+
+        # notify subhost owners
+        pass
 
         # notify upstream
         self.param.wanManager.on_host_disappear(ipList)
 
-        # record
-        for ip in ipList:
-            del self.clientDict[ip]
 
 
 class _DefaultBridge:
@@ -189,6 +196,13 @@ class _DefaultBridge:
     def on_bridge_destroyed(self, id):
         os.unlink(os.path.join(self.hostsDir, id))
 
+    def on_subhost_owner_connected(self, id):
+        with open(os.path.join(self.hostsDir, id), "w") as f:
+            pass
+        
+    def on_subhost_owner_disconnected(self, id):
+        os.unlink(os.path.join(self.hostsDir, id))
+
     def on_upstream_connected(self, id):
         with open(os.path.join(self.hostsDir, id), "w") as f:
             pass
@@ -227,6 +241,23 @@ class _DefaultBridge:
             with open(fn, "w") as f:
                 for line in lineList2:
                     f.write(line + "\n")
+            self.dnsmasqProc.send_signal(signal.SIGHUP)
+
+    def on_host_refresh(self, sourceId, ipDataDict):
+        fn = os.path.join(self.hostsDir, sourceId)
+
+        buf = ""
+        with open(fn, "r") as f:
+            buf = f.read()
+        
+        buf2 = ""
+        for ip, data in ipDataDict.items():
+            if "hostname" in data:
+                buf2 += ip + " " + hostname + "\n"
+
+        if buf != buf2:
+            with open(fn, "w") as f:
+                f.write(buf2)
             self.dnsmasqProc.send_signal(signal.SIGHUP)
 
     def _runDnsmasq(self):

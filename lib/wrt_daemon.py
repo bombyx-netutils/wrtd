@@ -11,13 +11,14 @@ from gi.repository import GLib
 from gi.repository import GObject
 from dbus.mainloop.glib import DBusGMainLoop
 from wrt_util import WrtUtil
-from wrt_dbus import DbusMainObject
-from wrt_dbus import DbusIpForwardObject
 from wrt_common import WrtCommon
 from wrt_manager_traffic import WrtTrafficManager
 from wrt_manager_lan import WrtLanManager
 from wrt_manager_wan import WrtWanManager
-from wrt_api_server import WrtSgwApiServer
+from wrt_api_dbus import DbusMainObject
+from wrt_api_dbus import DbusIpForwardObject
+from wrt_api_sgw import WrtSgwApiServer
+from wrt_api_cascade import WrtCascadeApiServer
 
 
 class WrtDaemon:
@@ -40,9 +41,6 @@ class WrtDaemon:
             DBusGMainLoop(set_as_default=True)
             self.param.mainloop = GLib.MainLoop()
 
-            self.param.dbusMainObject = DbusMainObject(self.param)
-            self.param.dbusIpForwardObject = DbusIpForwardObject(self.param)
-
             # write pid file
             with open(self.param.pidFile, "w") as f:
                 f.write(str(os.getpid()))
@@ -63,9 +61,19 @@ class WrtDaemon:
             self.param.lanManager = WrtLanManager(self.param)
             self.interfaceTimer = GObject.timeout_add_seconds(10, self._interfaceTimerCallback)
 
+            # start DBUS API server
+            self.param.dbusMainObject = DbusMainObject(self.param)
+            self.param.dbusIpForwardObject = DbusIpForwardObject(self.param)
+            logging.info("DBUS-API server started.")
+
             # start SGW API server
             self.param.sgwApiServer = WrtSgwApiServer(self.param)
             logging.info("SGW-API server started.")
+
+            # start CASCADE API server
+            for bridge in self.param.lanManager.get_bridges():
+                self.param.cascadeApiServerList.append(WrtCascadeApiServer(self.param, bridge))
+            logging.info("CASCADE-API servers started.")
 
             # start main loop
             logging.info("Mainloop begins.")
