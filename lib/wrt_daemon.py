@@ -14,9 +14,10 @@ from wrt_util import WrtUtil
 from wrt_dbus import DbusMainObject
 from wrt_dbus import DbusIpForwardObject
 from wrt_common import WrtCommon
-from wrt_api_server import WrtApiServer
+from wrt_manager_traffic import WrtTrafficManager
 from wrt_manager_lan import WrtLanManager
 from wrt_manager_wan import WrtWanManager
+from wrt_api_server import WrtSgwApiServer
 
 
 class WrtDaemon:
@@ -56,12 +57,12 @@ class WrtDaemon:
             with open(self.param.ownResolvConf, "w") as f:
                 f.write("")
 
-            # start API server
-            self.param.apiServer = WrtApiServer(self.param)
+            # start SGW API server
+            self.param.sgwApiServer = WrtSgwApiServer(self.param)
             logging.info("API server started.")
 
             # business initialize
-            self.param.trafficManager = WrtTrafficCop(self.param)
+            self.param.trafficManager = WrtTrafficManager(self.param)
             self.param.wanManager = WrtWanManager(self.param)
             self.param.lanManager = WrtLanManager(self.param)
             self.interfaceTimer = GObject.timeout_add_seconds(10, self._interfaceTimerCallback)
@@ -74,8 +75,8 @@ class WrtDaemon:
             self.param.mainloop.run()
             logging.info("Mainloop exits.")
         finally:
-            if self.param.apiServer is not None:
-                self.param.apiServer.dispose()
+            if self.param.sgwApiServer is not None:
+                self.param.sgwApiServer.dispose()
             if self.interfaceTimer is not None:
                 GLib.source_remove(self.interfaceTimer)
             if self.param.lanManager is not None:

@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
-class WrtTrafficCop:
+class WrtTrafficManager:
 
     def __init__(self, param):
         self.param = param
@@ -11,27 +11,25 @@ class WrtTrafficCop:
         self.dnsPort = None
         self.dnsmasqProc = None
 
-        logging.info("TCOP: Start.")
+        self.ownerDict = dict()
+
+        logging.info("TMAN: Start.")
 
         self._runDnsmasq()
-        logging.info("TCOP: Level 2 nameserver started.")
+        logging.info("TMAN: Level 2 nameserver started.")
 
     def dispose(self):
         self._stopDnsmasq()
-        logging.info("TCOP: Terminated.")
+        logging.info("TMAN: Terminated.")
 
     def get_l2_nameserver_port(self):
         return self.dnsPort
 
-    def add_host_entry(self, domain, ip):
-        pass
+    def set_data(self, owner, data):
+        self.ownerDict[owner] = data
 
-    def add_domain_nameserver(self):
-        pass
-
-
-
-
+    def delete_data(self, owner):
+        delete self.ownerDict[owner]
 
     def _runDnsmasq(self):
         self.dnsPort = WrtUtil.getFreeSocketPort("tcp")
@@ -67,3 +65,12 @@ class WrtTrafficCop:
             self.dnsmasqProc = None
         os.unlink(self.pidFile)
         os.unlink(self.cfgFile)
+
+
+class WrtTrafficManagerData:
+
+    def __init__(self):
+        self.domainIpDict = dict()                  # <domain-name, ip-address>
+        self.domainNsDict = dict()                  # <domain-name, nameserver-list>
+        self.webTransparentProxyDict = dict()       # <url-source, url-target>
+        self.routeDict = dict()                     # <prefix, (nexthop, interface)>

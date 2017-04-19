@@ -28,7 +28,9 @@ class WrtParam:
         self.baddr = "192.168.2.255"
         self.dhcpRange = ("192.168.2.2", "192.168.2.50")
 
-        self.apiPort = 2220
+        self.sgwApiPort = 2220
+
+        self.cascadeApiPort = 2221
         self.subHostRangeStart = 51
         self.subHostRangeEnd = 250
         self.subHostBlockSize = 50
@@ -40,4 +42,4 @@ class WrtParam:
         self.trafficManager = None
         self.lanManager = None
         self.wanManager = None
-        self.apiServer = None
+        self.sgwApiServer = None

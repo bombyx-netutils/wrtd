@@ -90,18 +90,15 @@ class WrtLanManager:
     def on_client_appear(self, sourceBridgeId, ipDataDict):
         assert all(ip not in self.clientDict for ip in ipDataDict.keys())
 
-        # notify api server
-        for ip in ipDataDict.keys():
-            self.param.apiServer.addClientIp(ip)
-
         # notify all bridges
-        # note: 1. multiple plugin can share one bridge
-        #       2. the source bridge is notified either
         for bridge in self.get_bridges():
+            if sourceBridgeId == bridge.get_bridge_id():
+                continue
             bridge.on_host_appear(sourceBridgeId, ipDataDict)
 
         # notify downstream
-        self.param.apiServer.notifyAppear2(ipDataDict)
+        if self.param.apiServer is not None:
+            self.param.apiServer.notifyAppear2(ipDataDict)
 
         # notify upstream
         self.param.wanManager.on_host_appear(ipDataDict)
@@ -113,18 +110,15 @@ class WrtLanManager:
     def on_client_disappear(self, sourceBridgeId, ipList):
         assert all(ip in self.clientDict for ip in ipDataDict.keys())
 
-        # notify api server
-        for ip in ipList:
-            self.param.apiServer.removeClientIp(ip)
-
         # notify all bridges
-        # note: 1. multiple plugin can share one bridge
-        #       2. the source bridge is notified either
         for bridge in self.get_bridges():
+            if sourceBridgeId == bridge.get_bridge_id():
+                continue
             bridge.on_host_disappear(sourceBridgeId, ipList)
 
         # notify downstream
-        self.param.apiServer.notifyDisappear2(ipList)
+        if self.param.apiServer is not None:
+            self.param.apiServer.notifyDisappear2(ipList)
 
         # notify upstream
         self.param.wanManager.on_host_disappear(ipList)
