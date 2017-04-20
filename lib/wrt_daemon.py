@@ -134,7 +134,10 @@ class WrtDaemon:
 
                 # lan interface plugin
                 for plugin in self.param.lanManager.pluginList:
-                    if plugin.interface_appear(intf):
+                    bridge = plugin.get_bridge()
+                    if bridge is None:
+                        bridge = self.param.lanManager.defaultBridge
+                    if plugin.interface_appear(bridge, intf):
                         self.interfaceDict[intf] = plugin
                         break
                 if intf in self.interfaceDict:

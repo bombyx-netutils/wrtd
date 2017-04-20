@@ -204,7 +204,7 @@ class TemplatePluginLanInterface:
         # must be call after start()
         assert False
 
-    def interface_appear(self, brname, ifname):
+    def interface_appear(self, bridge, ifname):
         # return True means we take this interface
         # must be call after start()
         assert False
