@@ -86,13 +86,10 @@ class DnsMasqHostFilesLock:
 
 class TemplateBridge:
 
-    def __init__(self, tmpDir, l2DnsPort, clientAppearFunc, clientChangeFunc, clientDisappearFunc):
+    def init2(self, l2DnsPort, clientAppearFunc, clientChangeFunc, clientDisappearFunc):
         assert False
 
-    def start(self):
-        assert False
-
-    def stop(self):
+    def dispose(self):
         assert False
 
     def get_bridge_id(self):
