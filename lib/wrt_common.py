@@ -190,7 +190,7 @@ class PluginTemplateWanVpn:
 # allow multiple plugins be loaded, and one plugin can have multiple instances
 class TemplatePluginLanInterface:
 
-    def init2(self, instanceName, cfg, brname, tmpDir):
+    def init2(self, instanceName, cfg, tmpDir):
         assert False
 
     def start(self):
