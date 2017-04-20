@@ -4,15 +4,13 @@
 import os
 import re
 import json
-import time
-import signal
-import socket
 import logging
-import threading
+import ipaddress
 from gi.repository import GLib
 from gi.repository import GObject
 from wrt_util import WrtUtil
 from wrt_common import WrtCommon
+from wrt_api_cascade import WrtCascadeApiClient
 
 
 class WrtWanManager:
@@ -174,7 +172,7 @@ class WrtWanManager:
                 ip = initData["subhost-start"]
                 while ip != initData["subhost-end"]:
                     self.subHostDict[ip] = None
-                    ip = str(IPv4Address(ip) + 1)
+                    ip = str(ipaddress.IPv4Address(ip) + 1)
                 self.subHostDict[ip] = None
 
             logging.info("VPN connected.")

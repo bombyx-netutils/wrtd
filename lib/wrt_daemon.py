@@ -3,6 +3,7 @@
 
 import os
 import sys
+import json
 import signal
 import shutil
 import logging
@@ -11,7 +12,6 @@ from gi.repository import GLib
 from gi.repository import GObject
 from dbus.mainloop.glib import DBusGMainLoop
 from wrt_util import WrtUtil
-from wrt_common import WrtCommon
 from wrt_manager_traffic import WrtTrafficManager
 from wrt_manager_lan import WrtLanManager
 from wrt_manager_wan import WrtWanManager

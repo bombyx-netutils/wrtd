@@ -1,10 +1,9 @@
 #!/usr/bin/python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
-
-
-
-
+import threading
+from wrt_util import JsonApiServer
+from wrt_util import JsonApiClient
 
 
 ################################################################################
@@ -82,7 +81,7 @@ class WrtCascadeApiServer:
         self.param = param
         self.bridge = bridge
 
-        self.globalLock = lock()
+        self.globalLock = threading.Lock()
         self.freeIpRange = self.bridge.get_subhost_ip_range()
         self.subhostOwnerDict = dict()
 
@@ -114,7 +113,7 @@ class WrtCascadeApiServer:
     def _clientInitCallback(self, addr):
         with self.globalLock:
             if len(self.freeIpRange) == 0:
-                throw Exception("too many sub-host owners")
+                raise Exception("too many sub-host owners")
             self.subhostOwnerDict[addr] = _WrtSubhostOwnerData()
             self.subhostOwnerDict[addr].ipRange = self.freeIpRange.pop(0)
 

@@ -34,4 +34,4 @@ class WrtParam:
         self.lanManager = None
         self.wanManager = None
         self.sgwApiServer = None
-        self.cascadeApiServerList = []]
+        self.cascadeApiServerList = []

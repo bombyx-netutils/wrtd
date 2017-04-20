@@ -3,12 +3,15 @@
 
 import os
 import glob
-import dbus
+import signal
 import json
 import shutil
 import socket
 import subprocess
 import logging
+import ipaddress
+from gi.repository import GLib
+from gi.repository import GObject
 from wrt_util import WrtUtil
 from wrt_common import WrtCommon
 
@@ -82,7 +85,7 @@ class WrtLanManager:
     def get_clients(self):
         return self.clientDict.keys()
 
-    def get_bridges(self)):
+    def get_bridges(self):
         ret = set()
         for plugin in self.pluginList:
             bridge = plugin.get_bridge()
@@ -119,7 +122,7 @@ class WrtLanManager:
         assert False
 
     def on_client_disappear(self, sourceBridgeId, ipList):
-        assert all(ip in self.clientDict for ip in ipDataDict.keys())
+        assert all(ip in self.clientDict for ip in ipList)
 
         # record
         for ip in ipList:
@@ -142,7 +145,6 @@ class WrtLanManager:
         self.param.wanManager.on_host_disappear(ipList)
 
 
-
 class _DefaultBridge:
 
     def __init__(self, tmpDir):
@@ -153,10 +155,10 @@ class _DefaultBridge:
         self.clientDisappearFunc = None
 
         self.brname = "wrtd-br"
-        self.ip = str(IPv4Address(self.param.prefix) + 1)
+        self.ip = str(ipaddress.IPv4Address(self.param.prefix) + 1)
         self.mask = "255.255.255.0"
-        self.dhcpStart = str(IPv4Address(self.param.prefix) + 2)
-        self.dhcpEnd = str(IPv4Address(self.param.prefix) + 50)
+        self.dhcpStart = str(ipaddress.IPv4Address(self.param.prefix) + 2)
+        self.dhcpEnd = str(ipaddress.IPv4Address(self.param.prefix) + 50)
 
         self.myhostnameFile = os.path.join(self.tmpDir, "dnsmasq.myhostname")
         self.hostsDir = os.path.join(self.tmpDir, "hosts.d")
@@ -166,7 +168,7 @@ class _DefaultBridge:
         self.leaseScanTimer = None
         self.lastScanRecord = None
 
-    def init2(self, l2DnsPort, clientAppearFunc, clientChangeFunc, clientDisappearFunc)
+    def init2(self, l2DnsPort, clientAppearFunc, clientChangeFunc, clientDisappearFunc):
         self.l2DnsPort = l2DnsPort
         self.clientAppearFunc = clientAppearFunc
         self.clientChangeFunc = clientChangeFunc
@@ -205,21 +207,21 @@ class _DefaultBridge:
 
     def on_other_bridge_created(self, id):
         with open(os.path.join(self.hostsDir, id), "w") as f:
-            pass
+            f.write("")
 
     def on_other_bridge_destroyed(self, id):
         os.unlink(os.path.join(self.hostsDir, id))
 
     def on_subhost_owner_connected(self, id):
         with open(os.path.join(self.hostsDir, id), "w") as f:
-            pass
-        
+            f.write("")
+
     def on_subhost_owner_disconnected(self, id):
         os.unlink(os.path.join(self.hostsDir, id))
 
     def on_upstream_connected(self, id):
         with open(os.path.join(self.hostsDir, id), "w") as f:
-            pass
+            f.write("")
 
     def on_upstream_disconnected(self, id):
         os.unlink(os.path.join(self.hostsDir, id))
@@ -230,7 +232,7 @@ class _DefaultBridge:
         with open(fn, "a") as f:
             for ip, data in ipDataDict.items():
                 if "hostname" in data:
-                    f.write(ip + " " + hostname + "\n")
+                    f.write(ip + " " + data["hostname"] + "\n")
                     bChanged = True
 
         if bChanged:
@@ -246,7 +248,7 @@ class _DefaultBridge:
 
         lineList2 = []
         for line in lineList:
-            if ip != line.split(" ")[0]:
+            if line.split(" ")[0] not in ipList:
                 lineList2.append(line)
             else:
                 bChanged = True
@@ -263,11 +265,11 @@ class _DefaultBridge:
         buf = ""
         with open(fn, "r") as f:
             buf = f.read()
-        
+
         buf2 = ""
         for ip, data in ipDataDict.items():
             if "hostname" in data:
-                buf2 += ip + " " + hostname + "\n"
+                buf2 += ip + " " + data["hostname"] + "\n"
 
         if buf != buf2:
             with open(fn, "w") as f:

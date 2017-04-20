@@ -127,7 +127,6 @@ class TemplateBridge:
         assert False
 
 
-
 # plugin module name: plugins.wconn_*
 # config file: ${ETC}/wan-connection.json
 # only allow one plugin be loaded

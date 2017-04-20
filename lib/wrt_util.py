@@ -4,8 +4,10 @@
 import os
 import re
 import sys
+import json
 import socket
 import shutil
+import time
 import struct
 import fcntl
 import ipaddress
@@ -13,6 +15,9 @@ import logging
 import ctypes
 import errno
 import subprocess
+import threading
+from collections import queue
+from gi.repository import GLib
 
 
 class WrtUtil:
@@ -424,7 +429,7 @@ class JsonApiServer:
     def removeValidClientIp(self, ip):
         self.clientIpSet.remove(ip)
 
-    def setOneClientPerIp(self, value)
+    def setOneClientPerIp(self, value):
         assert isinstance(value, bool)
         self.bOneClientPerIp = value
 
@@ -456,7 +461,7 @@ class JsonApiServer:
             time.sleep(1.0)
 
     def sendNotify(self, notify, data, include=None, exclude=None):
-        assert include is None or exlude is None
+        assert include is None or exclude is None
         assert notify in self.notifyList
 
         jsonObj = dict()
@@ -532,14 +537,14 @@ class JsonApiServer:
 
         return True
 
-    def _stopClient(sock):
-        tRecv, tSend = self.threadDict[sock]:
+    def _stopClient(self, sock):
+        tRecv, tSend = self.threadDict[sock]
         if tRecv is not None:
             tRecv.sock.shutdown(socket.SHUT_WR)
         if tSend is not None:
             tSend.bStop = True
 
-    def _disposeClient(sock, elem_id):
+    def _disposeClient(self, sock, elem_id):
         with self.globalLock:
             self.threadDict[sock][elem_id] = None
             if all(x is None for x in self.threadDict[sock]):
@@ -623,6 +628,8 @@ class _NotifyThread(threading.Thread):
 class JsonApiClient:
 
     def __init__(self, ip, port):
+        self.ip = ip
+        self.port = port
         self.sock = None
         self.notifyCallbackDict = dict()
         self.queue = queue.queue()
@@ -632,7 +639,7 @@ class JsonApiClient:
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
-            self.sock.connect((ip, port))
+            self.sock.connect((self.ip, self.port))
 
             # receive init data
             if bHasInit:
@@ -646,7 +653,7 @@ class JsonApiClient:
 
             _RecvThread(self).start()
         except:
-            sock.close()
+            self.sock.close()
             raise
 
         return ret
@@ -701,14 +708,9 @@ class _RecvThread(threading.Thread):
                         raise Exception("notify %s not supported" % (jsonObj["notify"]))
                     self.pObj.notifyCallbackDict[jsonObj["notify"]]()
                 elif "return" in jsonObj:
+                    self.queue.put(jsonObj["return"])
                 else:
                     raise Exception("invalid content")
-
-                if "data" in jsonObj:
-                    self.pObj.commandDict[jsonObj["command"]]()
-                else:
-                    self.pObj.commandDict[jsonObj["command"]](jsonObj["data"])
-                logging.info("Process API command \"%s\" from \"%s\"", jsonObj["command"], self.addr)
             except Exception as e:
                 logging.error("Failed to process API command from %s, %s", self.addr, e)
                 logging.debug("_CommandThread.run: Exception, %s, %s", e.__class__, e)

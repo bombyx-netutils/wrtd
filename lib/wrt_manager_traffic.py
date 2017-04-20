@@ -1,6 +1,12 @@
 #!/usr/bin/python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
+import os
+import logging
+import subprocess
+from wrt_util import WrtUtil
+
+
 class WrtTrafficManager:
 
     def __init__(self, param):
@@ -29,7 +35,7 @@ class WrtTrafficManager:
         self.ownerDict[owner] = data
 
     def delete_data(self, owner):
-        delete self.ownerDict[owner]
+        del self.ownerDict[owner]
 
     def _runDnsmasq(self):
         self.dnsPort = WrtUtil.getFreeSocketPort("tcp")

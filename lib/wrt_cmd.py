@@ -2,12 +2,9 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
-import dbus
-import random
-import zipfile
-import socket
-from OpenSSL import crypto
+import glob
 from wrt_util import WrtUtil
+from wrt_common import WrtCommon
 
 
 class SnSubCmdMain:
@@ -21,11 +18,11 @@ class SnSubCmdMain:
 
         iplist = []
         for fn in glob.glob(os.path.join(self.param.tmpDir, "vpn-*-self.hosts")):
-            for ip, hostname in FcsUtil.readDnsmasqHostFile(fn):
+            for ip, hostname in WrtUtil.readDnsmasqHostFile(fn):
                 self._showOneClient(ip, hostname)
                 iplist.append(ip)
         for fn in glob.glob(os.path.join(self.param.tmpDir, "*.leases")):
-            for mac, ip, hostname in FcsUtil.readDnsmasqLeaseFile(fn):
+            for mac, ip, hostname in WrtUtil.readDnsmasqLeaseFile(fn):
                 if ip in iplist:
                     continue
                 assert hostname is ""
@@ -41,13 +38,13 @@ class SnSubCmdMain:
             print(hostnameStr)
         else:
             print(hostnameStr + ":")
-            for sip, shostname in FcsUtil.readDnsmasqHostFile(fname):
+            for sip, shostname in WrtUtil.readDnsmasqHostFile(fname):
                 print("    " + shostname + " (" + sip + ")")
 
     def cmdGenerateClientScript(self, ostype):
-        if not FcsCommon.isInitialized(self.param):
+        if not WrtCommon.isInitialized(self.param):
             raise Exception("not initialized")
 
-        fn, buf = FcsCommon.generateClientScript(self.param, ostype)
+        fn, buf = WrtCommon.generateClientScript(self.param, ostype)
         with open(fn, "w") as f:
             f.write(buf)
