@@ -171,8 +171,8 @@ class WrtWanManager:
 
             self.subHostDict = dict()
             if True:
-                ip = initData["start"]
-                while ip != initData["end"]:
+                ip = initData["subhost-start"]
+                while ip != initData["subhost-end"]:
                     self.subHostDict[ip] = None
                     ip = str(IPv4Address(ip) + 1)
                 self.subHostDict[ip] = None

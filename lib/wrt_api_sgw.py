@@ -140,5 +140,6 @@ class WrtSgwApiServer:
         return dataDict
 
     def _cmdWakeupHost(self, addr, mac):
-        WrtUtil.shell("/usr/bin/wakeonlan -i %s %s" % (self.param.baddr, mac))
-        return {}
+        assert False
+        # WrtUtil.shell("/usr/bin/wakeonlan -i %s %s" % (self.param.baddr, mac))
+        # return {}

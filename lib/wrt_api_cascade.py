@@ -13,8 +13,12 @@
 #
 # {
 #     "init": {
-#         "start": "192.168.1.100",
-#         "end": "192.168.1.200",
+#         "upstream-ip-list": [
+#             "1.1.1.1",
+#             "1.2.3.4",
+#         ]
+#         "subhost-start": "192.168.1.100",
+#         "subhost-end": "192.168.1.200",
 #     },
 # }
 #
@@ -117,8 +121,8 @@ class WrtCascadeApiServer:
         self.bridge.on_subhost_owner_connected(self._source_id(addr))
 
         return {
-            "start": self.subhostOwnerDict[addr].ipRange[0],
-            "end": self.subhostOwnerDict[addr].ipRange[1],
+            "subhost-start": self.subhostOwnerDict[addr].ipRange[0],
+            "subhost-end": self.subhostOwnerDict[addr].ipRange[1],
         }
 
     def _clientTerminateCallback(self, addr):

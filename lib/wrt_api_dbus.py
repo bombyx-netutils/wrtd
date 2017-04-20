@@ -33,11 +33,17 @@ class DbusMainObject(dbus.service.Object):
 
     @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='s')
     def GetIp(self):
-        return self.param.ip
+        if self.param.lanManager is None:
+            return None
+        else:
+            return self.param.lanManager.defaultBridge.get_ip()
 
     @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='s')
     def GetMask(self):
-        return self.param.mask
+        if self.param.lanManager is None:
+            return None
+        else:
+            return self.param.lanManager.defaultBridge.get_mask()
 
     @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='a(sssb)')
     def GetClients(self):

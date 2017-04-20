@@ -57,7 +57,7 @@ class WrtLanManager:
                     p = WrtCommon.getLanInterfacePlugin(self.param, name)
                     self.pluginList.append(p)
 
-                    p.init2(instanceName, cfgObj, self.param.brname, tdir)
+                    p.init2(instanceName, cfgObj, tdir)
                     p.start()
                     if p.get_bridge() is not None:
                         p.get_bridge().init2(self.param.trafficManager.get_l2_nameserver_port(), self.on_client_appear, self.on_client_change, self.on_client_disappear)
@@ -153,9 +153,10 @@ class _DefaultBridge:
         self.clientDisappearFunc = None
 
         self.brname = "wrtd-br"
-        self.ip = "192.168.2.1"
+        self.ip = str(IPv4Address(self.param.prefix) + 1)
         self.mask = "255.255.255.0"
-        self.dhcpRange = ("192.168.2.2", "192.168.2.50")
+        self.dhcpStart = str(IPv4Address(self.param.prefix) + 2)
+        self.dhcpEnd = str(IPv4Address(self.param.prefix) + 50)
 
         self.myhostnameFile = os.path.join(self.tmpDir, "dnsmasq.myhostname")
         self.hostsDir = os.path.join(self.tmpDir, "hosts.d")
@@ -288,14 +289,14 @@ class _DefaultBridge:
         # generate dnsmasq config file
         buf = ""
         buf += "strict-order\n"
-        buf += "bind-interfaces\n"                            # don't listen on 0.0.0.0
+        buf += "bind-interfaces\n"                                       # don't listen on 0.0.0.0
         buf += "interface=lo,%s\n" % (self.brname)
         buf += "user=root\n"
         buf += "group=root\n"
         buf += "\n"
         buf += "dhcp-authoritative\n"
-        buf += "dhcp-range=%s,%s,%s,360\n" % (self.param.dhcpRange[0], self.param.dhcpRange[1], self.param.mask)
-        buf += "dhcp-option=option:T1,180\n"                                    # strange that dnsmasq's T1=165s, change to 180s which complies to RFC
+        buf += "dhcp-range=%s,%s,%s,360\n" % (self.dhcpStart, self.dhcpEnd, self.mask)
+        buf += "dhcp-option=option:T1,180\n"                             # strange that dnsmasq's T1=165s, change to 180s which complies to RFC
         buf += "dhcp-leasefile=%s\n" % (self.leasesFile)
         buf += "\n"
         buf += "domain-needed\n"

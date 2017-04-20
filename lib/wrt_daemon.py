@@ -37,6 +37,16 @@ class WrtDaemon:
             logging.getLogger().setLevel(WrtUtil.getLoggingLevel(self.param.logLevel))
             logging.info("Program begins.")
 
+            # load config
+            cfgfile = os.path.join(self.param.etcDir, "global.json")
+            if not os.path.exists(cfgfile):
+                raise Exception("no global.json found")
+            cfgObj = None
+            with open(cfgfile, "r") as f:
+                cfgObj = json.load(f)
+            self.param.prefix = cfgObj["prefix"]
+            logging.info("Configuration loaded.")
+
             # create main loop
             DBusGMainLoop(set_as_default=True)
             self.param.mainloop = GLib.MainLoop()
