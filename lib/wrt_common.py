@@ -108,10 +108,10 @@ class TemplateBridge:
         # return list(start_ip, end_ip)
         assert False
 
-    def on_bridge_created(self, ip):
+    def on_other_bridge_created(self, ip):
         assert False
 
-    def on_bridge_destroyed(self, ip):
+    def on_other_bridge_destroyed(self, ip):
         assert False
 
     def on_upstream_connected(self, ip):

@@ -189,11 +189,11 @@ class _DefaultBridge:
         # return (start_ip, ip_number, count)
         assert False
 
-    def on_bridge_created(self, id):
+    def on_other_bridge_created(self, id):
         with open(os.path.join(self.hostsDir, id), "w") as f:
             pass
 
-    def on_bridge_destroyed(self, id):
+    def on_other_bridge_destroyed(self, id):
         os.unlink(os.path.join(self.hostsDir, id))
 
     def on_subhost_owner_connected(self, id):
