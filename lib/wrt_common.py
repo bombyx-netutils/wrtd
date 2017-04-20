@@ -86,13 +86,10 @@ class DnsMasqHostFilesLock:
 
 class TemplateBridge:
 
-    def __init__(self, tmpDir, l2DnsPort, clientAppearFunc, clientChangeFunc, clientDisappearFunc):
+    def init2(self, l2DnsPort, clientAppearFunc, clientChangeFunc, clientDisappearFunc):
         assert False
 
-    def start(self):
-        assert False
-
-    def stop(self):
+    def dispose(self):
         assert False
 
     def get_bridge_id(self):
@@ -193,7 +190,7 @@ class PluginTemplateWanVpn:
 # allow multiple plugins be loaded, and one plugin can have multiple instances
 class TemplatePluginLanInterface:
 
-    def init2(self, instanceName, cfg, brname, tmpDir):
+    def init2(self, instanceName, cfg, tmpDir):
         assert False
 
     def start(self):
@@ -207,7 +204,7 @@ class TemplatePluginLanInterface:
         # must be call after start()
         assert False
 
-    def interface_appear(self, ifname):
+    def interface_appear(self, bridge, ifname):
         # return True means we take this interface
         # must be call after start()
         assert False
