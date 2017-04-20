@@ -160,6 +160,14 @@ class _DefaultBridge:
         self.dhcpStart = str(ipaddress.IPv4Address(self.param.prefix) + 2)
         self.dhcpEnd = str(ipaddress.IPv4Address(self.param.prefix) + 50)
 
+        self.subhostIpRange = []
+        i = 51
+        while i + 49 < 255:
+            s = str(ipaddress.IPv4Address(self.param.prefix) + i)
+            e = str(ipaddress.IPv4Address(self.param.prefix) + i + 49)
+            self.subhostIpRange.append((s, e))
+            i += 50
+
         self.myhostnameFile = os.path.join(self.tmpDir, "dnsmasq.myhostname")
         self.hostsDir = os.path.join(self.tmpDir, "hosts.d")
         self.leasesFile = os.path.join(self.tmpDir, "dnsmasq.leases")
@@ -202,8 +210,7 @@ class _DefaultBridge:
         return self.mask
 
     def get_subhost_ip_range(self):
-        # return (start_ip, ip_number, count)
-        assert False
+        return self.subhostIpRange
 
     def on_other_bridge_created(self, id):
         with open(os.path.join(self.hostsDir, id), "w") as f:
