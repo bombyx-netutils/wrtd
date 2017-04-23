@@ -12,10 +12,17 @@ from wrt_util import JsonApiClient
 #
 # {
 #     "init": {
-#         "upstream-ip-list": [
-#             "1.1.1.1",
-#             "1.2.3.4",
-#         ]
+#         "upstream": {
+#             "c5facfa6-d8c3-4bce-ac13-6abab49c86fc": {
+#                 "prefix-list": ["192.168.2.0/255.255.255.0", "192.168.3.0/255.255.255.0"],
+#             },
+#         },
+#         "host": {
+#             "1.2.3.4": {
+#                 "hostname": "abcd",
+#                 "wakeup-mac": "01-02-03-04-05-06",
+#             },
+#         },
 #         "subhost-start": "192.168.1.100",
 #         "subhost-end": "192.168.1.200",
 #     },
@@ -59,11 +66,24 @@ from wrt_util import JsonApiClient
 # }
 #
 ################################################################################
+# Notify: upstream-refresh
+################################################################################
+#
+# {
+#     "notify": "upstream-refresh",
+#     "data": {
+#         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc": {
+#             "prefix-list": ["192.168.2.0", "192.168.3.0"],
+#         },
+#     },
+# }
+#
+################################################################################
 # Notify: host-refresh
 ################################################################################
 #
 # {
-#     "notify": "hosts-refresh",
+#     "notify": "host-refresh",
 #     "data": {
 #         "1.2.3.4": {
 #             "hostname": "abcd",
@@ -107,10 +127,19 @@ class WrtCascadeApiServer:
     def removeValidClientIp(self, ip):
         self.realServer.removeValidClientIp(ip)
 
+    def notifyUpstreamRefresh(self, upstreamDict):
+        self.realServer.sendNotify("upstream-refresh", upstreamDict)
+
     def notifyHostRefresh(self, ipDataDict):
         self.realServer.sendNotify("host-refresh", ipDataDict)
 
     def _clientInitCallback(self, addr):
+        # upstream info
+
+        # host info
+
+
+        # subhost ip range
         with self.globalLock:
             if len(self.freeIpRange) == 0:
                 raise Exception("too many sub-host owners")
@@ -119,6 +148,7 @@ class WrtCascadeApiServer:
 
         self.bridge.on_subhost_owner_connected(self._source_id(addr))
 
+        # return value
         return {
             "subhost-start": self.subhostOwnerDict[addr].ipRange[0],
             "subhost-end": self.subhostOwnerDict[addr].ipRange[1],

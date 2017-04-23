@@ -16,11 +16,17 @@ import ctypes
 import errno
 import subprocess
 import threading
+from collections import OrderedDict
 from collections import queue
 from gi.repository import GLib
 
 
 class WrtUtil:
+
+    @staticmethod
+    def restartProgram():
+        python = sys.executable
+        os.execl(python, python, * sys.argv)
 
     @staticmethod
     def setInterfaceUpDown(ifname, upOrDown):
@@ -570,7 +576,7 @@ class _CommandThread(threading.Thread):
                 if len(buf) == 0:
                     break
                 try:
-                    jsonObj = json.loads(buf)
+                    jsonObj = json.loads(buf, object_pairs_hook=OrderedDict)
                     if "command" not in jsonObj:
                         raise Exception("invalid command")
                     if jsonObj["command"] not in self.pObj.commandDict:
@@ -646,7 +652,7 @@ class JsonApiClient:
                 buf = WrtUtil.recvLine(self.sock).decode("utf-8")
                 if len(buf) == 0:
                     raise Exception("no init data received")
-                jsonObj = json.loads(buf)
+                jsonObj = json.loads(buf, object_pairs_hook=OrderedDict)
                 if "init" not in jsonObj:
                     raise Exception("no init data received")
                 ret = jsonObj["init"]
@@ -702,7 +708,7 @@ class _RecvThread(threading.Thread):
             if len(buf) == 0:
                 break
             try:
-                jsonObj = json.loads(buf)
+                jsonObj = json.loads(buf, object_pairs_hook=OrderedDict)
                 if "notify" in jsonObj:
                     if jsonObj["notify"] not in self.pObj.notifyCallbackDict:
                         raise Exception("notify %s not supported" % (jsonObj["notify"]))

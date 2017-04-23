@@ -13,15 +13,16 @@ class WrtParam:
         self.runDir = "/run/wrtd"
         self.logDir = "/var/log/wrtd"
         self.tmpDir = "/tmp/wrtd"
+        self.varDir = "/var/wrtd"
 
         self.cfgFile = os.path.join(self.etcDir, "config.json")
         self.ownResolvConf = os.path.join(self.tmpDir, "resolv.conf")
 
+        self.uuid = None
+
         self.mainloop = None
         self.dbusMainObject = None
         self.dbusIpForwardObject = None
-
-        self.prefix = None                          # "192.168.2.0"
 
         self.sgwApiPort = 2220
         self.cascadeApiPort = 2221
@@ -30,6 +31,7 @@ class WrtParam:
         self.logLevel = None
         self.config = None
 
+        self.daemon = None
         self.trafficManager = None
         self.lanManager = None
         self.wanManager = None

@@ -6,6 +6,7 @@ import re
 import json
 import logging
 import ipaddress
+from collections import OrderedDict
 from gi.repository import GLib
 from gi.repository import GObject
 from wrt_util import WrtUtil
@@ -29,6 +30,7 @@ class WrtWanManager:
 
         self.vpnPlugin = None
         self.apiClient = None
+        self.upstreamDict = None                # ordereddict<upstream-id, data>
         self.subHostDict = None                 # dict<upstream-ip, subhost-ip>
         self.vpnRestartCountDown = None
 
@@ -164,8 +166,12 @@ class WrtWanManager:
         try:
             self.vpnPlugin.start()
 
-            self.apiClient = WrtCascadeApiClient(self.vpnPlugin.get_remote_ip(), self.param.apiPort)
+            self.apiClient = WrtCascadeApiClient(self.vpnPlugin.get_remote_ip(), self.param.cascadeApiPort)
             initData = self.apiClient.connect()
+
+            self.upstreamDict = OrderedDict()
+            for k, v in initData["upstream"]:
+                self.upstreamDict[k] = _UpStreamInfo(v)
 
             self.subHostDict = dict()
             if True:
@@ -180,6 +186,19 @@ class WrtWanManager:
             self._stopVpn()
             self.vpnRestartCountDown = 6
             logging.error("Failed to establish VPN connection, %s", e)
+            return True
+
+        # check upstream uuid and restart if neccessary
+        if self._checkAndChangeUpstreamUuid():
+            logging.error("Router UUID duplicated with upstream.")
+            os.kill(os.getpid(), signal.SIGHUP)
+            return True
+        
+        # check upstream prefix and restart if neccessary
+        if self._checkAndChangeUpstreamPrefix():
+            logging.error("Bridge prefix duplicated with upstream.")
+            os.kill(os.getpid(), signal.SIGHUP)
+            return True
 
         return True
 
@@ -191,3 +210,49 @@ class WrtWanManager:
             self.apiClient = None
         self.vpnPlugin.stop()
         self.vpnPlugin = None
+
+    def _checkAndChangeUpstreamUuid(self):
+        if self.param.uuid not in self.upstreamDict.keys():
+            return False
+
+        # we don't change uuid actually, duplicated uuid is impossible
+        return True
+
+    def _checkAndChangeUpstreamPrefix(self):
+        pendingBridges = []
+        for bridge in self.param.lanManager.get_bridges():
+            pIp, pMask = bridget.get_prefix()
+            for uinfo in self.upstreamDict:
+                c = len(pendingBridges)
+                for prefix in uinfo.prefixList:
+                    if ipaddress.IPv4Network(pIp + "/" + pMask).overlaps(ipaddress.IPv4Network(prefix)):
+                        pendingBridges.append(bridge)
+                        break
+                if len(pendingBridges) > c:
+                    break
+        if pendingBridges == []:
+            return False
+
+        for bridge in pendingBridges:
+            pIpNew = None
+            pMaskNew = None
+            for i in range(0, 256):
+                new_pip = "192.168.%d.0" % (i)
+                new_mask = "255.255.255.0"
+                overlap = False
+                for uinfo in self.upstreamDict:
+                    for prefix in uinfo.prefixList:
+                        if ipaddress.IPv4Network(new_pip + "/" + new_mask).overlaps(ipaddress.IPv4Network(prefix)):
+                            overlap = True
+                if not overlap:
+                    pIpNew = new_pip
+                    pMaskNew = new_mask
+                    break
+            #fixme
+
+
+
+class _UpStreamInfo:
+
+    def __init__(self, jsonObj):
+        self.prefixList = jsonObj["prefix-list"]

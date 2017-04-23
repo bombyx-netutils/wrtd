@@ -25,11 +25,15 @@ class WrtDaemon:
 
     def __init__(self, param):
         self.param = param
+        self.cfgFile = os.path.join(self.param.etcDir, "global.json")
+        self.dataFile = os.path.join(self.param.varDir, "data.json")
         self.mainloop = None
+        self.bRestart = False
         self.interfaceDict = dict()
         self.interfaceTimer = None
 
     def run(self):
+        WrtUtil.ensureDir(self.param.varDir)
         WrtUtil.mkDirAndClear(self.param.tmpDir)
         WrtUtil.mkDirAndClear(self.param.runDir)
         try:
@@ -38,14 +42,25 @@ class WrtDaemon:
             logging.info("Program begins.")
 
             # load config
-            cfgfile = os.path.join(self.param.etcDir, "global.json")
-            if not os.path.exists(cfgfile):
-                raise Exception("no global.json found")
-            cfgObj = None
-            with open(cfgfile, "r") as f:
-                cfgObj = json.load(f)
-            self.param.prefix = cfgObj["prefix"]
-            logging.info("Configuration loaded.")
+            if os.path.exists(self.cfgFile):
+                cfgObj = None
+                with open(self.cfgFile, "r") as f:
+                    cfgObj = json.load(f)
+                logging.info("Global configuration loaded.")
+
+            # load data
+            if os.path.exists(self.dataFile):
+                cfgObj = None
+                with open(self.dataFile, "r") as f:
+                    cfgObj = json.load(f)
+                self.param.uuid = cfgObj["uuid"]
+            else:
+                self.param.uuid = uuid4()
+                cfgObj = dict()
+                cfgObj["uuid"] = self.param.uuid
+                with open(self.dataFile, "w") as f:
+                    json.dump(cfgObj, f)
+            logging.info("Global data loaded, UUID = %s" % (self.param.uuid))
 
             # create main loop
             DBusGMainLoop(set_as_default=True)
@@ -104,6 +119,8 @@ class WrtDaemon:
             WrtUtil.shell('/sbin/nft delete table wrtd')
             logging.shutdown()
             shutil.rmtree(self.param.tmpDir)
+            if self.bRestart:
+                WrtUtil.restartProgram()
 
     def _sigHandlerINT(self, signum):
         logging.info("SIGINT received.")
@@ -117,9 +134,8 @@ class WrtDaemon:
 
     def _sigHandlerHUP(self, signum):
         logging.info("SIGHUP received.")
-        self.bDataChanged = True
-        if self.vpnClientProc is not None:
-            self.vpnClientProc.terminate()
+        self.bRestart = True
+        self.param.mainloop.quit()
         return True
 
     def _interfaceTimerCallback(self):

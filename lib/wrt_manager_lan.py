@@ -30,7 +30,9 @@ class WrtLanManager:
             # create default bridge
             tmpdir = os.path.join(self.param.tmpDir, "bridge-default")
             os.mkdir(tmpdir)
-            self.defaultBridge = _DefaultBridge(tmpdir)
+            vardir = os.path.join(self.param.varDir, "bridge-default")
+            WrtUtil.ensureDir(vardir)
+            self.defaultBridge = _DefaultBridge(tmpdir, vardir)
             self.defaultBridge.init2(self.param.trafficManager.get_l2_nameserver_port(), self.on_client_appear, self.on_client_change, self.on_client_disappear)
             logging.info("LAN: Default bridge started.")
 
@@ -147,24 +149,36 @@ class WrtLanManager:
 
 class _DefaultBridge:
 
-    def __init__(self, tmpDir):
+    def __init__(self, tmpDir, varDir):
         self.tmpDir = tmpDir
+        self.varDir = varDir
+        self.cfgFile = os.path.join(self.varDir, "config.json")
         self.l2DnsPort = None
         self.clientAppearFunc = None
         self.clientChangeFunc = None
         self.clientDisappearFunc = None
 
-        self.brname = "wrtd-br"
-        self.ip = str(ipaddress.IPv4Address(self.param.prefix) + 1)
+        # load config
+        self.prefix = "192.168.2.0/255.255.255.0"
         self.mask = "255.255.255.0"
-        self.dhcpStart = str(ipaddress.IPv4Address(self.param.prefix) + 2)
-        self.dhcpEnd = str(ipaddress.IPv4Address(self.param.prefix) + 50)
+        if os.path.exists(self.cfgFile):
+            cfgObj = None
+            with open(cfgfile, "r") as f:
+                cfgObj = json.load(f)
+            t = cfgObj["prefix"]
+            self.prefix = t.split("/")[0]
+            self.mask = t.split("/")[1]
+
+        self.brname = "wrtd-br"
+        self.ip = str(ipaddress.IPv4Address(self.prefix) + 1)
+        self.dhcpStart = str(ipaddress.IPv4Address(self.prefix) + 2)
+        self.dhcpEnd = str(ipaddress.IPv4Address(self.prefix) + 50)
 
         self.subhostIpRange = []
         i = 51
         while i + 49 < 255:
-            s = str(ipaddress.IPv4Address(self.param.prefix) + i)
-            e = str(ipaddress.IPv4Address(self.param.prefix) + i + 49)
+            s = str(ipaddress.IPv4Address(self.prefix) + i)
+            e = str(ipaddress.IPv4Address(self.prefix) + i + 49)
             self.subhostIpRange.append((s, e))
             i += 50
 
@@ -203,11 +217,17 @@ class _DefaultBridge:
     def get_bridge_id(self):
         return "bridge-" + self.ip
 
+    def change_prefix(self, prefix, netmask):
+        jsonObj = dict()
+        jsonObj["prefix"] = prefix + "/" + netmask
+        with open(self.cfgFile, "w") as f:
+            f.write(json.dumps(jsonObj))
+
+    def get_prefix(self):
+        assert (self.prefix, self.mask)
+
     def get_ip(self):
         return self.ip
-
-    def get_netmask(self):
-        return self.mask
 
     def get_subhost_ip_range(self):
         return self.subhostIpRange
