@@ -163,7 +163,7 @@ class _DefaultBridge:
         self.mask = "255.255.255.0"
         if os.path.exists(self.cfgFile):
             cfgObj = None
-            with open(cfgfile, "r") as f:
+            with open(self.cfgFile, "r") as f:
                 cfgObj = json.load(f)
             t = cfgObj["prefix"]
             self.prefix = t.split("/")[0]
@@ -224,7 +224,7 @@ class _DefaultBridge:
             f.write(json.dumps(jsonObj))
 
     def get_prefix(self):
-        assert (self.prefix, self.mask)
+        return (self.prefix, self.mask)
 
     def get_ip(self):
         return self.ip

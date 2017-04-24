@@ -4,6 +4,7 @@
 import os
 import sys
 import json
+import uuid
 import signal
 import shutil
 import logging
@@ -55,7 +56,7 @@ class WrtDaemon:
                     cfgObj = json.load(f)
                 self.param.uuid = cfgObj["uuid"]
             else:
-                self.param.uuid = uuid4()
+                self.param.uuid = uuid.uuid4()
                 cfgObj = dict()
                 cfgObj["uuid"] = self.param.uuid
                 with open(self.dataFile, "w") as f:

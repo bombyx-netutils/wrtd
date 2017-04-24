@@ -35,8 +35,8 @@ try:
     WrtUtil.mkDirAndClear(param.tmpDir)
 
     # start server
-    self.param.daemon = WrtDaemon(param)
-    self.param.daemon.run()
+    param.daemon = WrtDaemon(param)
+    param.daemon.run()
 finally:
     if os.path.exists(param.tmpDir):
         shutil.rmtree(param.tmpDir)

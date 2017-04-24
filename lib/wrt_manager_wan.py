@@ -4,6 +4,7 @@
 import os
 import re
 import json
+import signal
 import logging
 import ipaddress
 from collections import OrderedDict
@@ -193,7 +194,7 @@ class WrtWanManager:
             logging.error("Router UUID duplicates with upstream, restart automatically.")
             os.kill(os.getpid(), signal.SIGHUP)
             return True
-        
+
         # check upstream prefix and restart if neccessary
         if self._checkAndChangeUpstreamPrefix():
             logging.error("Bridge prefix duplicates with upstream, restart automatically.")
@@ -221,7 +222,7 @@ class WrtWanManager:
     def _checkAndChangeUpstreamPrefix(self):
         pendingBridges = []
         for bridge in self.param.lanManager.get_bridges():
-            pIp, pMask = bridget.get_prefix()
+            pIp, pMask = bridge.get_prefix()
             for uinfo in self.upstreamDict:
                 c = len(pendingBridges)
                 for prefix in uinfo.prefixList:

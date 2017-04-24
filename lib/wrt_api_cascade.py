@@ -138,7 +138,6 @@ class WrtCascadeApiServer:
 
         # host info
 
-
         # subhost ip range
         with self.globalLock:
             if len(self.freeIpRange) == 0:
