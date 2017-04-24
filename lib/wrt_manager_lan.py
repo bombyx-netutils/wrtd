@@ -10,6 +10,7 @@ import socket
 import subprocess
 import logging
 import ipaddress
+import pyroute2
 from gi.repository import GLib
 from gi.repository import GObject
 from wrt_util import WrtUtil
@@ -197,9 +198,11 @@ class _DefaultBridge:
         self.clientDisappearFunc = clientDisappearFunc
 
         # create bridge interface
-        WrtUtil.addBridge(self.brname)
-        WrtUtil.setInterfaceUpDown(self.brname, True)
-        WrtUtil.shell('/bin/ifconfig "%s" "%s" netmask "%s"' % (self.brname, self.ip, self.mask))
+        with pyroute2.IPRoute() as ip:
+            ip.link("add", kind="bridge", ifname=self.brname)
+            idx = ip.link_lookup(ifname=self.brname)[0]
+            ip.link("set", index=idx, state="up")
+            ip.addr("add", index=idx, address=self.ip, mask=self.mask)
 
         # start dnsmasq
         self._runDnsmasq()
@@ -211,8 +214,10 @@ class _DefaultBridge:
         with open("/etc/resolv.conf", "w") as f:
             f.write("")
         self._stopDnsmasq()
-        WrtUtil.setInterfaceUpDown(self.brname, False)
-        WrtUtil.removeBridge(self.brname)
+        with pyroute2.IPRoute() as ip:
+            idx = ip.link_lookup(ifname=self.brname)[0]
+            ip.link("set", index=idx, state="down")
+            ip.link("del", index=idx)
 
     def get_bridge_id(self):
         return "bridge-" + self.ip

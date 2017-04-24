@@ -6,6 +6,7 @@ import re
 import json
 import signal
 import logging
+import pyroute2
 import ipaddress
 from collections import OrderedDict
 from gi.repository import GLib
@@ -103,7 +104,9 @@ class WrtWanManager:
                 if v is None and empty is None:
                     empty = k
                     break
-            WrtUtil.shell("/bin/ifconfig %s add %s" % (self.vpnPlugin.get_interface(), empty))
+            with pyroute2.IPRoute() as ip:
+                idx = ip.link_lookup(ifname=self.vpnPlugin.get_interface())[0]
+                ip.addr("add", index=idx, address=empty)
             self._addNftRuleVpnSubHost(ip, empty)
             self.subHostDict[empty] = ip
             ipDataDict2[empty] = data
@@ -121,7 +124,9 @@ class WrtWanManager:
                 if v == ip:
                     self.subHostDict[k] = None
                     self._removeNftRuleSubHost(v, k)
-                    WrtUtil.shell("/bin/ifconfig %s del %s" % (self.vpnPlugin.get_interface(), k))
+                    with pyroute2.IPRoute() as ip:
+                        idx = ip.link_lookup(ifname=self.vpnPlugin.get_interface())[0]
+                        ip.addr("delete", index=idx, address=k)
                     ipList2.append(k)
                     break
         self.apiClient.removeSubhost(ipList2)

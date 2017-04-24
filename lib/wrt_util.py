@@ -8,8 +8,6 @@ import json
 import socket
 import shutil
 import time
-import struct
-import fcntl
 import ipaddress
 import logging
 import ctypes
@@ -27,53 +25,6 @@ class WrtUtil:
     def restartProgram():
         python = sys.executable
         os.execl(python, python, * sys.argv)
-
-    @staticmethod
-    def setInterfaceUpDown(ifname, upOrDown):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            ifreq = struct.pack("16sh", ifname.encode("ascii"), 0)
-            ret = fcntl.ioctl(s.fileno(), 0x8913, ifreq)
-            flags = struct.unpack("16sh", ret)[1]                   # SIOCGIFFLAGS
-
-            if upOrDown:
-                flags |= 0x1
-            else:
-                flags &= ~0x1
-
-            ifreq = struct.pack("16sh", ifname.encode("ascii"), flags)
-            fcntl.ioctl(s.fileno(), 0x8914, ifreq)                  # SIOCSIFFLAGS
-        finally:
-            s.close()
-
-    @staticmethod
-    def addBridge(ifname):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            fcntl.ioctl(s.fileno(), 0x89a0, ifname)                 # SIOCBRADDBR
-        finally:
-            s.close()
-
-    @staticmethod
-    def removeBridge(ifname):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            fcntl.ioctl(s.fileno(), 0x89a1, ifname)                 # SIOCBRDELBR
-        finally:
-            s.close()
-
-    @staticmethod
-    def addInterfaceToBridge(brname, ifname):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            ifreq = struct.pack("16si", ifname.encode("ascii"), 0)
-            ret = fcntl.ioctl(s.fileno(), 0x8933, ifreq)            # SIOCGIFINDEX
-            ifindex = struct.unpack("16si", ret)[1]
-
-            ifreq = struct.pack("16si", brname.encode("ascii"), ifindex)
-            fcntl.ioctl(s.fileno(), 0x89a2, ifreq)                  # SIOCBRADDIF
-        finally:
-            s.close()
 
     @staticmethod
     def readDnsmasqHostFile(filename):
