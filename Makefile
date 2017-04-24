@@ -3,9 +3,6 @@ prefix=/usr
 
 all:
 
-clean:
-	fixme
-
 install:
 	install -d -m 0755 "$(DESTDIR)/$(prefix)/sbin"
 	install -m 0755 wrtd "$(DESTDIR)/$(prefix)/sbin"
@@ -33,4 +30,4 @@ uninstall:
 	rm -rf "$(DESTDIR)/$(prefix)/lib/wrtd"
 	rm -rf "$(DESTDIR)/etc/wrtd"
 
-.PHONY: all clean install uninstall
+.PHONY: all install uninstall

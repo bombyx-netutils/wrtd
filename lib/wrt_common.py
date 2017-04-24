@@ -92,11 +92,11 @@ class TemplateBridge:
     def dispose(self):
         assert False
 
-    def change_prefix(self, prefix):
-        # prefix should be persisted and take effect after restart
+    def get_bridge_id(self):
         assert False
 
-    def get_bridge_id(self):
+    def change_prefix(self, prefix):
+        # prefix should be persisted and take effect after restart
         assert False
 
     def get_prefix(self):

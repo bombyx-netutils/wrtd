@@ -190,13 +190,13 @@ class WrtWanManager:
 
         # check upstream uuid and restart if neccessary
         if self._checkAndChangeUpstreamUuid():
-            logging.error("Router UUID duplicated with upstream.")
+            logging.error("Router UUID duplicates with upstream, restart automatically.")
             os.kill(os.getpid(), signal.SIGHUP)
             return True
         
         # check upstream prefix and restart if neccessary
         if self._checkAndChangeUpstreamPrefix():
-            logging.error("Bridge prefix duplicated with upstream.")
+            logging.error("Bridge prefix duplicates with upstream, restart automatically.")
             os.kill(os.getpid(), signal.SIGHUP)
             return True
 
@@ -248,8 +248,8 @@ class WrtWanManager:
                     pIpNew = new_pip
                     pMaskNew = new_mask
                     break
-            #fixme
-
+            bridge.change_prefix(pIpNew, pMaskNew)
+        return True
 
 
 class _UpStreamInfo:
