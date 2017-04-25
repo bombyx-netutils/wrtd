@@ -14,8 +14,8 @@ import ctypes
 import errno
 import subprocess
 import threading
+import queue
 from collections import OrderedDict
-from collections import queue
 from gi.repository import GLib
 
 
@@ -184,6 +184,12 @@ class WrtUtil:
     @staticmethod
     def nftDeleteRule(table, chain, ruleHandle):
         WrtUtil.shell('/sbin/nft delete rule %s %s handle %d' % (table, chain, ruleHandle))
+
+    @staticmethod
+    def nftForceDeleteTable(table):
+        rc, msg = WrtUtil.shell("/sbin/nft list table %s" % (table), "retcode+stdout")
+        if rc == 0:
+            WrtUtil.shell("/sbin/nft delete table %s" % (table))
 
     @staticmethod
     def getFreeSocketPort(portType):

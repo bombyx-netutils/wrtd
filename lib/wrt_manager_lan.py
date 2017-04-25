@@ -160,7 +160,7 @@ class _DefaultBridge:
         self.clientDisappearFunc = None
 
         # load config
-        self.prefix = "192.168.2.0/255.255.255.0"
+        self.prefix = "192.168.2.0"
         self.mask = "255.255.255.0"
         if os.path.exists(self.cfgFile):
             cfgObj = None
@@ -202,7 +202,7 @@ class _DefaultBridge:
             ip.link("add", kind="bridge", ifname=self.brname)
             idx = ip.link_lookup(ifname=self.brname)[0]
             ip.link("set", index=idx, state="up")
-            ip.addr("add", index=idx, address=self.ip, mask=self.mask)
+            ip.addr("add", index=idx, address=self.ip, mask=WrtUtil.ipMaskToLen(self.mask))
 
         # start dnsmasq
         self._runDnsmasq()
@@ -363,10 +363,10 @@ class _DefaultBridge:
             self.dnsmasqProc.terminate()
             self.dnsmasqProc.wait()
             self.dnsmasqProc = None
-        os.unlink(self.pidFile)
-        os.unlink(self.leasesFile)
-        shutil.rmtree(self.hostsDir)
-        os.unlink(self.myhostnameFile)
+        WrtUtil.forceDelete(self.pidFile)
+        WrtUtil.forceDelete(self.leasesFile)
+        WrtUtil.forceDelete(self.hostsDir)
+        WrtUtil.forceDelete(self.myhostnameFile)
 
     def _leaseScan(self):
         try:

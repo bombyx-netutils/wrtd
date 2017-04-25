@@ -56,7 +56,7 @@ class WrtDaemon:
                     cfgObj = json.load(f)
                 self.param.uuid = cfgObj["uuid"]
             else:
-                self.param.uuid = uuid.uuid4()
+                self.param.uuid = str(uuid.uuid4())
                 cfgObj = dict()
                 cfgObj["uuid"] = self.param.uuid
                 with open(self.dataFile, "w") as f:
@@ -117,7 +117,7 @@ class WrtDaemon:
                 self.param.lanManager.dispose()
             if self.param.wanManager is not None:
                 self.param.wanManager.dispose()
-            WrtUtil.shell('/sbin/nft delete table wrtd')
+            WrtUtil.nftForceDeleteTable("wrtd")
             logging.shutdown()
             shutil.rmtree(self.param.tmpDir)
             if self.bRestart:

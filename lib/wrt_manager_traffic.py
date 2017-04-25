@@ -11,8 +11,8 @@ class WrtTrafficManager:
 
     def __init__(self, param):
         self.param = param
-        self.cfgFile = os.path.join(self.tmpDir, "l2-dnsmasq.conf")
-        self.pidFile = os.path.join(self.tmpDir, "l2-dnsmasq.pid")
+        self.cfgFile = os.path.join(self.param.tmpDir, "l2-dnsmasq.conf")
+        self.pidFile = os.path.join(self.param.tmpDir, "l2-dnsmasq.pid")
 
         self.dnsPort = None
         self.dnsmasqProc = None
