@@ -92,6 +92,9 @@ class TemplateBridge:
     def dispose(self):
         assert False
 
+    def get_name(self):
+        assert False
+
     def get_bridge_id(self):
         assert False
 

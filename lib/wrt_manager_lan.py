@@ -5,7 +5,6 @@ import os
 import glob
 import signal
 import json
-import shutil
 import socket
 import subprocess
 import logging
@@ -61,13 +60,12 @@ class WrtLanManager:
                     os.mkdir(tdir)
 
                     p = WrtCommon.getLanInterfacePlugin(self.param, name)
-                    self.pluginList.append(p)
-
                     p.init2(instanceName, cfgObj, tdir)
                     p.start()
                     if p.get_bridge() is not None:
                         p.get_bridge().init2(self.param.trafficManager.get_l2_nameserver_port(), self.on_client_appear, self.on_client_change, self.on_client_disappear)
 
+                    self.pluginList.append(p)
                     logging.info("LAN: Interface plugin \"%s\" activated." % (name))
         except:
             self.dispose()
@@ -218,6 +216,9 @@ class _DefaultBridge:
             idx = ip.link_lookup(ifname=self.brname)[0]
             ip.link("set", index=idx, state="down")
             ip.link("del", index=idx)
+
+    def get_name(self):
+        return self.brname
 
     def get_bridge_id(self):
         return "bridge-" + self.ip
