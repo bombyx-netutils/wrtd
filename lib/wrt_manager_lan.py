@@ -55,12 +55,11 @@ class WrtLanManager:
                         with open(cfgFile, "r") as f:
                             cfgObj = json.load(f)
 
-                    tdir = "lif-%s" % (name)
                     if instanceName != "":
-                        tdir += "-%s" % (instanceName)
-                    tmpdir = os.path.join(self.param.tmpDir, tdir)
+                        name += "-%s" % (instanceName)
+                    tmpdir = os.path.join(self.param.tmpDir, "lif-%s" % (name))
                     os.mkdir(tmpdir)
-                    vardir = os.path.join(self.param.varDir, tdir)
+                    vardir = os.path.join(self.param.varDir, "lif-%s" % (name))
                     WrtUtil.ensureDir(vardir)
 
                     p = WrtCommon.getLanInterfacePlugin(self.param, name)
@@ -69,18 +68,18 @@ class WrtLanManager:
                     if p.get_bridge() is not None:
                         p.get_bridge().init2(self.param.trafficManager.get_l2_nameserver_port(), self.on_client_appear, self.on_client_change, self.on_client_disappear)
 
-                    self.pluginDict[tdir] = p
-                    logging.info("LAN: Interface plugin \"%s\" activated." % (tdir))
+                    self.pluginDict[name] = p
+                    logging.info("LAN: Interface plugin \"%s\" activated." % (name))
         except:
             self.dispose()
             raise
 
     def dispose(self):
-        for tdir, p in self.pluginDict.items():
+        for name, p in self.pluginDict.items():
             if p.get_bridge() is not None:
                 p.get_bridge().dispose()
             p.stop()
-            logging.info("LAN: Interface plugin \"%s\" deactivated." % (tdir))
+            logging.info("LAN: Interface plugin \"%s\" deactivated." % (name))
         if self.defaultBridge is not None:
             self.defaultBridge.dispose()
             self.defaultBridge = None
