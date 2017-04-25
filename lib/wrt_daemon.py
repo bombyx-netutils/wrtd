@@ -117,6 +117,8 @@ class WrtDaemon:
                 self.param.lanManager.dispose()
             if self.param.wanManager is not None:
                 self.param.wanManager.dispose()
+            if self.param.trafficManager is not None:
+                self.param.trafficManager.dispose()
             WrtUtil.nftForceDeleteTable("wrtd")
             logging.shutdown()
             shutil.rmtree(self.param.tmpDir)

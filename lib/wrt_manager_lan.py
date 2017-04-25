@@ -10,6 +10,7 @@ import subprocess
 import logging
 import ipaddress
 import pyroute2
+from collections import OrderedDict
 from gi.repository import GLib
 from gi.repository import GObject
 from wrt_util import WrtUtil
@@ -20,7 +21,7 @@ class WrtLanManager:
 
     def __init__(self, param):
         self.param = param
-        self.pluginList = []
+        self.pluginDict = OrderedDict()             # <name, object>
         self.defaultBridge = None
         self.clientDict = dict()
 
@@ -54,29 +55,32 @@ class WrtLanManager:
                         with open(cfgFile, "r") as f:
                             cfgObj = json.load(f)
 
-                    tdir = os.path.join(self.param.tmpDir, "lif-%s" % (name))
+                    tdir = "lif-%s" % (name)
                     if instanceName != "":
                         tdir += "-%s" % (instanceName)
-                    os.mkdir(tdir)
+                    tmpdir = os.path.join(self.param.tmpDir, tdir)
+                    os.mkdir(tmpdir)
+                    vardir = os.path.join(self.param.varDir, tdir)
+                    WrtUtil.ensureDir(vardir)
 
                     p = WrtCommon.getLanInterfacePlugin(self.param, name)
-                    p.init2(instanceName, cfgObj, tdir)
+                    p.init2(instanceName, cfgObj, tmpdir, vardir)
                     p.start()
                     if p.get_bridge() is not None:
                         p.get_bridge().init2(self.param.trafficManager.get_l2_nameserver_port(), self.on_client_appear, self.on_client_change, self.on_client_disappear)
 
-                    self.pluginList.append(p)
-                    logging.info("LAN: Interface plugin \"%s\" activated." % (name))
+                    self.pluginDict[tdir] = p
+                    logging.info("LAN: Interface plugin \"%s\" activated." % (tdir))
         except:
             self.dispose()
             raise
 
     def dispose(self):
-        for p in self.pluginList:
+        for tdir, p in self.pluginDict.items():
             if p.get_bridge() is not None:
                 p.get_bridge().dispose()
             p.stop()
-            logging.info("LAN: Interface plugin \"%s\" deactivated." % ("fixme"))
+            logging.info("LAN: Interface plugin \"%s\" deactivated." % (tdir))
         if self.defaultBridge is not None:
             self.defaultBridge.dispose()
             self.defaultBridge = None
@@ -88,7 +92,7 @@ class WrtLanManager:
 
     def get_bridges(self):
         ret = set()
-        for plugin in self.pluginList:
+        for plugin in self.pluginDict.values():
             bridge = plugin.get_bridge()
             if bridge is None:
                 ret.add(self.defaultBridge)
