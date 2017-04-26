@@ -130,7 +130,7 @@ class PrefixPool:
             ip, mask, used = self.prefixList[i]
             if not used:
                 self.prefixList[i] = (ip, mask, True)
-            return (ip, mask)
+                return (ip, mask)
 
         # create a new prefix
         pip, pmask = PrefixPool._createNewPrefix(self.prefixList + self.upstreamPrefixList)
@@ -195,7 +195,7 @@ class PrefixPool:
 
 class TemplateBridge:
 
-    def init2(self, prefix, l2DnsPort, clientAppearFunc, clientChangeFunc, clientDisappearFunc):
+    def init2(self, brname, prefix, l2DnsPort, clientAppearFunc, clientChangeFunc, clientDisappearFunc):
         assert False
 
     def dispose(self):
@@ -204,10 +204,10 @@ class TemplateBridge:
     def get_name(self):
         assert False
 
-    def get_bridge_id(self):
+    def get_prefix(self):
         assert False
 
-    def get_prefix(self):
+    def get_bridge_id(self):
         assert False
 
     def get_ip(self):

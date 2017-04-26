@@ -14,8 +14,6 @@ class WrtParam:
         self.logDir = "/var/log/wrtd"
         self.tmpDir = "/tmp/wrtd"
         self.varDir = "/var/wrtd"
-
-        self.cfgFile = os.path.join(self.etcDir, "config.json")
         self.ownResolvConf = os.path.join(self.tmpDir, "resolv.conf")
 
         self.uuid = None

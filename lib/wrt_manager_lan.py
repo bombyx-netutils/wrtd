@@ -34,7 +34,8 @@ class WrtLanManager:
             vardir = os.path.join(self.param.varDir, "bridge-default")
             WrtUtil.ensureDir(vardir)
             self.defaultBridge = _DefaultBridge(tmpdir, vardir)
-            self.defaultBridge.init2(self.param.daemon.getPrefixPool().usePrefix(),
+            self.defaultBridge.init2("wrtd-br",
+                                     self.param.daemon.getPrefixPool().usePrefix(),
                                      self.param.trafficManager.get_l2_nameserver_port(),
                                      self.on_client_appear,
                                      self.on_client_change,
@@ -42,6 +43,7 @@ class WrtLanManager:
             logging.info("LAN: Default bridge started.")
 
             # start all lan interface plugins
+            bridgeNo = 2
             for name in WrtCommon.getLanInterfacePluginList(self.param):
                 tlist = []
                 for fn in glob.glob(os.path.join(self.param.etcDir, "lan-interface-%s*.json" % (name))):
@@ -60,34 +62,38 @@ class WrtLanManager:
                             cfgObj = json.load(f)
 
                     if instanceName != "":
-                        name += "-%s" % (instanceName)
-                    tmpdir = os.path.join(self.param.tmpDir, "lif-%s" % (name))
+                        tname = "%s-%s" % (name, instanceName)
+                    else:
+                        tname = name
+                    tmpdir = os.path.join(self.param.tmpDir, "lif-%s" % (tname))
                     os.mkdir(tmpdir)
-                    vardir = os.path.join(self.param.varDir, "lif-%s" % (name))
+                    vardir = os.path.join(self.param.varDir, "lif-%s" % (tname))
                     WrtUtil.ensureDir(vardir)
 
                     p = WrtCommon.getLanInterfacePlugin(self.param, name)
                     p.init2(instanceName, cfgObj, tmpdir, vardir)
                     if p.get_bridge() is not None:
-                        p.get_bridge().init2(self.param.daemon.getPrefixPool().usePrefix(),
+                        p.get_bridge().init2("wrtd-br%d" % (bridgeNo),
+                                             self.param.daemon.getPrefixPool().usePrefix(),
                                              self.param.trafficManager.get_l2_nameserver_port(),
                                              self.on_client_appear,
                                              self.on_client_change,
                                              self.on_client_disappear)
+                        bridgeNo += 1
                     p.start()
 
-                    self.pluginDict[name] = p
-                    logging.info("LAN: Interface plugin \"%s\" activated." % (name))
+                    self.pluginDict[tname] = p
+                    logging.info("LAN: Interface plugin \"%s\" activated." % (tname))
         except:
             self.dispose()
             raise
 
     def dispose(self):
-        for name, p in self.pluginDict.items():
+        for tname, p in self.pluginDict.items():
             if p.get_bridge() is not None:
                 p.get_bridge().dispose()
             p.stop()
-            logging.info("LAN: Interface plugin \"%s\" deactivated." % (name))
+            logging.info("LAN: Interface plugin \"%s\" deactivated." % (tname))
         if self.defaultBridge is not None:
             self.defaultBridge.dispose()
             self.defaultBridge = None
@@ -165,13 +171,12 @@ class _DefaultBridge:
     def __init__(self, tmpDir, varDir):
         self.tmpDir = tmpDir
         self.varDir = varDir
-        self.cfgFile = os.path.join(self.varDir, "config.json")
         self.l2DnsPort = None
         self.clientAppearFunc = None
         self.clientChangeFunc = None
         self.clientDisappearFunc = None
 
-        self.brname = "wrtd-br"
+        self.brname = None
         self.prefix = None
         self.mask = None
         self.ip = None
@@ -187,9 +192,10 @@ class _DefaultBridge:
         self.leaseScanTimer = None
         self.lastScanRecord = None
 
-    def init2(self, prefix, l2DnsPort, clientAppearFunc, clientChangeFunc, clientDisappearFunc):
+    def init2(self, brname, prefix, l2DnsPort, clientAppearFunc, clientChangeFunc, clientDisappearFunc):
         assert prefix[1] == "255.255.255.0"
 
+        self.brname = brname
         self.prefix = prefix[0]
         self.mask = prefix[1]
         self.ip = str(ipaddress.IPv4Address(self.prefix) + 1)

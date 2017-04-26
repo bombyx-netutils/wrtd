@@ -152,7 +152,7 @@ class WrtDaemon:
 
     def _interfaceTimerCallback(self):
         intfList = netifaces.interfaces()
-        intfList = [x for x in intfList if x.startswith("en") or x.startswith("wl")]
+        intfList = [x for x in intfList if x.startswith("en") or x.startswith("eth") or x.startswith("wl")]
 
         addList = list(set(intfList) - set(self.interfaceDict.keys()))
         removeList = list(set(self.interfaceDict.keys()) - set(intfList))
