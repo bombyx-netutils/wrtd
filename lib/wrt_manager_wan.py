@@ -225,37 +225,11 @@ class WrtWanManager:
         return True
 
     def _checkAndChangeUpstreamPrefix(self):
-        pendingBridges = []
-        for bridge in self.param.lanManager.get_bridges():
-            pIp, pMask = bridge.get_prefix()
-            for uinfo in self.upstreamDict:
-                c = len(pendingBridges)
-                for prefix in uinfo.prefixList:
-                    if ipaddress.IPv4Network(pIp + "/" + pMask).overlaps(ipaddress.IPv4Network(prefix)):
-                        pendingBridges.append(bridge)
-                        break
-                if len(pendingBridges) > c:
-                    break
-        if pendingBridges == []:
-            return False
+        tl = []
+        for uinfo in self.upstreamDict:
+            tl += uinfo.prefixList
 
-        for bridge in pendingBridges:
-            pIpNew = None
-            pMaskNew = None
-            for i in range(0, 256):
-                new_pip = "192.168.%d.0" % (i)
-                new_mask = "255.255.255.0"
-                overlap = False
-                for uinfo in self.upstreamDict:
-                    for prefix in uinfo.prefixList:
-                        if ipaddress.IPv4Network(new_pip + "/" + new_mask).overlaps(ipaddress.IPv4Network(prefix)):
-                            overlap = True
-                if not overlap:
-                    pIpNew = new_pip
-                    pMaskNew = new_mask
-                    break
-            bridge.change_prefix(pIpNew, pMaskNew)
-        return True
+        return self.param.daemon.getPrefixPool().setUpstreamPrefixList(tl)
 
 
 class _UpStreamInfo:

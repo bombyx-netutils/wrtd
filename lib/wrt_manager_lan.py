@@ -34,7 +34,11 @@ class WrtLanManager:
             vardir = os.path.join(self.param.varDir, "bridge-default")
             WrtUtil.ensureDir(vardir)
             self.defaultBridge = _DefaultBridge(tmpdir, vardir)
-            self.defaultBridge.init2(self.param.trafficManager.get_l2_nameserver_port(), self.on_client_appear, self.on_client_change, self.on_client_disappear)
+            self.defaultBridge.init2(self.param.daemon.getPrefixPool().usePrefix(),
+                                     self.param.trafficManager.get_l2_nameserver_port(),
+                                     self.on_client_appear,
+                                     self.on_client_change,
+                                     self.on_client_disappear)
             logging.info("LAN: Default bridge started.")
 
             # start all lan interface plugins
@@ -64,9 +68,13 @@ class WrtLanManager:
 
                     p = WrtCommon.getLanInterfacePlugin(self.param, name)
                     p.init2(instanceName, cfgObj, tmpdir, vardir)
-                    p.start()
                     if p.get_bridge() is not None:
-                        p.get_bridge().init2(self.param.trafficManager.get_l2_nameserver_port(), self.on_client_appear, self.on_client_change, self.on_client_disappear)
+                        p.get_bridge().init2(self.param.daemon.getPrefixPool().usePrefix(),
+                                             self.param.trafficManager.get_l2_nameserver_port(),
+                                             self.on_client_appear,
+                                             self.on_client_change,
+                                             self.on_client_disappear)
+                    p.start()
 
                     self.pluginDict[name] = p
                     logging.info("LAN: Interface plugin \"%s\" activated." % (name))
@@ -160,18 +168,27 @@ class _DefaultBridge:
         self.clientChangeFunc = None
         self.clientDisappearFunc = None
 
-        # load config
-        self.prefix = "192.168.2.0"
-        self.mask = "255.255.255.0"
-        if os.path.exists(self.cfgFile):
-            cfgObj = None
-            with open(self.cfgFile, "r") as f:
-                cfgObj = json.load(f)
-            t = cfgObj["prefix"]
-            self.prefix = t.split("/")[0]
-            self.mask = t.split("/")[1]
-
         self.brname = "wrtd-br"
+        self.prefix = None
+        self.mask = None
+        self.ip = None
+        self.dhcpStart = None
+        self.dhcpEnd = None
+        self.subhostIpRange = None
+
+        self.myhostnameFile = os.path.join(self.tmpDir, "dnsmasq.myhostname")
+        self.hostsDir = os.path.join(self.tmpDir, "hosts.d")
+        self.leasesFile = os.path.join(self.tmpDir, "dnsmasq.leases")
+        self.pidFile = os.path.join(self.tmpDir, "dnsmasq.pid")
+        self.dnsmasqProc = None
+        self.leaseScanTimer = None
+        self.lastScanRecord = None
+
+    def init2(self, prefix, l2DnsPort, clientAppearFunc, clientChangeFunc, clientDisappearFunc):
+        assert prefix[1] == "255.255.255.0"
+
+        self.prefix = prefix[0]
+        self.mask = prefix[1]
         self.ip = str(ipaddress.IPv4Address(self.prefix) + 1)
         self.dhcpStart = str(ipaddress.IPv4Address(self.prefix) + 2)
         self.dhcpEnd = str(ipaddress.IPv4Address(self.prefix) + 50)
@@ -184,15 +201,6 @@ class _DefaultBridge:
             self.subhostIpRange.append((s, e))
             i += 50
 
-        self.myhostnameFile = os.path.join(self.tmpDir, "dnsmasq.myhostname")
-        self.hostsDir = os.path.join(self.tmpDir, "hosts.d")
-        self.leasesFile = os.path.join(self.tmpDir, "dnsmasq.leases")
-        self.pidFile = os.path.join(self.tmpDir, "dnsmasq.pid")
-        self.dnsmasqProc = None
-        self.leaseScanTimer = None
-        self.lastScanRecord = None
-
-    def init2(self, l2DnsPort, clientAppearFunc, clientChangeFunc, clientDisappearFunc):
         self.l2DnsPort = l2DnsPort
         self.clientAppearFunc = clientAppearFunc
         self.clientChangeFunc = clientChangeFunc
@@ -225,12 +233,6 @@ class _DefaultBridge:
 
     def get_bridge_id(self):
         return "bridge-" + self.ip
-
-    def change_prefix(self, prefix, netmask):
-        jsonObj = dict()
-        jsonObj["prefix"] = prefix + "/" + netmask
-        with open(self.cfgFile, "w") as f:
-            f.write(json.dumps(jsonObj))
 
     def get_prefix(self):
         return (self.prefix, self.mask)

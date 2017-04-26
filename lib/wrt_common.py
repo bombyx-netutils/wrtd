@@ -4,6 +4,8 @@
 import os
 import glob
 import fcntl
+import json
+import ipaddress
 
 
 class WrtCommon:
@@ -84,9 +86,116 @@ class DnsMasqHostFilesLock:
         self.lockFd = None
 
 
+class PrefixPool:
+
+    def __init__(self, dataFile):
+        self.dataFile = dataFile
+        self.upstreamPrefixList = []    # list<prefix-ip, prefix-mask>
+        self.prefixList = []            # list<prefix-ip, prefix-mask, used-flag>
+        self._load()
+
+    def setUpstreamPrefixList(self, upstreamPrefixList):
+        ret = False
+
+        # get conflict items
+        idxList = []
+        for i in range(0, len(self.prefixList)):
+            pip, pmask, used = self.prefixList[i]
+            netobj = ipaddress.IPv4Network(pip + "/" + pmask)
+            for ip2, mask2 in upstreamPrefixList:
+                if netobj.overlaps(ipaddress.IPv4Network(ip2 + "/" + mask2)):
+                    idxList.append(i)
+                    if used:
+                        ret = True              # program restart needed
+                    break
+
+        # get a reference list for create new prefix
+        refList = []
+        for i in range(0, len(self.prefixList)):
+            if i not in idxList:
+                refList.append(self.prefixList[i])
+
+        # create new prefix for conflict items
+        for i in idxList:
+            pip, pmask = PrefixPool._createNewPrefix(refList + upstreamPrefixList)
+            self.prefixList[i] = (pip, pmask, False)
+
+        self.upstreamPrefixList = upstreamPrefixList
+        self._save()
+        return ret
+
+    def usePrefix(self):
+        # use a prefix in pool
+        for i in range(0, len(self.prefixList)):
+            ip, mask, used = self.prefixList[i]
+            if not used:
+                self.prefixList[i][2] = True
+            return (ip, mask)
+
+        # create a new prefix
+        pip, pmask = PrefixPool._createNewPrefix(self.prefixList + self.upstreamPrefixList)
+        self.prefixList.append((pip, pmask, True))
+        self._save()
+        return (pip, pmask)
+
+    def getPrefixList(self):
+        ret = []
+        for ip, mask, used in self.prefixList:
+            ret.append((ip, mask))
+        return ret
+
+    def shrink(self):
+        list2 = []
+        for ip, mask, used in self.prefixList:
+            if used:
+                list2.append((ip, mask))
+        self.prefixList = list2
+        self._save()
+
+    def _load(self):
+        if not os.path.exists(self.dataFile):
+            self.prefixList = []
+        else:
+            cfgObj = None
+            with open(self.dataFile, "r") as f:
+                cfgObj = json.load(f)
+            for t in cfgObj:
+                prefix = t.split("/")[0]
+                mask = t.split("/")[1]
+                self.prefixList.append((prefix, mask, False))
+
+    def _save(self):
+        cfgObj = []
+        for ip, mask, used in self.prefixList:
+            cfgObj.append(ip + "/" + mask)
+        with open(self.dataFile, "w") as f:
+            f.write(json.dumps(cfgObj))
+
+    @staticmethod
+    def _createNewPrefix(excludeList):
+        pip = None
+        pmask = None
+        for i in range(0, 256):
+            pip = "192.168.%d.0" % (i)
+            pmask = "255.255.255.0"
+            overlap = False
+            netobj = ipaddress.IPv4Network(pip + "/" + pmask)
+            for item in excludeList:
+                ip2 = item[0]
+                mask2 = item[1]
+                if netobj.overlaps(ipaddress.IPv4Network(ip2 + "/" + mask2)):
+                    overlap = True
+                    break
+            if overlap:
+                continue
+            break
+        assert pip is not None and pmask is not None
+        return (pip, pmask)
+
+
 class TemplateBridge:
 
-    def init2(self, l2DnsPort, clientAppearFunc, clientChangeFunc, clientDisappearFunc):
+    def init2(self, prefix, l2DnsPort, clientAppearFunc, clientChangeFunc, clientDisappearFunc):
         assert False
 
     def dispose(self):
@@ -96,10 +205,6 @@ class TemplateBridge:
         assert False
 
     def get_bridge_id(self):
-        assert False
-
-    def change_prefix(self, prefix):
-        # prefix should be persisted and take effect after restart
         assert False
 
     def get_prefix(self):

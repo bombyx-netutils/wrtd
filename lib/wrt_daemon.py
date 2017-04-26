@@ -13,6 +13,7 @@ from gi.repository import GLib
 from gi.repository import GObject
 from dbus.mainloop.glib import DBusGMainLoop
 from wrt_util import WrtUtil
+from wrt_common import PrefixPool
 from wrt_manager_traffic import WrtTrafficManager
 from wrt_manager_lan import WrtLanManager
 from wrt_manager_wan import WrtWanManager
@@ -27,11 +28,15 @@ class WrtDaemon:
     def __init__(self, param):
         self.param = param
         self.cfgFile = os.path.join(self.param.etcDir, "global.json")
-        self.dataFile = os.path.join(self.param.varDir, "data.json")
+        self.dataFile = os.path.join(self.param.varDir, "global.json")
+        self.prefixPool = None
         self.mainloop = None
         self.bRestart = False
         self.interfaceDict = dict()
         self.interfaceTimer = None
+
+    def getPrefixPool(self):
+        return self.prefixPool
 
     def run(self):
         WrtUtil.ensureDir(self.param.varDir)
@@ -61,7 +66,11 @@ class WrtDaemon:
                 cfgObj["uuid"] = self.param.uuid
                 with open(self.dataFile, "w") as f:
                     json.dump(cfgObj, f)
-            logging.info("Global data loaded, UUID = %s" % (self.param.uuid))
+            logging.info("Global data loaded, UUID = \"%s\"." % (self.param.uuid))
+
+            # load prefix pool
+            self.prefixPool = PrefixPool(os.path.join(self.param.varDir, "prefix-pool.json"))
+            logging.info("Prefix pool loaded.")
 
             # create main loop
             DBusGMainLoop(set_as_default=True)
