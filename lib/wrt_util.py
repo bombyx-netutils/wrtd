@@ -8,7 +8,6 @@ import json
 import socket
 import shutil
 import time
-import ipaddress
 import logging
 import ctypes
 import errno
