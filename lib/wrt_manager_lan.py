@@ -94,8 +94,8 @@ class WrtLanManager:
             logging.info("LAN: Default bridge destroyed.")
         logging.info("LAN: Terminated.")
 
-    def get_clients(self):
-        return self.clientDict.keys()
+    def get_plugins(self):
+        return self.pluginDict.values()
 
     def get_bridges(self):
         ret = set()
@@ -106,6 +106,9 @@ class WrtLanManager:
             else:
                 ret.add(bridge)
         return list(ret)
+
+    def get_clients(self):
+        return self.clientDict.keys()
 
     def on_client_appear(self, sourceBridgeId, ipDataDict):
         assert all(ip not in self.clientDict for ip in ipDataDict.keys())

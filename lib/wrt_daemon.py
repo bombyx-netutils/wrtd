@@ -171,7 +171,7 @@ class WrtDaemon:
                     continue
 
                 # lan interface plugin
-                for plugin in self.param.lanManager.pluginList:
+                for plugin in self.param.lanManager.get_plugins():
                     bridge = plugin.get_bridge()
                     if bridge is None:
                         bridge = self.param.lanManager.defaultBridge

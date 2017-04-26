@@ -228,7 +228,6 @@ class WrtWanManager:
         tl = []
         for uinfo in self.upstreamDict:
             tl += uinfo.prefixList
-
         return self.param.daemon.getPrefixPool().setUpstreamPrefixList(tl)
 
 

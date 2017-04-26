@@ -129,7 +129,7 @@ class PrefixPool:
         for i in range(0, len(self.prefixList)):
             ip, mask, used = self.prefixList[i]
             if not used:
-                self.prefixList[i][2] = True
+                self.prefixList[i] = (ip, mask, True)
             return (ip, mask)
 
         # create a new prefix
