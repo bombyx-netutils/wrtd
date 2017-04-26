@@ -57,7 +57,7 @@ class WrtLanManager:
 
                 for instanceName, cfgFile in tlist:
                     cfgObj = dict()
-                    if cfgFile is not None:
+                    if cfgFile is not None and os.path.getsize(cfgFile) > 0:
                         with open(cfgFile, "r") as f:
                             cfgObj = json.load(f)
 
