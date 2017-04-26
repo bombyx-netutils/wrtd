@@ -13,8 +13,6 @@ install:
 	find "$(DESTDIR)/$(prefix)/lib/wrtd" -type d | xargs chmod 755
 
 	install -d -m 0755 "$(DESTDIR)/etc/wrtd"
-	cp -r etc/* "$(DESTDIR)/etc/wrtd"
-	find "$(DESTDIR)/etc/wrtd" -type f | xargs chmod 600
 
 	install -d -m 0755 "$(DESTDIR)/$(prefix)/lib/systemd/system"
 	install -m 0644 data/wrtd.service "$(DESTDIR)/$(prefix)/lib/systemd/system"
