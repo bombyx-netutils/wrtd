@@ -140,24 +140,6 @@ class WrtUtil:
             os.makedirs(dirname)
 
     @staticmethod
-    def getGatewayInterface():
-        ret = WrtUtil.shell("/bin/route -n4", "stdout")
-        # syntax: DestIp GatewayIp DestMask ... OutIntf
-        m = re.search("^(0\\.0\\.0\\.0)\\s+([0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+)\\s+(0\\.0\\.0\\.0)\\s+.*\\s+(\\S+)$", ret, re.M)
-        if m is None:
-            return None
-        return m.group(4)
-
-    @staticmethod
-    def getGatewayNexthop():
-        ret = WrtUtil.shell("/bin/route -n4", "stdout")
-        # syntax: DestIp GatewayIp DestMask ... OutIntf
-        m = re.search("^(0\\.0\\.0\\.0)\\s+([0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+)\\s+(0\\.0\\.0\\.0)\\s+.*\\s+(\\S+)$", ret, re.M)
-        if m is None:
-            return None
-        return m.group(2)
-
-    @staticmethod
     def ipMaskToLen(mask):
         """255.255.255.0 -> 24"""
 
@@ -216,50 +198,6 @@ class WrtUtil:
                 return port
 
         raise Exception("no valid port")
-
-    def ip2ipar(ip):
-        AF_INET = 2
-        # AF_INET6 = 10
-        el = ip.split(".")
-        assert len(el) == 4
-        return (AF_INET, [bytes([int(x)]) for x in el])
-
-    @staticmethod
-    def getReservedIpv4NetworkList():
-        return [
-            ipaddress.IPv4Network("0.0.0.0/8"),
-            ipaddress.IPv4Network("10.0.0.0/8"),
-            ipaddress.IPv4Network("100.64.0.0/10"),
-            ipaddress.IPv4Network("127.0.0.0/8"),
-            ipaddress.IPv4Network("169.254.0.0/16"),
-            ipaddress.IPv4Network("172.16.0.0/12"),
-            ipaddress.IPv4Network("192.0.0.0/24"),
-            ipaddress.IPv4Network("192.0.2.0/24"),
-            ipaddress.IPv4Network("192.88.99.0/24"),
-            ipaddress.IPv4Network("192.168.0.0/16"),
-            ipaddress.IPv4Network("198.18.0.0/15"),
-            ipaddress.IPv4Network("198.51.100.0/24"),
-            ipaddress.IPv4Network("203.0.113.0/24"),
-            ipaddress.IPv4Network("224.0.0.0/4"),
-            ipaddress.IPv4Network("240.0.0.0/4"),
-            ipaddress.IPv4Network("255.255.255.255/32"),
-        ]
-
-    @staticmethod
-    def substractIpv4Network(ipv4Network, ipv4NetworkList):
-        netlist = [ipv4Network]
-        for n in ipv4NetworkList:
-            tlist = []
-            for n2 in netlist:
-                if not n2.overlaps(n):
-                    tlist.append(n2)                                # no need to substract
-                    continue
-                try:
-                    tlist += list(n2.address_exclude(n))            # successful to substract
-                except:
-                    pass                                            # substract to none
-            netlist = tlist
-        return netlist
 
     @staticmethod
     def readDnsmasqLeaseFile(filename):
