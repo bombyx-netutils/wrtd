@@ -198,6 +198,7 @@ class _DefaultBridge:
         self.brname = brname
         self.prefix = prefix[0]
         self.mask = prefix[1]
+        self.baddr = str(ipaddress.IPv4Network(prefix).network_address)
         self.ip = str(ipaddress.IPv4Address(self.prefix) + 1)
         self.dhcpStart = str(ipaddress.IPv4Address(self.prefix) + 2)
         self.dhcpEnd = str(ipaddress.IPv4Address(self.prefix) + 50)
@@ -220,7 +221,7 @@ class _DefaultBridge:
             ip.link("add", kind="bridge", ifname=self.brname)
             idx = ip.link_lookup(ifname=self.brname)[0]
             ip.link("set", index=idx, state="up")
-            ip.addr("add", index=idx, address=self.ip, mask=WrtUtil.ipMaskToLen(self.mask))
+            ip.addr("add", index=idx, address=self.ip, mask=WrtUtil.ipMaskToLen(self.mask), broadcast=self.baddr)
 
         # start dnsmasq
         self._runDnsmasq()
