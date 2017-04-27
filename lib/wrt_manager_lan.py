@@ -198,7 +198,7 @@ class _DefaultBridge:
         self.brname = brname
         self.prefix = prefix[0]
         self.mask = prefix[1]
-        self.baddr = str(ipaddress.IPv4Network(prefix).network_address)
+        self.baddr = str(ipaddress.IPv4Network(self.prefix + "/" + self.mask).network_address)
         self.ip = str(ipaddress.IPv4Address(self.prefix) + 1)
         self.dhcpStart = str(ipaddress.IPv4Address(self.prefix) + 2)
         self.dhcpEnd = str(ipaddress.IPv4Address(self.prefix) + 50)
