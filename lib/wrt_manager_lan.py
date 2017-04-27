@@ -177,11 +177,8 @@ class _DefaultBridge:
         self.clientDisappearFunc = None
 
         self.brname = None
-        self.prefix = None
-        self.mask = None
-        self.ip = None
-        self.dhcpStart = None
-        self.dhcpEnd = None
+        self.brnetwork = None
+        self.dhcpRange = None
         self.subhostIpRange = None
 
         self.myhostnameFile = os.path.join(self.tmpDir, "dnsmasq.myhostname")
@@ -196,17 +193,13 @@ class _DefaultBridge:
         assert prefix[1] == "255.255.255.0"
 
         self.brname = brname
-        self.prefix = prefix[0]
-        self.mask = prefix[1]
-        self.ip = str(ipaddress.IPv4Address(self.prefix) + 1)
-        self.dhcpStart = str(ipaddress.IPv4Address(self.prefix) + 2)
-        self.dhcpEnd = str(ipaddress.IPv4Address(self.prefix) + 50)
-
+        self.brnetwork = ipaddress.IPv4Network(prefix)
+        self.dhcpRange = (str(self.brnetwork.hosts()[1]), str(self.brnetwork.hosts()[50]))
         self.subhostIpRange = []
         i = 51
         while i + 49 < 255:
-            s = str(ipaddress.IPv4Address(self.prefix) + i)
-            e = str(ipaddress.IPv4Address(self.prefix) + i + 49)
+            s = str(self.brnetwork.hosts()[i])
+            e = str(self.brnetwork.hsots()[i + 49])
             self.subhostIpRange.append((s, e))
             i += 50
 
@@ -220,7 +213,7 @@ class _DefaultBridge:
             ip.link("add", kind="bridge", ifname=self.brname)
             idx = ip.link_lookup(ifname=self.brname)[0]
             ip.link("set", index=idx, state="up")
-            ip.addr("add", index=idx, address=self.ip, mask=WrtUtil.ipMaskToLen(self.mask))
+            ip.addr("add", index=idx, address=self.brnetwork.hosts()[0], mask=self.brnetwork.prefixlen)
 
         # start dnsmasq
         self._runDnsmasq()
@@ -241,13 +234,13 @@ class _DefaultBridge:
         return self.brname
 
     def get_bridge_id(self):
-        return "bridge-" + self.ip
+        return "bridge-" + self.brnetwork.hosts()[0]
 
     def get_prefix(self):
-        return (self.prefix, self.mask)
+        return (self.brnetwork.network_address, self.brnetwork.prefixlen)
 
     def get_ip(self):
-        return self.ip
+        return self.self.brnetwork.hosts()[0]
 
     def get_subhost_ip_range(self):
         return self.subhostIpRange
@@ -326,7 +319,7 @@ class _DefaultBridge:
     def _runDnsmasq(self):
         # myhostname file
         with open(self.myhostnameFile, "w") as f:
-            f.write("%s %s\n" % (self.ip, socket.gethostname()))
+            f.write("%s %s\n" % (self.brnetwork.hosts()[0], socket.gethostname()))
 
         # make hosts directory
         os.mkdir(self.hostsDir)
@@ -344,7 +337,7 @@ class _DefaultBridge:
         buf += "group=root\n"
         buf += "\n"
         buf += "dhcp-authoritative\n"
-        buf += "dhcp-range=%s,%s,%s,360\n" % (self.dhcpStart, self.dhcpEnd, self.mask)
+        buf += "dhcp-range=%s,%s,%s,360\n" % (self.dhcpRange[0], self.dhcpRange[1], self.brnetwork.netmask)
         buf += "dhcp-option=option:T1,180\n"                             # strange that dnsmasq's T1=165s, change to 180s which complies to RFC
         buf += "dhcp-leasefile=%s\n" % (self.leasesFile)
         buf += "\n"
