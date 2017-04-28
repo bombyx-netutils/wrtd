@@ -194,12 +194,12 @@ class _DefaultBridge:
 
         self.brname = brname
         self.brnetwork = ipaddress.IPv4Network(prefix)
-        self.dhcpRange = (str(self.brnetwork.hosts()[1]), str(self.brnetwork.hosts()[50]))
+        self.dhcpRange = (self.brnetwork.hosts()[1], self.brnetwork.hosts()[50])
         self.subhostIpRange = []
         i = 51
         while i + 49 < 255:
-            s = str(self.brnetwork.hosts()[i])
-            e = str(self.brnetwork.hsots()[i + 49])
+            s = self.brnetwork.hosts()[i]
+            e = self.brnetwork.hsots()[i + 49]
             self.subhostIpRange.append((s, e))
             i += 50
 
@@ -237,7 +237,7 @@ class _DefaultBridge:
         return "bridge-" + self.brnetwork.hosts()[0]
 
     def get_prefix(self):
-        return (self.brnetwork.network_address, self.brnetwork.prefixlen)
+        return (self.brnetwork.network_address, self.brnetwork.netmask)
 
     def get_ip(self):
         return self.self.brnetwork.hosts()[0]
