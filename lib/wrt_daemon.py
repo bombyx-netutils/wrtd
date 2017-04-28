@@ -47,26 +47,11 @@ class WrtDaemon:
             logging.getLogger().setLevel(WrtUtil.getLoggingLevel(self.param.logLevel))
             logging.info("Program begins.")
 
-            # load config
-            if os.path.exists(self.cfgFile):
-                cfgObj = None
-                with open(self.cfgFile, "r") as f:
-                    cfgObj = json.load(f)
-                logging.info("Global configuration loaded.")
-
-            # load data
-            if os.path.exists(self.dataFile):
-                cfgObj = None
-                with open(self.dataFile, "r") as f:
-                    cfgObj = json.load(f)
-                self.param.uuid = cfgObj["uuid"]
+            # load UUID
+            if self._loadUuid():
+                logging.info("UUID generated: \"%s\"." % (self.param.uuid))
             else:
-                self.param.uuid = str(uuid.uuid4())
-                cfgObj = dict()
-                cfgObj["uuid"] = self.param.uuid
-                with open(self.dataFile, "w") as f:
-                    json.dump(cfgObj, f)
-            logging.info("Global data loaded, UUID = \"%s\"." % (self.param.uuid))
+                logging.info("UUID loaded: \"%s\"." % (self.param.uuid))
 
             # load prefix pool
             self.prefixPool = PrefixPool(os.path.join(self.param.varDir, "prefix-pool.json"))
@@ -118,6 +103,8 @@ class WrtDaemon:
             self.param.mainloop.run()
             logging.info("Mainloop exits.")
         finally:
+            for s in self.param.cascadeApiServerList:
+                s.dispose()
             if self.param.sgwApiServer is not None:
                 self.param.sgwApiServer.dispose()
             if self.interfaceTimer is not None:
@@ -149,6 +136,21 @@ class WrtDaemon:
         self.bRestart = True
         self.param.mainloop.quit()
         return True
+
+    def _loadUuid(self):
+        if os.path.exists(self.dataFile):
+            cfgObj = None
+            with open(self.dataFile, "r") as f:
+                cfgObj = json.load(f)
+            self.param.uuid = cfgObj["uuid"]
+            return False
+        else:
+            self.param.uuid = str(uuid.uuid4())
+            cfgObj = dict()
+            cfgObj["uuid"] = self.param.uuid
+            with open(self.dataFile, "w") as f:
+                json.dump(cfgObj, f)
+            return True
 
     def _interfaceTimerCallback(self):
         intfList = netifaces.interfaces()

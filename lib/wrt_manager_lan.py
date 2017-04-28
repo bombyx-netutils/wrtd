@@ -57,7 +57,7 @@ class WrtLanManager:
 
                 for instanceName, cfgFile in tlist:
                     cfgObj = dict()
-                    if cfgFile is not None:
+                    if cfgFile is not None and os.path.getsize(cfgFile) > 0:
                         with open(cfgFile, "r") as f:
                             cfgObj = json.load(f)
 
@@ -195,6 +195,7 @@ class _DefaultBridge:
         self.brname = brname
         self.brnetwork = ipaddress.IPv4Network(prefix)
         self.dhcpRange = (self.brnetwork.hosts()[1], self.brnetwork.hosts()[50])
+
         self.subhostIpRange = []
         i = 51
         while i + 49 < 255:
@@ -213,7 +214,7 @@ class _DefaultBridge:
             ip.link("add", kind="bridge", ifname=self.brname)
             idx = ip.link_lookup(ifname=self.brname)[0]
             ip.link("set", index=idx, state="up")
-            ip.addr("add", index=idx, address=self.brnetwork.hosts()[0], mask=self.brnetwork.prefixlen)
+            ip.addr("add", index=idx, address=self.brnetwork.hosts()[0], mask=self.brnetwork.prefixlen, broadcast=self.brnetwork.broadcast_address)
 
         # start dnsmasq
         self._runDnsmasq()
