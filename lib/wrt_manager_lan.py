@@ -196,7 +196,7 @@ class _DefaultBridge:
         self.brnetwork = ipaddress.IPv4Network(prefix)
 
         self.brip = ipaddress.IPv4Address(prefix[0]) + 1
-        self.dhcpRange = (self.brip, self.brip + 49)
+        self.dhcpRange = (self.brip + 1, self.brip + 49)
         self.subhostIpRange = []
         i = 51
         while i + 49 < 255:
