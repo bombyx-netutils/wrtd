@@ -197,11 +197,6 @@ class _DefaultBridge:
 
         self.brip = ipaddress.IPv4Address(prefix[0]) + 1
         self.dhcpRange = (self.brip + 1, self.brip + 49)
-        self.subhostIpRange = []
-        i = 51
-        while i + 49 < 255:
-            self.subhostIpRange.append((self.brip + i, self.brip + i + 49))
-            i += 50
 
         self.l2DnsPort = l2DnsPort
         self.clientAppearFunc = clientAppearFunc
@@ -213,7 +208,7 @@ class _DefaultBridge:
             ip.link("add", kind="bridge", ifname=self.brname)
             idx = ip.link_lookup(ifname=self.brname)[0]
             ip.link("set", index=idx, state="up")
-            ip.addr("add", index=idx, address=self.brip, mask=self.brnetwork.prefixlen, broadcast=self.brnetwork.broadcast_address)
+            ip.addr("add", index=idx, address=str(self.brip), mask=self.brnetwork.prefixlen, broadcast=str(self.brnetwork.broadcast_address))
 
         # start dnsmasq
         self._runDnsmasq()
@@ -234,16 +229,18 @@ class _DefaultBridge:
         return self.brname
 
     def get_bridge_id(self):
-        return "bridge-" + self.brip
+        return "bridge-%s" % (self.brip)
 
     def get_prefix(self):
-        return (self.brnetwork.network_address, self.brnetwork.netmask)
-
-    def get_ip(self):
-        return self.self.brip
+        return (str(self.brnetwork.network_address), str(self.brnetwork.netmask))
 
     def get_subhost_ip_range(self):
-        return self.subhostIpRange
+        subhostIpRange = []
+        i = 51
+        while i + 49 < 255:
+            subhostIpRange.append((str(self.brip + i), str(self.brip + i + 49)))
+            i += 50
+        return subhostIpRange
 
     def on_other_bridge_created(self, id):
         with open(os.path.join(self.hostsDir, id), "w") as f:

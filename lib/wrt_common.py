@@ -11,6 +11,10 @@ import ipaddress
 class WrtCommon:
 
     @staticmethod
+    def bridgeGetIp(bridge):
+        return str(ipaddress.IPv4Address(bridge.get_prefix()[0]) + 1)
+
+    @staticmethod
     def getWanConnectionPluginList(param):
         return WrtCommon._getPluginList(param, "wconn")
 
@@ -208,9 +212,6 @@ class TemplateBridge:
         assert False
 
     def get_bridge_id(self):
-        assert False
-
-    def get_ip(self):
         assert False
 
     def get_subhost_ip_range(self):

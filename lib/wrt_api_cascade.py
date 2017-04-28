@@ -4,6 +4,7 @@
 import threading
 from wrt_util import JsonApiServer
 from wrt_util import JsonApiClient
+from wrt_common import WrtCommon
 
 
 ################################################################################
@@ -105,7 +106,7 @@ class WrtCascadeApiServer:
         self.freeIpRange = self.bridge.get_subhost_ip_range()
         self.subhostOwnerDict = dict()
 
-        self.realServer = JsonApiServer([bridge.get_ip()], self.param.cascadeApiPort)
+        self.realServer = JsonApiServer([WrtCommon.bridgeGetIp(bridge)], self.param.cascadeApiPort)
 
         self.realServer.setValidClient(True)
         self.realServer.setOneClientPerIp(True)
