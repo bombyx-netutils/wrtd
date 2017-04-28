@@ -194,14 +194,13 @@ class _DefaultBridge:
 
         self.brname = brname
         self.brnetwork = ipaddress.IPv4Network(prefix)
-        self.dhcpRange = (self.brnetwork.hosts()[1], self.brnetwork.hosts()[50])
 
+        self.brip = ipaddress.IPv4Address(prefix[0]) + 1
+        self.dhcpRange = (self.brip, self.brip + 49)
         self.subhostIpRange = []
         i = 51
         while i + 49 < 255:
-            s = self.brnetwork.hosts()[i]
-            e = self.brnetwork.hsots()[i + 49]
-            self.subhostIpRange.append((s, e))
+            self.subhostIpRange.append((self.brip + i, self.brip + i + 49))
             i += 50
 
         self.l2DnsPort = l2DnsPort
@@ -214,7 +213,7 @@ class _DefaultBridge:
             ip.link("add", kind="bridge", ifname=self.brname)
             idx = ip.link_lookup(ifname=self.brname)[0]
             ip.link("set", index=idx, state="up")
-            ip.addr("add", index=idx, address=self.brnetwork.hosts()[0], mask=self.brnetwork.prefixlen, broadcast=self.brnetwork.broadcast_address)
+            ip.addr("add", index=idx, address=self.brip, mask=self.brnetwork.prefixlen, broadcast=self.brnetwork.broadcast_address)
 
         # start dnsmasq
         self._runDnsmasq()
@@ -235,13 +234,13 @@ class _DefaultBridge:
         return self.brname
 
     def get_bridge_id(self):
-        return "bridge-" + self.brnetwork.hosts()[0]
+        return "bridge-" + self.brip
 
     def get_prefix(self):
         return (self.brnetwork.network_address, self.brnetwork.netmask)
 
     def get_ip(self):
-        return self.self.brnetwork.hosts()[0]
+        return self.self.brip
 
     def get_subhost_ip_range(self):
         return self.subhostIpRange
@@ -320,7 +319,7 @@ class _DefaultBridge:
     def _runDnsmasq(self):
         # myhostname file
         with open(self.myhostnameFile, "w") as f:
-            f.write("%s %s\n" % (self.brnetwork.hosts()[0], socket.gethostname()))
+            f.write("%s %s\n" % (self.brip, socket.gethostname()))
 
         # make hosts directory
         os.mkdir(self.hostsDir)
