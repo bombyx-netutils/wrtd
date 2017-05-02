@@ -3,6 +3,7 @@
 
 import dbus
 import dbus.service
+from wrt_common import WrtCommon
 
 
 ################################################################################
@@ -36,7 +37,7 @@ class DbusMainObject(dbus.service.Object):
         if self.param.lanManager is None:
             return None
         else:
-            return self.param.lanManager.defaultBridge.get_ip()
+            return WrtCommon.bridgeGetIp(self.param.lanManager.defaultBridge)
 
     @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='s')
     def GetMask(self):

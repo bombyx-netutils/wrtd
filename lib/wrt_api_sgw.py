@@ -5,6 +5,7 @@ import os
 import glob
 from wrt_util import WrtUtil
 from wrt_util import JsonApiServer
+from wrt_common import WrtCommon
 
 
 ################################################################################
@@ -89,7 +90,7 @@ class WrtSgwApiServer:
         self.subhostOwnerDict = dict()
 
         ipList = ["127.0.0.1"]
-        ipList += [x.get_ip() for x in self.param.lanManager.get_bridges()]
+        ipList += [WrtCommon.bridgeGetIp(x) for x in self.param.lanManager.get_bridges()]
         self.realServer = JsonApiServer(ipList, self.param.sgwApiPort)
 
         self.realServer.addCommand("get-host-list", self._cmdGetHostList)
