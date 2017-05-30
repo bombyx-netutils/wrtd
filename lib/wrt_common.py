@@ -262,7 +262,10 @@ class PluginTemplateWanConnection:
     def stop(self):
         assert False
 
-    def get_out_interface(self):
+    def is_alive(self):
+        assert False
+
+    def get_interface(self):
         assert False
 
     def get_prefix_list(self):
@@ -305,6 +308,9 @@ class PluginTemplateWanVpn:
         assert False
 
     def get_interface(self):
+        assert False
+
+    def get_prefix_list(self):
         assert False
 
 

@@ -8,6 +8,7 @@ import signal
 import logging
 import pyroute2
 import ipaddress
+import threading
 from collections import OrderedDict
 from gi.repository import GLib
 from wrt_util import WrtUtil
@@ -28,6 +29,8 @@ class WrtWanManager:
     def __init__(self, param):
         self.param = param
         self.logger = logging.getLogger(self.__module__ + "." + self.__class__.__name__)
+        self.mainThreadId = threading.get_ident()
+
         self.wanConnPlugin = None
 
         self.vpnPlugin = None
@@ -45,11 +48,7 @@ class WrtWanManager:
                 self.wanConnPlugin = WrtCommon.getWanConnectionPlugin(self.param, cfgObj["plugin"])
                 tdir = os.path.join(self.param.tmpDir, "wconn-%s" % (cfgObj["plugin"]))
                 os.mkdir(tdir)
-                self.wanConnPlugin.init2(cfgObj,
-                                         tdir,
-                                         self.param.ownResolvConf,
-                                         lambda: WrtUtil.idleInvoke(self.on_wconn_up),
-                                         lambda: WrtUtil.idleInvoke(self.on_wconn_down))
+                self.wanConnPlugin.init2(cfgObj, tdir, self.param.ownResolvConf, self.on_wconn_up, self.on_wconn_down)
                 self.wanConnPlugin.start()
                 self.logger.info("Internet connection activated, plugin: %s." % (cfgObj["plugin"]))
 
@@ -67,10 +66,7 @@ class WrtWanManager:
                 self.vpnPlugin = WrtCommon.getWanVpnPlugin(self.param, cfgObj["plugin"])
                 tdir = os.path.join(self.param.tmpDir, "wvpn-%s" % (cfgObj["plugin"]))
                 os.mkdir(tdir)
-                self.vpnPlugin.init2(cfgObj,
-                                     tdir,
-                                     lambda: WrtUtil.idleInvoke(self.on_vpn_up),
-                                     lambda: WrtUtil.idleInvoke(self.on_vpn_down))
+                self.vpnPlugin.init2(cfgObj, tdir, self.on_wvpn_up, self.on_wvpn_down)
                 self.vpnPlugin.start()
                 self.logger.info("VPN activated, plugin: %s." % (cfgObj["plugin"]))
             else:
@@ -94,27 +90,32 @@ class WrtWanManager:
         self.logger.info("Terminated.")
 
     def on_wconn_up(self):
+        assert threading.get_ident() == self.mainThreadId
+
         # check prefix and restart if neccessary
-        if self.param.daemon.getPrefixPool().setExcludedPrefixList("wan", self.wanConnPlugin.get_prefix_list()):
+        if self.param.daemon.getPrefixPool().setExcludePrefixList("wan", self.wanConnPlugin.get_prefix_list()):
             self.logger.error("Bridge prefix duplicates with internet connection, restart automatically.")
             os.kill(os.getpid(), signal.SIGHUP)
             return
 
         # change the firewall rules
-        intf = self.wanConnPlugin.get_out_interface()
+        intf = self.wanConnPlugin.get_interface()
         WrtUtil.shell('/sbin/nft add rule wrtd natpost oifname %s masquerade' % (intf))
         WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ct state established,related accept' % (intf))
         WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ip protocol icmp accept' % (intf))
         WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s drop' % (intf))
 
     def on_wconn_down(self):
-        pass
+        assert threading.get_ident() == self.mainThreadId
 
-    def on_vpn_up(self):
+        ret = self.param.daemon.getPrefixPool().setExcludePrefixList("wan", [])
+        assert ret
+
+    def on_wvpn_up(self):
+        assert threading.get_ident() == self.mainThreadId
+
         # check prefix and restart if neccessary
-        netobj = ipaddress.IPv4Network(self.vpnPlugin.get_local_ip(), self.vpnPlugin.get_netmask(), False)
-        prefix = (str(netobj.network_address), str(netobj.netmask))
-        if self.param.daemon.getPrefixPool().setExcludedPrefixList("vpn", [prefix]):
+        if self.param.daemon.getPrefixPool().setExcludePrefixList("vpn", self.vpnPlugin.get_prefix_list()):
             self.logger.error("Bridge prefix duplicates with VPN connection, restart automatically.")
             os.kill(os.getpid(), signal.SIGHUP)
             return
@@ -157,14 +158,25 @@ class WrtWanManager:
             os.kill(os.getpid(), signal.SIGHUP)
             return
 
-    def on_vpn_down(self):
+    def on_wvpn_down(self):
+        assert threading.get_ident() == self.mainThreadId
+
         self.subHostDict = None
+
         self.vpnUpstreamDict = None
+        ret = self.param.daemon.getPrefixPool().setExcludePrefixList("vpn-upstream", [])
+        assert ret
+
         if self.apiClient is not None:
             self.apiClient.dispose()
             self.apiClient = None
 
+        ret = self.param.daemon.getPrefixPool().setExcludePrefixList("vpn", [])
+        assert ret
+
     def on_host_appear(self, ipDataDict):
+        assert threading.get_ident() == self.mainThreadId
+
         if self.vpnPlugin is None:
             return
         if self.apiClient is None:
@@ -186,6 +198,8 @@ class WrtWanManager:
         self.apiClient.addSubhost(ipDataDict2)
 
     def on_host_disappear(self, ipList):
+        assert threading.get_ident() == self.mainThreadId
+
         if self.vpnPlugin is None:
             return
         if self.apiClient is None:
