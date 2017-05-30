@@ -265,7 +265,7 @@ class PluginTemplateWanConnection:
     def get_out_interface(self):
         assert False
 
-    def get_prefixes(self):
+    def get_prefix_list(self):
         assert False
 
     def interface_appear(self, ifname):
