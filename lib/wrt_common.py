@@ -94,11 +94,11 @@ class PrefixPool:
 
     def __init__(self, dataFile):
         self.dataFile = dataFile
-        self.upstreamPrefixList = []    # list<prefix-ip, prefix-mask>
-        self.prefixList = []            # list<prefix-ip, prefix-mask, used-flag>
+        self.excludePrefixDict = dict()     # dict<key, list<prefix-ip, prefix-mask>>
+        self.prefixList = []                # list<prefix-ip, prefix-mask, used-flag>
         self._load()
 
-    def setUpstreamPrefixList(self, upstreamPrefixList):
+    def setExcludePrefixList(self, key, prefixList):
         """Returns True means conflict is found and solved, reboot needed"""
 
         ret = False
@@ -108,7 +108,7 @@ class PrefixPool:
         for i in range(0, len(self.prefixList)):
             pip, pmask, used = self.prefixList[i]
             netobj = ipaddress.IPv4Network(pip + "/" + pmask)
-            for ip2, mask2 in upstreamPrefixList:
+            for ip2, mask2 in prefixList:
                 if netobj.overlaps(ipaddress.IPv4Network(ip2 + "/" + mask2)):
                     idxList.append(i)
                     if used:
@@ -123,10 +123,10 @@ class PrefixPool:
 
         # create new prefix for conflict items
         for i in idxList:
-            pip, pmask = PrefixPool._createNewPrefix(refList + upstreamPrefixList)
+            pip, pmask = PrefixPool._createNewPrefix(refList + prefixList)
             self.prefixList[i] = (pip, pmask, False)
 
-        self.upstreamPrefixList = upstreamPrefixList
+        self.excludePrefixDict[key] = prefixList
         self._save()
         return ret
 
@@ -138,8 +138,13 @@ class PrefixPool:
                 self.prefixList[i] = (ip, mask, True)
                 return (ip, mask)
 
+        # get exluded prefix list
+        tl = self.prefixList
+        for l in self.excludePrefixDict.values():
+            tl += l
+
         # create a new prefix
-        pip, pmask = PrefixPool._createNewPrefix(self.prefixList + self.upstreamPrefixList)
+        pip, pmask = PrefixPool._createNewPrefix(tl)
         self.prefixList.append((pip, pmask, True))
         self._save()
         return (pip, pmask)
@@ -260,10 +265,7 @@ class PluginTemplateWanConnection:
     def get_out_interface(self):
         assert False
 
-    def get_ip(self):
-        assert False
-
-    def get_netmask(self):
+    def get_prefixes(self):
         assert False
 
     def interface_appear(self, ifname):

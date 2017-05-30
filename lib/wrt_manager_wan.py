@@ -94,6 +94,12 @@ class WrtWanManager:
         self.logger.info("Terminated.")
 
     def on_wconn_up(self):
+        # check prefix and restart if neccessary
+        if self.param.daemon.getPrefixPool().setExcludedPrefixList("wan", self.wanConnPlugin.get_prefix_list()):
+            self.logger.error("Bridge prefix duplicates with internet connection, restart automatically.")
+            os.kill(os.getpid(), signal.SIGHUP)
+            return
+
         # change the firewall rules
         intf = self.wanConnPlugin.get_out_interface()
         WrtUtil.shell('/sbin/nft add rule wrtd natpost oifname %s masquerade' % (intf))
@@ -105,6 +111,14 @@ class WrtWanManager:
         pass
 
     def on_vpn_up(self):
+        # check prefix and restart if neccessary
+        netobj = ipaddress.IPv4Network(self.vpnPlugin.get_local_ip(), self.vpnPlugin.get_netmask(), False)
+        prefix = (str(netobj.network_address), str(netobj.netmask))
+        if self.param.daemon.getPrefixPool().setExcludedPrefixList("vpn", [prefix]):
+            self.logger.error("Bridge prefix duplicates with VPN connection, restart automatically.")
+            os.kill(os.getpid(), signal.SIGHUP)
+            return
+
         try:
             self.apiClient = WrtCascadeApiClient(self.vpnPlugin.get_remote_ip(), self.param.cascadeApiPort)
             initData = self.apiClient.connect()
@@ -127,13 +141,18 @@ class WrtWanManager:
             return
 
         # check upstream uuid and restart if neccessary
-        if self._checkUpstreamUuid():
-            self.logger.error("Router UUID duplicates with upstream, restart automatically.")
-            os.kill(os.getpid(), signal.SIGHUP)
-            return
+        if self.vpnUpstreamDict is not None:
+            if self.param.uuid in self.vpnUpstreamDict.keys():
+                self.logger.error("Router UUID duplicates with upstream, restart automatically.")
+                os.kill(os.getpid(), signal.SIGHUP)
+                return
 
         # check upstream prefix and restart if neccessary
-        if self._checkUpstreamPrefixListAndChange():
+        tl = []
+        if self.vpnUpstreamDict is not None:
+            for uinfo in self.vpnUpstreamDict:
+                tl += uinfo.prefixList
+        if self.param.daemon.getPrefixPool().setExcludePrefixList("vpn-upstream", tl):
             self.logger.error("Bridge prefix duplicates with upstream, restart automatically.")
             os.kill(os.getpid(), signal.SIGHUP)
             return
@@ -199,28 +218,6 @@ class WrtWanManager:
         m = re.search("\\s*ip saddr %s oif \"%s\" snat to %s # handle ([0-9]+)" % (subHostIp, self.vpnPlugin.get_interface(), natIp), msg, re.M)
         if m is not None:
             WrtUtil.shell("/sbin/nft delete rule wrtd natpost handle %s" % (m.group(1)))
-
-    def _checkUpstreamUuid(self):
-        if self.vpnUpstreamDict is None:
-            return False
-        if self.param.uuid not in self.vpnUpstreamDict.keys():
-            return False
-
-        # we don't change uuid actually, duplicated uuid is impossible
-        return True
-
-    def _checkUpstreamPrefixListAndChange(self):
-        tl = []
-        if self.wanConnPlugin is not None:
-            if self.wanConnPlugin.get_ip() is not None and self.wanConnPlugin.get_netmask() is not None:
-                tl.append((self.wanConnPlugin.get_ip(), self.wanConnPlugin.get_netmask()))
-        if self.vpnPlugin is not None:
-            if self.vpnPlugin.get_local_ip() is not None and self.vpnPlugin.get_netmask() is not None:
-                tl.append((self.vpnPlugin.get_local_ip(), self.vpnPlugin.get_netmask()))
-        if self.vpnUpstreamDict is not None:
-            for uinfo in self.vpnUpstreamDict:
-                tl += uinfo.prefixList
-        return self.param.daemon.getPrefixPool().setUpstreamPrefixList(tl)
 
 
 class _UpStreamInfo:
