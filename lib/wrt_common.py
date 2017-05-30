@@ -99,6 +99,8 @@ class PrefixPool:
         self._load()
 
     def setUpstreamPrefixList(self, upstreamPrefixList):
+        """Returns True means conflict is found and solved, reboot needed"""
+
         ret = False
 
         # get conflict items
@@ -243,9 +245,10 @@ class TemplateBridge:
 # plugin module name: plugins.wconn_*
 # config file: ${ETC}/wan-connection.json
 # only allow one plugin be loaded
+# must set an all deny firewall rule for the out interface immediately after wan connection is up
 class PluginTemplateWanConnection:
 
-    def init2(self, tmpDir, ownResolvConf):
+    def init2(self, tmpDir, ownResolvConf, upCallback, downCallback):
         assert False
 
     def start(self):
@@ -257,13 +260,19 @@ class PluginTemplateWanConnection:
     def get_out_interface(self):
         assert False
 
+    def get_ip(self):
+        assert False
+
+    def get_netmask(self):
+        assert False
+
     def interface_appear(self, ifname):
         # return True means we take this interface
-        # must be call after start()
+        # must be called after start()
         assert False
 
     def interface_disappear(self, ifname):
-        # must be call after start()
+        # must be called after start()
         assert False
 
 
@@ -272,10 +281,10 @@ class PluginTemplateWanConnection:
 # only allow one plugin be loaded
 class PluginTemplateWanVpn:
 
-    def init2(self, tmpDir):
+    def init2(self, cfg, tmpDir, upCallback, downCallback):
         assert False
 
-    def start(self, cfg):
+    def start(self):
         assert False
 
     def stop(self):
@@ -313,14 +322,14 @@ class TemplatePluginLanInterface:
 
     def get_bridge(self):
         # return None means using default bridge
-        # must be call after start()
+        # must be called after start()
         assert False
 
     def interface_appear(self, bridge, ifname):
         # return True means we take this interface
-        # must be call after start()
+        # must be called after start()
         assert False
 
     def interface_disappear(self, ifname):
-        # must be call after start()
+        # must be called after start()
         assert False

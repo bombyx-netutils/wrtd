@@ -21,6 +21,13 @@ from gi.repository import GLib
 class WrtUtil:
 
     @staticmethod
+    def idleInvoke(func, *args):
+        def _idleCallback(func, *args):
+            func(*args)
+            return False
+        GLib.idle_add(_idleCallback, func, *args)
+
+    @staticmethod
     def restartProgram():
         python = sys.executable
         os.execl(python, python, * sys.argv)

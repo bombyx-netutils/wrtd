@@ -10,7 +10,6 @@ import pyroute2
 import ipaddress
 from collections import OrderedDict
 from gi.repository import GLib
-from gi.repository import GObject
 from wrt_util import WrtUtil
 from wrt_common import WrtCommon
 from wrt_api_cascade import WrtCascadeApiClient
@@ -28,15 +27,15 @@ class WrtWanManager:
 
     def __init__(self, param):
         self.param = param
+        self.logger = logging.getLogger(self.__module__ + "." + self.__class__.__name__)
         self.wanConnPlugin = None
 
         self.vpnPlugin = None
         self.apiClient = None
-        self.upstreamDict = None                # ordereddict<upstream-id, data>
+        self.vpnUpstreamDict = None             # ordereddict<upstream-id, data>
         self.subHostDict = None                 # dict<upstream-ip, subhost-ip>
-        self.vpnRestartCountDown = None
 
-        logging.info("WAN: Start.")
+        self.logger.info("Start.")
         try:
             cfgfile = os.path.join(self.param.etcDir, "wan-connection.json")
             if os.path.exists(cfgfile):
@@ -46,18 +45,19 @@ class WrtWanManager:
                 self.wanConnPlugin = WrtCommon.getWanConnectionPlugin(self.param, cfgObj["plugin"])
                 tdir = os.path.join(self.param.tmpDir, "wconn-%s" % (cfgObj["plugin"]))
                 os.mkdir(tdir)
-                self.wanConnPlugin.init2(cfgObj, tdir, self.param.ownResolvConf)
+                self.wanConnPlugin.init2(cfgObj,
+                                         tdir,
+                                         self.param.ownResolvConf,
+                                         lambda: WrtUtil.idleInvoke(self.on_wconn_up),
+                                         lambda: WrtUtil.idleInvoke(self.on_wconn_down))
                 self.wanConnPlugin.start()
-                logging.info("WAN: Internet connection activated, plugin: %s." % (cfgObj["plugin"]))
-
-                self._addNftRuleWan()
-                logging.info("WAN: Firewall is up.")
+                self.logger.info("Internet connection activated, plugin: %s." % (cfgObj["plugin"]))
 
                 with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
                     f.write("1")
-                logging.info("WAN: IP forwarding enabled.")
+                self.logger.info("IP forwarding enabled.")
             else:
-                logging.info("WAN: No internet connection configured.")
+                self.logger.info("No internet connection configured.")
 
             cfgfile = os.path.join(self.param.etcDir, "wan-vpn.json")
             if os.path.exists(cfgfile):
@@ -67,12 +67,14 @@ class WrtWanManager:
                 self.vpnPlugin = WrtCommon.getWanVpnPlugin(self.param, cfgObj["plugin"])
                 tdir = os.path.join(self.param.tmpDir, "wvpn-%s" % (cfgObj["plugin"]))
                 os.mkdir(tdir)
-                self.vpnPlugin.init2(cfgObj, self.vpnPlugin.get_interface(), tdir)
-                self.vpnTimer = GObject.timeout_add_seconds(10, self._vpnTimerCallback)
-                self.vpnRestartCountDown = 0
-                logging.info("WAN: VPN activated, plugin: %s." % (cfgObj["plugin"]))
+                self.vpnPlugin.init2(cfgObj,
+                                     tdir,
+                                     lambda: WrtUtil.idleInvoke(self.on_vpn_up),
+                                     lambda: WrtUtil.idleInvoke(self.on_vpn_down))
+                self.vpnPlugin.start()
+                self.logger.info("VPN activated, plugin: %s." % (cfgObj["plugin"]))
             else:
-                logging.info("WAN: No VPN configured.")
+                self.logger.info("No VPN configured.")
         except:
             self.dispose()
             raise
@@ -82,14 +84,66 @@ class WrtWanManager:
             GLib.source_remove(self.vpnTimer)
             self.vpnPlugin.stop()
             self.vpnPlugin = None
-            logging.info("WAN: VPN deactivated.")
+            self.logger.info("VPN deactivated.")
         if self.wanConnPlugin is not None:
             with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
                 f.write("0")
             self.wanConnPlugin.stop()
             self.wanConnPlugin = None
-            logging.info("WAN: Internet connection deactivated.")
-        logging.info("WAN: Terminated.")
+            self.logger.info("Internet connection deactivated.")
+        self.logger.info("Terminated.")
+
+    def on_wconn_up(self):
+        # change the firewall rules
+        intf = self.wanConnPlugin.get_out_interface()
+        WrtUtil.shell('/sbin/nft add rule wrtd natpost oifname %s masquerade' % (intf))
+        WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ct state established,related accept' % (intf))
+        WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ip protocol icmp accept' % (intf))
+        WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s drop' % (intf))
+
+    def on_wconn_down(self):
+        pass
+
+    def on_vpn_up(self):
+        try:
+            self.apiClient = WrtCascadeApiClient(self.vpnPlugin.get_remote_ip(), self.param.cascadeApiPort)
+            initData = self.apiClient.connect()
+
+            self.vpnUpstreamDict = OrderedDict()
+            for k, v in initData["upstream"]:
+                self.vpnUpstreamDict[k] = _UpStreamInfo(v)
+
+            self.subHostDict = dict()
+            if True:
+                ip = initData["subhost-start"]
+                while ip != initData["subhost-end"]:
+                    self.subHostDict[ip] = None
+                    ip = str(ipaddress.IPv4Address(ip) + 1)
+                self.subHostDict[ip] = None
+        except Exception as e:
+            self.vpnPlugin.stop()
+            self.vpnPlugin.start()
+            self.logger.error("Cascade API error, restart VPN plugin, %s", e)
+            return
+
+        # check upstream uuid and restart if neccessary
+        if self._checkUpstreamUuid():
+            self.logger.error("Router UUID duplicates with upstream, restart automatically.")
+            os.kill(os.getpid(), signal.SIGHUP)
+            return
+
+        # check upstream prefix and restart if neccessary
+        if self._checkUpstreamPrefixListAndChange():
+            self.logger.error("Bridge prefix duplicates with upstream, restart automatically.")
+            os.kill(os.getpid(), signal.SIGHUP)
+            return
+
+    def on_vpn_down(self):
+        self.subHostDict = None
+        self.vpnUpstreamDict = None
+        if self.apiClient is not None:
+            self.apiClient.dispose()
+            self.apiClient = None
 
     def on_host_appear(self, ipDataDict):
         if self.vpnPlugin is None:
@@ -131,13 +185,6 @@ class WrtWanManager:
                     break
         self.apiClient.removeSubhost(ipList2)
 
-    def _addNftRuleWan(self):
-        intf = self.wanConnPlugin.get_out_interface()
-        WrtUtil.shell('/sbin/nft add rule wrtd natpost oifname %s masquerade' % (intf))
-        WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ct state established,related accept' % (intf))
-        WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ip protocol icmp accept' % (intf))
-        WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s drop' % (intf))
-
     def _addNftRuleVpnSubHost(self, subHostIp, natIp):
         WrtUtil.shell('/sbin/nft add rule wrtd natpre ip daddr %s iif %s dnat %s' % (natIp, self.vpnPlugin.get_interface(), subHostIp))
         WrtUtil.shell('/sbin/nft add rule wrtd natpost ip saddr %s oif %s snat %s' % (subHostIp, self.vpnPlugin.get_interface(), natIp))
@@ -153,81 +200,26 @@ class WrtWanManager:
         if m is not None:
             WrtUtil.shell("/sbin/nft delete rule wrtd natpost handle %s" % (m.group(1)))
 
-    def _vpnTimerCallback(self):
-        if self.vpnRestartCountDown is None:
-            if self.vpnPlugin.is_alive():
-                return True
-            else:
-                # vpn is in bad state, stop it now, restart it in the next cycle
-                self._stopVpn()
-                self.vpnRestartCountDown = 6
-                logging.info("VPN disconnected.")
-                return True
-
-        if self.vpnRestartCountDown > 0:
-            self.vpnRestartCountDown -= 1
-            return True
-
-        logging.info("Establishing VPN connection.")
-        try:
-            self.vpnPlugin.start()
-
-            self.apiClient = WrtCascadeApiClient(self.vpnPlugin.get_remote_ip(), self.param.cascadeApiPort)
-            initData = self.apiClient.connect()
-
-            self.upstreamDict = OrderedDict()
-            for k, v in initData["upstream"]:
-                self.upstreamDict[k] = _UpStreamInfo(v)
-
-            self.subHostDict = dict()
-            if True:
-                ip = initData["subhost-start"]
-                while ip != initData["subhost-end"]:
-                    self.subHostDict[ip] = None
-                    ip = str(ipaddress.IPv4Address(ip) + 1)
-                self.subHostDict[ip] = None
-
-            logging.info("VPN connected.")
-        except Exception as e:
-            self._stopVpn()
-            self.vpnRestartCountDown = 6
-            logging.error("Failed to establish VPN connection, %s", e)
-            return True
-
-        # check upstream uuid and restart if neccessary
-        if self._checkAndChangeUpstreamUuid():
-            logging.error("Router UUID duplicates with upstream, restart automatically.")
-            os.kill(os.getpid(), signal.SIGHUP)
-            return True
-
-        # check upstream prefix and restart if neccessary
-        if self._checkAndChangeUpstreamPrefix():
-            logging.error("Bridge prefix duplicates with upstream, restart automatically.")
-            os.kill(os.getpid(), signal.SIGHUP)
-            return True
-
-        return True
-
-    def _stopVpn(self):
-        self.vpnRestartCountDown = None
-        self.subHostDict = None
-        if self.apiClient is not None:
-            self.apiClient.dispose()
-            self.apiClient = None
-        self.vpnPlugin.stop()
-        self.vpnPlugin = None
-
-    def _checkAndChangeUpstreamUuid(self):
-        if self.param.uuid not in self.upstreamDict.keys():
+    def _checkUpstreamUuid(self):
+        if self.vpnUpstreamDict is None:
+            return False
+        if self.param.uuid not in self.vpnUpstreamDict.keys():
             return False
 
         # we don't change uuid actually, duplicated uuid is impossible
         return True
 
-    def _checkAndChangeUpstreamPrefix(self):
+    def _checkUpstreamPrefixListAndChange(self):
         tl = []
-        for uinfo in self.upstreamDict:
-            tl += uinfo.prefixList
+        if self.wanConnPlugin is not None:
+            if self.wanConnPlugin.get_ip() is not None and self.wanConnPlugin.get_netmask() is not None:
+                tl.append((self.wanConnPlugin.get_ip(), self.wanConnPlugin.get_netmask()))
+        if self.vpnPlugin is not None:
+            if self.vpnPlugin.get_local_ip() is not None and self.vpnPlugin.get_netmask() is not None:
+                tl.append((self.vpnPlugin.get_local_ip(), self.vpnPlugin.get_netmask()))
+        if self.vpnUpstreamDict is not None:
+            for uinfo in self.vpnUpstreamDict:
+                tl += uinfo.prefixList
         return self.param.daemon.getPrefixPool().setUpstreamPrefixList(tl)
 
 
