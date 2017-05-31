@@ -109,7 +109,7 @@ class WrtWanManager:
         assert threading.get_ident() == self.mainThreadId
 
         ret = self.param.daemon.getPrefixPool().setExcludePrefixList("wan", [])
-        assert ret
+        assert not ret
 
     def on_wvpn_up(self):
         assert threading.get_ident() == self.mainThreadId
@@ -165,14 +165,14 @@ class WrtWanManager:
 
         self.vpnUpstreamDict = None
         ret = self.param.daemon.getPrefixPool().setExcludePrefixList("vpn-upstream", [])
-        assert ret
+        assert not ret
 
         if self.apiClient is not None:
             self.apiClient.dispose()
             self.apiClient = None
 
         ret = self.param.daemon.getPrefixPool().setExcludePrefixList("vpn", [])
-        assert ret
+        assert not ret
 
     def on_host_appear(self, ipDataDict):
         assert threading.get_ident() == self.mainThreadId
