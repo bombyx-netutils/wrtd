@@ -12,8 +12,8 @@ install:
 
 	install -d -m 0755 "$(DESTDIR)/$(prefix)/lib/wrtd"
 	cp -r lib/* "$(DESTDIR)/$(prefix)/lib/wrtd"
-	find "$(DESTDIR)/$(prefix)/lib/wrtd" -type f | xargs chmod 644
-	find "$(DESTDIR)/$(prefix)/lib/wrtd" -type d | xargs chmod 755
+	find "$(DESTDIR)/$(prefix)/lib/wrtd" -path "$(DESTDIR)/$(prefix)/lib/wrtd/plugins" -prune -o -type f | xargs chmod 644
+	find "$(DESTDIR)/$(prefix)/lib/wrtd" -path "$(DESTDIR)/$(prefix)/lib/wrtd/plugins" -prune -o -type d | xargs chmod 755
 
 	install -d -m 0755 "$(DESTDIR)/etc/wrtd"
 

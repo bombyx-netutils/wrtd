@@ -66,7 +66,9 @@ class WrtCommon:
             modname = modname.replace("/", ".")
             exec("import %s" % (modname))
             if name in eval("%s.get_plugin_list()" % (modname)):
-                return eval("%s.get_plugin(\"%s\")" % (modname, name))
+                obj = eval("%s.get_plugin(\"%s\")" % (modname, name))
+                obj.plugin_id = name
+                return obj
         return None
 
 
@@ -80,7 +82,7 @@ class DnsMasqHostFilesLock:
         try:
             self.lockFd = os.open(self.lockFile, os.O_WRONLY | os.O_CREAT | os.O_CLOEXEC, 0o600)
             fcntl.lockf(self.lockFd, fcntl.LOCK_EX)
-        except:
+        except BaseException:
             if self.lockFd is not None:
                 os.close(self.lockFd)
                 self.lockFd = None

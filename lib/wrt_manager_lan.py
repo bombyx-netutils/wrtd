@@ -23,7 +23,7 @@ class WrtLanManager:
         self.param = param
         self.pluginDict = OrderedDict()             # <name, object>
         self.defaultBridge = None
-        self.clientDict = dict()
+        self.clientDict = dict()                    # <client-ip, client-info>
 
         logging.info("LAN: Start.")
 
@@ -84,7 +84,7 @@ class WrtLanManager:
 
                     self.pluginDict[tname] = p
                     logging.info("LAN: Interface plugin \"%s\" activated." % (tname))
-        except:
+        except BaseException:
             self.dispose()
             raise
 
@@ -395,3 +395,7 @@ class _DefaultBridge:
             self.lastScanRecord = ret
         finally:
             return True
+
+
+class _ClientInfo:
+    pass

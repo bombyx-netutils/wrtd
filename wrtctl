@@ -5,7 +5,7 @@ import sys
 import argparse
 sys.path.append('/usr/lib/wrtd')
 from wrt_param import WrtParam
-from wrt_subcmd import WrtSubCmdMain
+from wrt_cmd import WrtSubCmdMain
 
 
 def parseArgs():

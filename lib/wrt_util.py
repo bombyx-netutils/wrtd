@@ -281,7 +281,7 @@ class NewMountNamespace:
             if self._mount(srcdir, target, None, (self._MS_REC | self._MS_PRIVATE), None) != 0:
                 e = ctypes.get_errno()
                 raise OSError(e, errno.errorcode[e])
-        except:
+        except BaseException:
             self.parentfd.close()
             self.parentfd = None
             raise
@@ -321,10 +321,11 @@ class JsonApiServer:
                 serverSock.setblocking(0)
                 serverSourceId = GLib.io_add_watch(serverSock, GLib.IO_IN | self.flagError, self._onServerAccept)
                 self.serverSockList.append((serverSock, serverSourceId))
-        except:
+        except BaseException:
             for serverSock, serverSourceId in self.serverSockList:
                 GLib.source_remove(serverSourceId)
                 serverSock.close()
+            self.serverSockList = []
 
     def setValidClient(self, value):
         assert isinstance(value, bool)
@@ -559,7 +560,7 @@ class JsonApiClient:
                 ret = jsonObj["init"]
 
             _RecvThread(self).start()
-        except:
+        except BaseException:
             self.sock.close()
             raise
 

@@ -71,7 +71,7 @@ class WrtWanManager:
                 self.logger.info("VPN activated, plugin: %s." % (cfgObj["plugin"]))
             else:
                 self.logger.info("No VPN configured.")
-        except:
+        except BaseException:
             self.dispose()
             raise
 

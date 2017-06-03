@@ -16,9 +16,12 @@ from wrt_common import WrtCommon
 # Object path           /
 #
 # Methods:
+# str                                          GetWanConnInfo()
+# (mac,ip,hostname)                            GetClients()
+
+
 # str                                          GetIp()
 # int                                          GetMask()
-# (mac,ip,hostname,bWiredOrWireless)           GetClients()
 #
 class DbusMainObject(dbus.service.Object):
 
@@ -31,6 +34,17 @@ class DbusMainObject(dbus.service.Object):
 
     def release(self):
         self.remove_from_connection()
+
+    @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='s')
+    def GetWanConnInfo(self):
+        if self.param.wanManager.wanConnPlugin is None:
+            return "None"
+
+        plugin = self.param.wanManager.wanConnPlugin
+        msg = ""
+        msg += "Plugin: " + plugin.plugin_id + "\n"
+        msg += "Status: " + "Connected" if plugin.is_alive() else "Disconnected"
+        return msg
 
     @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='s')
     def GetIp(self):
@@ -46,13 +60,10 @@ class DbusMainObject(dbus.service.Object):
         else:
             return self.param.lanManager.defaultBridge.get_mask()
 
-    @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='a(sssb)')
+#    @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='a(sssb)')
+    @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='a(s)')
     def GetClients(self):
-        return []
-        # ret = []
-        # for c in self.param.lanManager.getClients():
-        #     ret.append((c.mac, c.ip, c.hostname, c.bWiredOrWireless))
-        # return ret
+        return self.param.lanManager.get_clients()
 
 
 ################################################################################
