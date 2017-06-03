@@ -4,7 +4,6 @@
 import os
 import dbus
 from wrt_util import WrtUtil
-from wrt_common import WrtCommon
 
 
 class WrtSubCmdMain:
@@ -20,6 +19,9 @@ class WrtSubCmdMain:
         print("Internet Connection:")
         print(self._addIndent(dbusObj.GetWanConnInfo(dbus_interface="org.fpemud.WRT")))
         print("")
+
+        print("LAN Interface:")
+        print(self._addIndent(dbusObj.GetLanInterfaceInfo(dbus_interface="org.fpemud.WRT")))
 
         print("Clients:")
         msg = "\n".join(dbusObj.GetClients(dbus_interface="org.fpemud.WRT"))
@@ -41,6 +43,13 @@ class WrtSubCmdMain:
         print("Upstream Hosts:")
         print("?")
 
+    def cmdGenerateClientScript(self, lif_plugin_id, ostype):
+        dbusObj = dbus.SystemBus().get_object('org.fpemud.WRT', '/org/fpemud/WRT')
+        if dbusObj is None:
+            raise Exception("not started")
+        ret = dbusObj.GenerateClientScript(lif_plugin_id, ostype, dbus_interface="org.fpemud.WRT")
+        print(ret)
+
     def _showOneClient(self, ip, hostname):
         if hostname != "":
             hostnameStr = "%s (%s)" % (hostname, ip)
@@ -53,14 +62,6 @@ class WrtSubCmdMain:
             print(hostnameStr + ":")
             for sip, shostname in WrtUtil.readDnsmasqHostFile(fname):
                 print("        " + shostname + " (" + sip + ")")
-
-    def cmdGenerateClientScript(self, ostype):
-        if not WrtCommon.isInitialized(self.param):
-            raise Exception("not initialized")
-
-        fn, buf = WrtCommon.generateClientScript(self.param, ostype)
-        with open(fn, "w") as f:
-            f.write(buf)
 
     def _addIndent(self, msg):
         assert not msg.endswith("\n")

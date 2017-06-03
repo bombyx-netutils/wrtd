@@ -17,6 +17,7 @@ def parseArgs():
 
     apServerGenClientCert = subParsers.add_parser("generate-client-script")
     apServerGenClientCert.set_defaults(subcmd="generate-client-script")
+    apServerGenClientCert.add_argument("--lif-type")
     apServerGenClientCert.add_argument("--os")
 
     return argParser.parse_args()
@@ -30,6 +31,6 @@ parseResult = parseArgs()
 if parseResult.subcmd == "show":
     WrtSubCmdMain(param).cmdShow()
 elif parseResult.subcmd == "generate-client-script":
-    WrtSubCmdMain(param).cmdGenerateClientScript()
+    WrtSubCmdMain(param).cmdGenerateClientScript(parseResult.lif_type, parseResult.os)
 else:
     raise Exception("Invalid command")

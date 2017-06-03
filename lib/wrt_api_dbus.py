@@ -17,6 +17,7 @@ from wrt_common import WrtCommon
 #
 # Methods:
 # str                                          GetWanConnInfo()
+# str                                          GenerateClientScript(lif_plugin_id, os_type)
 # (mac,ip,hostname)                            GetClients()
 
 
@@ -47,6 +48,11 @@ class DbusMainObject(dbus.service.Object):
         return msg
 
     @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='s')
+    def GetLanInterfaceInfo(self):
+        msg = "\n".join(x.plugin_id for x in self.param.lanManager.get_plugins())
+        return msg
+
+    @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='s')
     def GetIp(self):
         if self.param.lanManager is None:
             return None
@@ -64,6 +70,20 @@ class DbusMainObject(dbus.service.Object):
     @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='a(s)')
     def GetClients(self):
         return self.param.lanManager.get_clients()
+
+    @dbus.service.method('org.fpemud.WRT', in_signature='s', out_signature='s')
+    def GenerateClientScript(self, lif_plugin_id, os_type):
+        pluginObj = None
+        for po in self.param.lanManager.get_plugins():
+            if po.plugin_id != lif_plugin_id:
+                pluginObj = po
+                break
+        if pluginObj is None:
+            raise Exception("the specified plugin does not exist")
+
+        if not hasattr(pluginObj, "generate_client_script"):
+            raise Exception("the specified plugin has no client script capability")
+        return pluginObj.generate_client_script(os_type)
 
 
 ################################################################################

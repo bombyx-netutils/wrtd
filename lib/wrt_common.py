@@ -343,3 +343,7 @@ class TemplatePluginLanInterface:
     def interface_disappear(self, ifname):
         # must be called after start()
         assert False
+
+    def generate_client_script(self, ostype):
+        # optional method
+        assert False
