@@ -50,7 +50,7 @@ class WrtSubCmdMain:
         fn, buf = dbusObj.GenerateClientScript(lif_plugin_id, ostype, dbus_interface="org.fpemud.WRT")
         with open(fn, "w") as f:
             f.write(buf)
-        print("Client script generated as %s" % (fn))
+        print("Client script generated as ./%s" % (fn))
 
     def _showOneClient(self, ip, hostname):
         if hostname != "":
