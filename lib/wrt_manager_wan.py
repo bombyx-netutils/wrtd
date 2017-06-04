@@ -39,41 +39,38 @@ class WrtWanManager:
         self.subHostDict = None                 # dict<upstream-ip, subhost-ip>
 
         self.logger.info("Start.")
-        try:
-            cfgfile = os.path.join(self.param.etcDir, "wan-connection.json")
-            if os.path.exists(cfgfile):
-                cfgObj = None
-                with open(cfgfile, "r") as f:
-                    cfgObj = json.load(f)
-                self.wanConnPlugin = WrtCommon.getWanConnectionPlugin(self.param, cfgObj["plugin"])
-                tdir = os.path.join(self.param.tmpDir, "wconn-%s" % (cfgObj["plugin"]))
-                os.mkdir(tdir)
-                self.wanConnPlugin.init2(cfgObj, tdir, self.param.ownResolvConf, self.on_wconn_up, self.on_wconn_down)
-                self.wanConnPlugin.start()
-                self.logger.info("Internet connection activated, plugin: %s." % (cfgObj["plugin"]))
 
-                with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
-                    f.write("1")
-                self.logger.info("IP forwarding enabled.")
-            else:
-                self.logger.info("No internet connection configured.")
+        cfgfile = os.path.join(self.param.etcDir, "wan-connection.json")
+        if os.path.exists(cfgfile):
+            cfgObj = None
+            with open(cfgfile, "r") as f:
+                cfgObj = json.load(f)
+            self.wanConnPlugin = WrtCommon.getWanConnectionPlugin(self.param, cfgObj["plugin"])
+            tdir = os.path.join(self.param.tmpDir, "wconn-%s" % (cfgObj["plugin"]))
+            os.mkdir(tdir)
+            self.wanConnPlugin.init2(cfgObj, tdir, self.param.ownResolvConf, self.on_wconn_up, self.on_wconn_down)
+            self.wanConnPlugin.start()
+            self.logger.info("Internet connection activated, plugin: %s." % (cfgObj["plugin"]))
 
-            cfgfile = os.path.join(self.param.etcDir, "wan-vpn.json")
-            if os.path.exists(cfgfile):
-                cfgObj = None
-                with open(cfgfile, "r") as f:
-                    cfgObj = json.load(f)
-                self.vpnPlugin = WrtCommon.getWanVpnPlugin(self.param, cfgObj["plugin"])
-                tdir = os.path.join(self.param.tmpDir, "wvpn-%s" % (cfgObj["plugin"]))
-                os.mkdir(tdir)
-                self.vpnPlugin.init2(cfgObj, tdir, self.on_wvpn_up, self.on_wvpn_down)
-                self.vpnPlugin.start()
-                self.logger.info("VPN activated, plugin: %s." % (cfgObj["plugin"]))
-            else:
-                self.logger.info("No VPN configured.")
-        except BaseException:
-            self.dispose()
-            raise
+            with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
+                f.write("1")
+            self.logger.info("IP forwarding enabled.")
+        else:
+            self.logger.info("No internet connection configured.")
+
+        cfgfile = os.path.join(self.param.etcDir, "wan-vpn.json")
+        if os.path.exists(cfgfile):
+            cfgObj = None
+            with open(cfgfile, "r") as f:
+                cfgObj = json.load(f)
+            self.vpnPlugin = WrtCommon.getWanVpnPlugin(self.param, cfgObj["plugin"])
+            tdir = os.path.join(self.param.tmpDir, "wvpn-%s" % (cfgObj["plugin"]))
+            os.mkdir(tdir)
+            self.vpnPlugin.init2(cfgObj, tdir, self.on_wvpn_up, self.on_wvpn_down)
+            self.vpnPlugin.start()
+            self.logger.info("VPN activated, plugin: %s." % (cfgObj["plugin"]))
+        else:
+            self.logger.info("No VPN configured.")
 
     def dispose(self):
         if self.vpnPlugin is not None:
@@ -92,22 +89,36 @@ class WrtWanManager:
     def on_wconn_up(self):
         assert threading.get_ident() == self.mainThreadId
 
-        # check prefix and restart if neccessary
+        # set exclude prefix and restart if neccessary
         if self.param.daemon.getPrefixPool().setExcludePrefixList("wan", self.wanConnPlugin.get_prefix_list()):
             self.logger.error("Bridge prefix duplicates with internet connection, restart automatically.")
             os.kill(os.getpid(), signal.SIGHUP)
             return
 
-        # change the firewall rules
+        # check prefix and tell upstream
+        if self.apiClient is not None:
+            plist = []
+            for p1 in self.vpnPlugin.get_prefix_list():
+                for p2 in self.wanConnPlugin.get_prefix_list():
+                    if WrtUtil.prefixConflic(p1, p2):
+                        plist.append(p1)
+            if len(plist) > 0:
+                self.logger.error("Upstream prefix duplicates with internet connection, tell upstream and restart myself (ah, sucks).")
+                self.apiClient.prefixConflict(plist)
+                os.kill(os.getpid(), signal.SIGHUP)
+                return
+
+        # change firewall rules
         intf = self.wanConnPlugin.get_interface()
-        WrtUtil.shell('/sbin/nft add rule wrtd natpost oifname %s masquerade' % (intf))
-        WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ct state established,related accept' % (intf))
-        WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ip protocol icmp accept' % (intf))
-        WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s drop' % (intf))
+        self.param.trafficManager.set_wan_interface(intf)
 
     def on_wconn_down(self):
         assert threading.get_ident() == self.mainThreadId
 
+        # remove firewall rules
+        self.param.trafficManager.set_wan_interface(None)
+
+        # remove exclude prefix
         ret = self.param.daemon.getPrefixPool().setExcludePrefixList("wan", [])
         assert not ret
 
@@ -157,6 +168,19 @@ class WrtWanManager:
             self.logger.error("Bridge prefix duplicates with upstream, restart automatically.")
             os.kill(os.getpid(), signal.SIGHUP)
             return
+
+        # check prefix and tell upstream
+        if self.wanConnPlugin.is_alive():
+            plist = []
+            for p1 in self.vpnPlugin.get_prefix_list():
+                for p2 in self.wanConnPlugin.get_prefix_list():
+                    if WrtUtil.prefixConflic(p1, p2):
+                        plist.append(p1)
+            if len(plist) > 0:
+                self.logger.error("Upstream prefix duplicates with internet connection, tell upstream and restart myself (ah, sucks).")
+                self.apiClient.prefixConflict(plist)
+                os.kill(os.getpid(), signal.SIGHUP)
+                return
 
     def on_wvpn_down(self):
         assert threading.get_ident() == self.mainThreadId

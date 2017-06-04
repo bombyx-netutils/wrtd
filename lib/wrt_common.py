@@ -6,6 +6,7 @@ import glob
 import fcntl
 import json
 import ipaddress
+from wrt_util import WrtUtil
 
 
 class WrtCommon:
@@ -67,7 +68,6 @@ class WrtCommon:
             exec("import %s" % (modname))
             if name in eval("%s.get_plugin_list()" % (modname)):
                 obj = eval("%s.get_plugin(\"%s\")" % (modname, name))
-                obj.plugin_id = name
                 return obj
         return None
 
@@ -108,12 +108,10 @@ class PrefixPool:
         # get conflict items
         idxList = []
         for i in range(0, len(self.prefixList)):
-            pip, pmask, used = self.prefixList[i]
-            netobj = ipaddress.IPv4Network(pip + "/" + pmask)
-            for ip2, mask2 in prefixList:
-                if netobj.overlaps(ipaddress.IPv4Network(ip2 + "/" + mask2)):
+            for p2 in prefixList:
+                if WrtUtil.prefixConflict(self.prefixList[i], p2):
                     idxList.append(i)
-                    if used:
+                    if self.prefixList[i][2]:
                         ret = True              # program restart needed
                     break
 
@@ -321,7 +319,7 @@ class PluginTemplateWanVpn:
 # allow multiple plugins be loaded, and one plugin can have multiple instances
 class TemplatePluginLanInterface:
 
-    def init2(self, instanceName, cfg, tmpDir):
+    def init2(self, instanceName, cfg, tmpDir, varDir, firewallAllowFunc):
         assert False
 
     def start(self):
@@ -347,4 +345,37 @@ class TemplatePluginLanInterface:
     def generate_client_script(self, ostype):
         # optional method
         # returns (suggested-script-filename, script-content)
+        assert False
+
+
+class TemplateTrafficManagementData:
+
+    @property
+    def domain_ip_dict(self):
+        # dict<domain-name, ip-address>, optional
+        assert False
+
+    @property
+    def domain_nameserver_dict(self):
+        # dict<domain-name, nameserver-list>, optional
+        assert False
+
+    @property
+    def web_transparent_proxy_dict(self):
+        # dict<url-source, url-target>, optional
+        assert False
+
+    @property
+    def route_dict(self):
+        # dict<prefix, (nexthop, interface)>, optional
+        assert False
+
+    @property
+    def firewall_allow(self):
+        # list<rule>, optional
+        assert False
+
+    @property
+    def firewall_port_mapping_dict(self):
+        # dict<port, (ip, port)>, optional
         assert False

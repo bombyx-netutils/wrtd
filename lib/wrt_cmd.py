@@ -48,8 +48,13 @@ class WrtSubCmdMain:
         dbusObj = dbus.SystemBus().get_object('org.fpemud.WRT', '/org/fpemud/WRT')
         if dbusObj is None:
             raise Exception("not started")
-        ret = dbusObj.GenerateClientScript(lif_plugin_id, ostype, dbus_interface="org.fpemud.WRT")
-        print(ret)
+
+        fn, buf = dbusObj.GenerateClientScript(lif_plugin_id, ostype, dbus_interface="org.fpemud.WRT")
+        with open(fn, "w") as f:
+            f.write(buf)
+        os.chmod(fn, 0o755)
+
+        print("Client script generated as ./%s" % (fn))
 
     def _showOneClient(self, ip, hostname):
         if hostname != "":

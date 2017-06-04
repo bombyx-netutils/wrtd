@@ -14,6 +14,8 @@ class WrtTrafficManager:
         self.cfgFile = os.path.join(self.param.tmpDir, "l2-dnsmasq.conf")
         self.pidFile = os.path.join(self.param.tmpDir, "l2-dnsmasq.pid")
 
+        self.wanIntf = None
+
         self.dnsPort = None
         self.dnsmasqProc = None
 
@@ -30,6 +32,17 @@ class WrtTrafficManager:
 
     def get_l2_nameserver_port(self):
         return self.dnsPort
+
+    def set_wan_interface(self, intf):
+        pass
+        # if intf is not None:
+        #     WrtUtil.shell('/sbin/nft add rule wrtd natpost oifname %s masquerade' % (intf))
+        #     WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ct state established,related accept' % (intf))
+        #     WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ip protocol icmp accept' % (intf))
+        #     WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s drop' % (intf))
+        # else:
+        #     pass
+        # self.wanIntf = intf
 
     def set_data(self, owner, data):
         self.ownerDict[owner] = data
@@ -71,12 +84,3 @@ class WrtTrafficManager:
             self.dnsmasqProc = None
         WrtUtil.forceDelete(self.pidFile)
         WrtUtil.forceDelete(self.cfgFile)
-
-
-class WrtTrafficManagerData:
-
-    def __init__(self):
-        self.domainIpDict = dict()                  # <domain-name, ip-address>
-        self.domainNsDict = dict()                  # <domain-name, nameserver-list>
-        self.webTransparentProxyDict = dict()       # <url-source, url-target>
-        self.routeDict = dict()                     # <prefix, (nexthop, interface)>

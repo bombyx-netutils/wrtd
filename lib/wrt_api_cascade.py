@@ -67,6 +67,23 @@ from wrt_common import WrtCommon
 # }
 #
 ################################################################################
+# Command: prefix-conflict
+################################################################################
+#
+# Request:
+# {
+#     "command": "prefix-conflict",
+#     "data": [
+#         "192.168.2.0/255.255.255.0",
+#     ]
+# }
+# Response:
+# {
+#     "return": {
+#     },
+# }
+#
+################################################################################
 # Notify: upstream-refresh
 ################################################################################
 #
@@ -189,6 +206,9 @@ class WrtCascadeApiServer:
                 continue
             bridge.on_host_disappear(self.bridge.get_bridge_id(), ipList)
 
+    def _prefixConflict(self, prefixList):
+        pass
+
     def _source_id(self, addr):
         return "subhost-%s" % (addr[0])
 
@@ -212,6 +232,9 @@ class WrtCascadeApiClient:
 
     def removeSubhost(self, ipList):
         self.realClient.execCommand("remove-subhost", ipList)
+
+    def prefixConflict(self, prefixList):
+        self.realClient.execCommand("prefix-conflict", prefixList)
 
     def _notifyHostRefresh(self, ipDataDict):
         # notify all bridges

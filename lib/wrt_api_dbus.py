@@ -17,7 +17,7 @@ from wrt_common import WrtCommon
 #
 # Methods:
 # str                                          GetWanConnInfo()
-# str                                          GenerateClientScript(lif_plugin_id, os_type)
+# (suggested_filename:str,content:str)         GenerateClientScript(lif_plugin_id:str, os_type:str)
 # (mac,ip,hostname)                            GetClients()
 
 
@@ -78,7 +78,7 @@ class DbusMainObject(dbus.service.Object):
 
         pluginObj = None
         for po in self.param.lanManager.get_plugins():
-            if po.plugin_id != lif_plugin_id:
+            if po.plugin_id == lif_plugin_id:
                 pluginObj = po
                 break
         if pluginObj is None:
@@ -86,6 +86,8 @@ class DbusMainObject(dbus.service.Object):
 
         if not hasattr(pluginObj, "generate_client_script"):
             raise Exception("the specified plugin has no client script capability")
+        if os_type not in ["linux", "win32"]:
+            raise Exception("invalid OS type")
         return pluginObj.generate_client_script(os_type)
 
 
