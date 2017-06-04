@@ -70,6 +70,7 @@ class WrtLanManager:
                 WrtUtil.ensureDir(vardir)
 
                 p = WrtCommon.getLanInterfacePlugin(self.param, name)
+                p.plugin_id = tname
                 p.init2(instanceName,
                         cfgObj,
                         tmpdir,

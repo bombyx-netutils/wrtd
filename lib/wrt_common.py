@@ -68,7 +68,6 @@ class WrtCommon:
             exec("import %s" % (modname))
             if name in eval("%s.get_plugin_list()" % (modname)):
                 obj = eval("%s.get_plugin(\"%s\")" % (modname, name))
-                obj.plugin_id = name
                 return obj
         return None
 
