@@ -25,80 +25,76 @@ class WrtLanManager:
         self.defaultBridge = None
         self.clientDict = dict()                    # <client-ip, client-info>
 
-        logging.info("LAN: Start.")
+        logging.info("Start.")
 
-        try:
-            # create default bridge
-            tmpdir = os.path.join(self.param.tmpDir, "bridge-default")
-            os.mkdir(tmpdir)
-            vardir = os.path.join(self.param.varDir, "bridge-default")
-            WrtUtil.ensureDir(vardir)
-            self.defaultBridge = _DefaultBridge(tmpdir, vardir)
-            self.defaultBridge.init2("wrtd-br",
-                                     self.param.daemon.getPrefixPool().usePrefix(),
-                                     self.param.trafficManager.get_l2_nameserver_port(),
-                                     self.on_client_appear,
-                                     self.on_client_change,
-                                     self.on_client_disappear)
-            logging.info("LAN: Default bridge started.")
+        # create default bridge
+        tmpdir = os.path.join(self.param.tmpDir, "bridge-default")
+        os.mkdir(tmpdir)
+        vardir = os.path.join(self.param.varDir, "bridge-default")
+        WrtUtil.ensureDir(vardir)
+        self.defaultBridge = _DefaultBridge(tmpdir, vardir)
+        self.defaultBridge.init2("wrtd-br",
+                                 self.param.daemon.getPrefixPool().usePrefix(),
+                                 self.param.trafficManager.get_l2_nameserver_port(),
+                                 self.on_client_appear,
+                                 self.on_client_change,
+                                 self.on_client_disappear)
+        logging.info("Default bridge started.")
 
-            # start all lan interface plugins
-            bridgeNo = 2
-            for name in WrtCommon.getLanInterfacePluginList(self.param):
-                tlist = []
-                for fn in glob.glob(os.path.join(self.param.etcDir, "lan-interface-%s*.json" % (name))):
-                    bn = os.path.basename(fn)
-                    instanceName = bn[len("lan-interface-%s" % (name)):len(".json") * -1]
-                    if instanceName != "":
-                        instanceName = instanceName.lstrip("-")
-                    tlist.append((instanceName, fn))
-                if len(tlist) == 0:
-                    tlist.append(("", None))
+        # start all lan interface plugins
+        bridgeNo = 2
+        for name in WrtCommon.getLanInterfacePluginList(self.param):
+            tlist = []
+            for fn in glob.glob(os.path.join(self.param.etcDir, "lan-interface-%s*.json" % (name))):
+                bn = os.path.basename(fn)
+                instanceName = bn[len("lan-interface-%s" % (name)):len(".json") * -1]
+                if instanceName != "":
+                    instanceName = instanceName.lstrip("-")
+                tlist.append((instanceName, fn))
+            if len(tlist) == 0:
+                tlist.append(("", None))
 
-                for instanceName, cfgFile in tlist:
-                    cfgObj = dict()
-                    if cfgFile is not None and os.path.getsize(cfgFile) > 0:
-                        with open(cfgFile, "r") as f:
-                            cfgObj = json.load(f)
+            for instanceName, cfgFile in tlist:
+                cfgObj = dict()
+                if cfgFile is not None and os.path.getsize(cfgFile) > 0:
+                    with open(cfgFile, "r") as f:
+                        cfgObj = json.load(f)
 
-                    if instanceName != "":
-                        tname = "%s-%s" % (name, instanceName)
-                    else:
-                        tname = name
-                    tmpdir = os.path.join(self.param.tmpDir, "lif-%s" % (tname))
-                    os.mkdir(tmpdir)
-                    vardir = os.path.join(self.param.varDir, "lif-%s" % (tname))
-                    WrtUtil.ensureDir(vardir)
+                if instanceName != "":
+                    tname = "%s-%s" % (name, instanceName)
+                else:
+                    tname = name
+                tmpdir = os.path.join(self.param.tmpDir, "lif-%s" % (tname))
+                os.mkdir(tmpdir)
+                vardir = os.path.join(self.param.varDir, "lif-%s" % (tname))
+                WrtUtil.ensureDir(vardir)
 
-                    p = WrtCommon.getLanInterfacePlugin(self.param, name)
-                    p.init2(instanceName, cfgObj, tmpdir, vardir)
-                    if p.get_bridge() is not None:
-                        p.get_bridge().init2("wrtd-br%d" % (bridgeNo),
-                                             self.param.daemon.getPrefixPool().usePrefix(),
-                                             self.param.trafficManager.get_l2_nameserver_port(),
-                                             self.on_client_appear,
-                                             self.on_client_change,
-                                             self.on_client_disappear)
-                        bridgeNo += 1
-                    p.start()
+                p = WrtCommon.getLanInterfacePlugin(self.param, name)
+                p.init2(instanceName, cfgObj, tmpdir, vardir)
+                if p.get_bridge() is not None:
+                    p.get_bridge().init2("wrtd-br%d" % (bridgeNo),
+                                         self.param.daemon.getPrefixPool().usePrefix(),
+                                         self.param.trafficManager.get_l2_nameserver_port(),
+                                         self.on_client_appear,
+                                         self.on_client_change,
+                                         self.on_client_disappear)
+                    bridgeNo += 1
+                p.start()
 
-                    self.pluginDict[tname] = p
-                    logging.info("LAN: Interface plugin \"%s\" activated." % (tname))
-        except BaseException:
-            self.dispose()
-            raise
+                self.pluginDict[tname] = p
+                logging.info("Interface plugin \"%s\" activated." % (tname))
 
     def dispose(self):
         for tname, p in self.pluginDict.items():
             if p.get_bridge() is not None:
                 p.get_bridge().dispose()
             p.stop()
-            logging.info("LAN: Interface plugin \"%s\" deactivated." % (tname))
+            logging.info("Interface plugin \"%s\" deactivated." % (tname))
         if self.defaultBridge is not None:
             self.defaultBridge.dispose()
             self.defaultBridge = None
-            logging.info("LAN: Default bridge destroyed.")
-        logging.info("LAN: Terminated.")
+            logging.info("Default bridge destroyed.")
+        logging.info("Terminated.")
 
     def get_plugins(self):
         return self.pluginDict.values()

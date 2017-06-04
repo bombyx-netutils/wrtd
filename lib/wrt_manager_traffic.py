@@ -31,6 +31,11 @@ class WrtTrafficManager:
     def get_l2_nameserver_port(self):
         return self.dnsPort
 
+    def protectWanInterface(self, intf):
+        WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ct state established,related accept' % (intf))
+        WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ip protocol icmp accept' % (intf))
+        WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s drop' % (intf))
+
     def set_data(self, owner, data):
         self.ownerDict[owner] = data
 

@@ -39,41 +39,38 @@ class WrtWanManager:
         self.subHostDict = None                 # dict<upstream-ip, subhost-ip>
 
         self.logger.info("Start.")
-        try:
-            cfgfile = os.path.join(self.param.etcDir, "wan-connection.json")
-            if os.path.exists(cfgfile):
-                cfgObj = None
-                with open(cfgfile, "r") as f:
-                    cfgObj = json.load(f)
-                self.wanConnPlugin = WrtCommon.getWanConnectionPlugin(self.param, cfgObj["plugin"])
-                tdir = os.path.join(self.param.tmpDir, "wconn-%s" % (cfgObj["plugin"]))
-                os.mkdir(tdir)
-                self.wanConnPlugin.init2(cfgObj, tdir, self.param.ownResolvConf, self.on_wconn_up, self.on_wconn_down)
-                self.wanConnPlugin.start()
-                self.logger.info("Internet connection activated, plugin: %s." % (cfgObj["plugin"]))
 
-                with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
-                    f.write("1")
-                self.logger.info("IP forwarding enabled.")
-            else:
-                self.logger.info("No internet connection configured.")
+        cfgfile = os.path.join(self.param.etcDir, "wan-connection.json")
+        if os.path.exists(cfgfile):
+            cfgObj = None
+            with open(cfgfile, "r") as f:
+                cfgObj = json.load(f)
+            self.wanConnPlugin = WrtCommon.getWanConnectionPlugin(self.param, cfgObj["plugin"])
+            tdir = os.path.join(self.param.tmpDir, "wconn-%s" % (cfgObj["plugin"]))
+            os.mkdir(tdir)
+            self.wanConnPlugin.init2(cfgObj, tdir, self.param.ownResolvConf, self.on_wconn_up, self.on_wconn_down)
+            self.wanConnPlugin.start()
+            self.logger.info("Internet connection activated, plugin: %s." % (cfgObj["plugin"]))
 
-            cfgfile = os.path.join(self.param.etcDir, "wan-vpn.json")
-            if os.path.exists(cfgfile):
-                cfgObj = None
-                with open(cfgfile, "r") as f:
-                    cfgObj = json.load(f)
-                self.vpnPlugin = WrtCommon.getWanVpnPlugin(self.param, cfgObj["plugin"])
-                tdir = os.path.join(self.param.tmpDir, "wvpn-%s" % (cfgObj["plugin"]))
-                os.mkdir(tdir)
-                self.vpnPlugin.init2(cfgObj, tdir, self.on_wvpn_up, self.on_wvpn_down)
-                self.vpnPlugin.start()
-                self.logger.info("VPN activated, plugin: %s." % (cfgObj["plugin"]))
-            else:
-                self.logger.info("No VPN configured.")
-        except BaseException:
-            self.dispose()
-            raise
+            with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
+                f.write("1")
+            self.logger.info("IP forwarding enabled.")
+        else:
+            self.logger.info("No internet connection configured.")
+
+        cfgfile = os.path.join(self.param.etcDir, "wan-vpn.json")
+        if os.path.exists(cfgfile):
+            cfgObj = None
+            with open(cfgfile, "r") as f:
+                cfgObj = json.load(f)
+            self.vpnPlugin = WrtCommon.getWanVpnPlugin(self.param, cfgObj["plugin"])
+            tdir = os.path.join(self.param.tmpDir, "wvpn-%s" % (cfgObj["plugin"]))
+            os.mkdir(tdir)
+            self.vpnPlugin.init2(cfgObj, tdir, self.on_wvpn_up, self.on_wvpn_down)
+            self.vpnPlugin.start()
+            self.logger.info("VPN activated, plugin: %s." % (cfgObj["plugin"]))
+        else:
+            self.logger.info("No VPN configured.")
 
     def dispose(self):
         if self.vpnPlugin is not None:
@@ -114,9 +111,7 @@ class WrtWanManager:
         # change the firewall rules
         intf = self.wanConnPlugin.get_interface()
         WrtUtil.shell('/sbin/nft add rule wrtd natpost oifname %s masquerade' % (intf))
-        WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ct state established,related accept' % (intf))
-        WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ip protocol icmp accept' % (intf))
-        WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s drop' % (intf))
+        self.param.trafficManager.protectWanInterface(intf)
 
     def on_wconn_down(self):
         assert threading.get_ident() == self.mainThreadId
