@@ -22,7 +22,7 @@ from gi.repository import GLib
 class WrtUtil:
 
     @staticmethod
-    def prefixConflic(self, prefix1, prefix2):
+    def prefixConflict(prefix1, prefix2):
         netobj1 = ipaddress.IPv4Network(prefix1[0] + "/" + prefix1[1])
         netobj2 = ipaddress.IPv4Network(prefix2[0] + "/" + prefix2[1])
         return netobj1.overlaps(netobj2)

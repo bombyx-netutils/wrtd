@@ -34,14 +34,15 @@ class WrtTrafficManager:
         return self.dnsPort
 
     def set_wan_interface(self, intf):
-        if intf is not None:
-            WrtUtil.shell('/sbin/nft add rule wrtd natpost oifname %s masquerade' % (intf))
-            WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ct state established,related accept' % (intf))
-            WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ip protocol icmp accept' % (intf))
-            WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s drop' % (intf))
-        else:
-            pass
-        self.wanIntf = intf
+        pass
+        # if intf is not None:
+        #     WrtUtil.shell('/sbin/nft add rule wrtd natpost oifname %s masquerade' % (intf))
+        #     WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ct state established,related accept' % (intf))
+        #     WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ip protocol icmp accept' % (intf))
+        #     WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s drop' % (intf))
+        # else:
+        #     pass
+        # self.wanIntf = intf
 
     def set_data(self, owner, data):
         self.ownerDict[owner] = data
