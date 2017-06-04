@@ -98,6 +98,19 @@ class WrtWanManager:
             os.kill(os.getpid(), signal.SIGHUP)
             return
 
+        # check prefix and tell upstream
+        if self.apiClient is not None:
+            plist = []
+            for p1 in self.vpnPlugin.get_prefix_list():
+                for p2 in self.wanConnPlugin.get_prefix_list():
+                    if WrtUtil.prefixConflic(p1, p2):
+                        plist.append(p1)
+            if len(plist) > 0:
+                self.logger.error("Upstream prefix duplicates with internet connection, tell upstream and restart myself (ah, sucks).")
+                self.apiClient.prefixConflict(plist)
+                os.kill(os.getpid(), signal.SIGHUP)
+                return
+
         # change the firewall rules
         intf = self.wanConnPlugin.get_interface()
         WrtUtil.shell('/sbin/nft add rule wrtd natpost oifname %s masquerade' % (intf))
@@ -157,6 +170,19 @@ class WrtWanManager:
             self.logger.error("Bridge prefix duplicates with upstream, restart automatically.")
             os.kill(os.getpid(), signal.SIGHUP)
             return
+
+        # check prefix and tell upstream
+        if self.wanConnPlugin.is_alive():
+            plist = []
+            for p1 in self.vpnPlugin.get_prefix_list():
+                for p2 in self.wanConnPlugin.get_prefix_list():
+                    if WrtUtil.prefixConflic(p1, p2):
+                        plist.append(p1)
+            if len(plist) > 0:
+                self.logger.error("Upstream prefix duplicates with internet connection, tell upstream and restart myself (ah, sucks).")
+                self.apiClient.prefixConflict(plist)
+                os.kill(os.getpid(), signal.SIGHUP)
+                return
 
     def on_wvpn_down(self):
         assert threading.get_ident() == self.mainThreadId

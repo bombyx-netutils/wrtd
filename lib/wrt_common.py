@@ -6,6 +6,7 @@ import glob
 import fcntl
 import json
 import ipaddress
+from wrt_util import WrtUtil
 
 
 class WrtCommon:
@@ -108,12 +109,10 @@ class PrefixPool:
         # get conflict items
         idxList = []
         for i in range(0, len(self.prefixList)):
-            pip, pmask, used = self.prefixList[i]
-            netobj = ipaddress.IPv4Network(pip + "/" + pmask)
-            for ip2, mask2 in prefixList:
-                if netobj.overlaps(ipaddress.IPv4Network(ip2 + "/" + mask2)):
+            for p2 in prefixList:
+                if WrtUtil.prefixConflict(self.prefixList[i], p2):
                     idxList.append(i)
-                    if used:
+                    if self.prefixList[i][2]:
                         ret = True              # program restart needed
                     break
 
