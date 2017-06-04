@@ -346,4 +346,5 @@ class TemplatePluginLanInterface:
 
     def generate_client_script(self, ostype):
         # optional method
+        # returns (suggested-script-filename, script-content)
         assert False

@@ -22,6 +22,7 @@ class WrtSubCmdMain:
 
         print("LAN Interface:")
         print(self._addIndent(dbusObj.GetLanInterfaceInfo(dbus_interface="org.fpemud.WRT")))
+        print("")
 
         print("Clients:")
         msg = "\n".join(dbusObj.GetClients(dbus_interface="org.fpemud.WRT"))

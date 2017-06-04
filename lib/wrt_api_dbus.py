@@ -44,7 +44,7 @@ class DbusMainObject(dbus.service.Object):
         plugin = self.param.wanManager.wanConnPlugin
         msg = ""
         msg += "Plugin: " + plugin.plugin_id + "\n"
-        msg += "Status: " + "Connected" if plugin.is_alive() else "Disconnected"
+        msg += "Status: " + ("Connected" if plugin.is_alive() else "Disconnected")
         return msg
 
     @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='s')
@@ -71,8 +71,11 @@ class DbusMainObject(dbus.service.Object):
     def GetClients(self):
         return self.param.lanManager.get_clients()
 
-    @dbus.service.method('org.fpemud.WRT', in_signature='s', out_signature='s')
+    @dbus.service.method('org.fpemud.WRT', in_signature='ss', out_signature='ss')
     def GenerateClientScript(self, lif_plugin_id, os_type):
+        if os_type not in ["linux", "win32"]:
+            raise Exception("invalid OS type")
+
         pluginObj = None
         for po in self.param.lanManager.get_plugins():
             if po.plugin_id != lif_plugin_id:
