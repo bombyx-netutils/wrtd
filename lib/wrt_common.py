@@ -320,7 +320,7 @@ class PluginTemplateWanVpn:
 # allow multiple plugins be loaded, and one plugin can have multiple instances
 class TemplatePluginLanInterface:
 
-    def init2(self, instanceName, cfg, tmpDir):
+    def init2(self, instanceName, cfg, tmpDir, varDir, firewallAllowFunc):
         assert False
 
     def start(self):
@@ -345,4 +345,37 @@ class TemplatePluginLanInterface:
 
     def generate_client_script(self, ostype):
         # optional method
+        assert False
+
+
+class TemplateTrafficManagementData:
+
+    @property
+    def domain_ip_dict(self):
+        # dict<domain-name, ip-address>, optional
+        assert False
+
+    @property
+    def domain_nameserver_dict(self):
+        # dict<domain-name, nameserver-list>, optional
+        assert False
+
+    @property
+    def web_transparent_proxy_dict(self):
+        # dict<url-source, url-target>, optional
+        assert False
+
+    @property
+    def route_dict(self):
+        # dict<prefix, (nexthop, interface)>, optional
+        assert False
+
+    @property
+    def firewall_allow(self):
+        # list<rule>, optional
+        assert False
+
+    @property
+    def firewall_port_mapping_dict(self):
+        # dict<port, (ip, port)>, optional
         assert False

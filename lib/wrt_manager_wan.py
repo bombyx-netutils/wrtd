@@ -89,7 +89,7 @@ class WrtWanManager:
     def on_wconn_up(self):
         assert threading.get_ident() == self.mainThreadId
 
-        # check prefix and restart if neccessary
+        # set exclude prefix and restart if neccessary
         if self.param.daemon.getPrefixPool().setExcludePrefixList("wan", self.wanConnPlugin.get_prefix_list()):
             self.logger.error("Bridge prefix duplicates with internet connection, restart automatically.")
             os.kill(os.getpid(), signal.SIGHUP)
@@ -108,14 +108,17 @@ class WrtWanManager:
                 os.kill(os.getpid(), signal.SIGHUP)
                 return
 
-        # change the firewall rules
+        # change firewall rules
         intf = self.wanConnPlugin.get_interface()
-        WrtUtil.shell('/sbin/nft add rule wrtd natpost oifname %s masquerade' % (intf))
-        self.param.trafficManager.protectWanInterface(intf)
+        self.param.trafficManager.set_wan_interface(intf)
 
     def on_wconn_down(self):
         assert threading.get_ident() == self.mainThreadId
 
+        # remove firewall rules
+        self.param.trafficManager.set_wan_interface(None)
+
+        # remove exclude prefix
         ret = self.param.daemon.getPrefixPool().setExcludePrefixList("wan", [])
         assert not ret
 

@@ -70,7 +70,11 @@ class WrtLanManager:
                 WrtUtil.ensureDir(vardir)
 
                 p = WrtCommon.getLanInterfacePlugin(self.param, name)
-                p.init2(instanceName, cfgObj, tmpdir, vardir)
+                p.init2(instanceName,
+                        cfgObj,
+                        tmpdir,
+                        vardir,
+                        lambda x: self._apiFirewallAllowFunc("lif-%s" % (tname), x))
                 if p.get_bridge() is not None:
                     p.get_bridge().init2("wrtd-br%d" % (bridgeNo),
                                          self.param.daemon.getPrefixPool().usePrefix(),
@@ -160,6 +164,13 @@ class WrtLanManager:
 
         # notify upstream
         self.param.wanManager.on_host_disappear(ipList)
+
+    def _apiFirewallAllowFunc(self, owner, rule):
+        class _Stub:
+            pass
+        data = _Stub
+        data.firewall_allow = [rule]
+        self.param.trafficManager.set_data(owner, data)
 
 
 class _DefaultBridge:
@@ -391,7 +402,3 @@ class _DefaultBridge:
             self.lastScanRecord = ret
         finally:
             return True
-
-
-class _ClientInfo:
-    pass
