@@ -130,6 +130,10 @@ class PrefixPool:
         self._save()
         return ret
 
+    def removeExcludePrefixlist(self, key):
+        if key in self.excludePrefixDict:
+            del self.excludePrefixDict[key]
+
     def usePrefix(self):
         # use a prefix in pool
         for i in range(0, len(self.prefixList)):

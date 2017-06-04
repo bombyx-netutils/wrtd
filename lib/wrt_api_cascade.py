@@ -15,7 +15,8 @@ from wrt_common import WrtCommon
 #     "init": {
 #         "upstream": {
 #             "c5facfa6-d8c3-4bce-ac13-6abab49c86fc": {
-#                 "prefix-list": ["192.168.2.0/255.255.255.0", "192.168.3.0/255.255.255.0"],
+#                 "wan-prefix-list": ["192.168.0.0/255.255.255.0", "192.168.1.0/255.255.255.0"],
+#                 "lan-prefix-list": ["192.168.2.0/255.255.255.0", "192.168.3.0/255.255.255.0"],
 #             },
 #         },
 #         "host": {
@@ -91,7 +92,8 @@ from wrt_common import WrtCommon
 #     "notify": "upstream-refresh",
 #     "data": {
 #         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc": {
-#             "prefix-list": ["192.168.2.0", "192.168.3.0"],
+#             "wan-prefix-list": ["192.168.0.0/255.255.255.0", "192.168.1.0/255.255.255.0"],
+#             "lan-prefix-list": ["192.168.2.0/255.255.255.0", "192.168.3.0/255.255.255.0"],
 #         },
 #     },
 # }
