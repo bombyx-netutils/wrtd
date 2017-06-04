@@ -17,8 +17,8 @@ def parseArgs():
 
     apServerGenClientCert = subParsers.add_parser("generate-client-script")
     apServerGenClientCert.set_defaults(subcmd="generate-client-script")
-    apServerGenClientCert.add_argument("--lif-type")
-    apServerGenClientCert.add_argument("--os")
+    apServerGenClientCert.add_argument("lif_type", metavar="lan-interface-type")
+    apServerGenClientCert.add_argument("os", metavar="os-type")
 
     return argParser.parse_args()
 
