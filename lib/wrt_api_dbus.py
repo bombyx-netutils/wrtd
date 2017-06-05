@@ -3,6 +3,7 @@
 
 import dbus
 import dbus.service
+from wrt_util import WrtUtil
 from wrt_common import WrtCommon
 
 
@@ -45,6 +46,9 @@ class DbusMainObject(dbus.service.Object):
         msg = ""
         msg += "Plugin: " + plugin.plugin_id + "\n"
         msg += "Status: " + ("Connected" if plugin.is_alive() else "Disconnected")
+        if plugin.is_alive():
+            ip = plugin.get_ip()
+            msg += "IP:     " + ip + " " + ("(public)" if WrtUtil.isIpPublic(ip) else "(behind NAT)")
         return msg
 
     @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='s')
@@ -74,7 +78,7 @@ class DbusMainObject(dbus.service.Object):
     @dbus.service.method('org.fpemud.WRT', in_signature='ss', out_signature='ss')
     def GenerateClientScript(self, lif_plugin_id, os_type):
         if os_type not in ["linux", "win32"]:
-            raise Exception("invalid OS type")
+            raise Exception("Invalid OS type.")
 
         pluginObj = None
         for po in self.param.lanManager.get_plugins():
@@ -82,13 +86,20 @@ class DbusMainObject(dbus.service.Object):
                 pluginObj = po
                 break
         if pluginObj is None:
-            raise Exception("the specified plugin does not exist")
+            raise Exception("The specified plugin does not exist.")
 
         if not hasattr(pluginObj, "generate_client_script"):
-            raise Exception("the specified plugin has no client script capability")
-        if os_type not in ["linux", "win32"]:
-            raise Exception("invalid OS type")
-        return pluginObj.generate_client_script(os_type)
+            raise Exception("The specified plugin has no client script capability.")
+
+        if self.param.wanManager.wanConnPlugin is None:
+            raise Exception("No internet connection.")
+        if not self.param.wanManager.wanConnPlugin.is_alive():
+            raise Exception("No internet connection.")
+        ip = self.param.wanManager.wanConnPlugin.get_ip()
+        if not WrtUtil.isIpPublic(ip):
+            raise Exception("Internet connection is behind NAT.")
+
+        return pluginObj.generate_client_script(ip, os_type)
 
 
 ################################################################################
