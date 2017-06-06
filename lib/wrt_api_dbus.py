@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
+import json
 import dbus
 import dbus.service
 from wrt_util import WrtUtil
@@ -17,13 +18,8 @@ from wrt_common import WrtCommon
 # Object path           /
 #
 # Methods:
-# str                                          GetWanConnInfo()
+# info:json                                    GetRouterInfo()
 # (suggested_filename:str,content:str)         GenerateClientScript(lif_plugin_id:str, os_type:str)
-# (mac,ip,hostname)                            GetClients()
-
-
-# str                                          GetIp()
-# int                                          GetMask()
 #
 class DbusMainObject(dbus.service.Object):
 
@@ -38,51 +34,57 @@ class DbusMainObject(dbus.service.Object):
         self.remove_from_connection()
 
     @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='s')
-    def GetWanConnInfo(self):
-        if self.param.wanManager.wanConnPlugin is None:
-            return "None"
+    def GetRouterInfo(self):
+        ret = dict()
 
-        plugin = self.param.wanManager.wanConnPlugin
-        msg = ""
-        msg += "Plugin: " + plugin.plugin_id + "\n"
-        msg += "Status: " + ("Connected" if plugin.is_alive() else "Disconnected")
-        if plugin.is_alive():
-            ip = plugin.get_ip()
-            msg += "IP:     " + ip + " " + ("(public)" if WrtUtil.isIpPublic(ip) else "(behind NAT)")
-        return msg
+        if self.param.wanManager.wanConnPlugin is not None:
+            plugin = self.param.wanManager.wanConnPlugin
+            ret["wconn-plugin"] = dict()
+            ret["wconn-plugin"]["name"] = plugin.full_name
+            if plugin.is_alive():
+                ret["wconn-plugin"]["alive"] = True
+                ret["wconn-plugin"]["ip"] = plugin.get_ip()
+                ret["wconn-plugin"]["is-ip-public"] = WrtUtil.isIpPublic(plugin.get_ip())
+            else:
+                ret["wconn-plugin"]["alive"] = False
 
-    @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='s')
-    def GetLanInterfaceInfo(self):
-        msg = "\n".join(x.plugin_id for x in self.param.lanManager.get_plugins())
-        return msg
+        if self.param.wanManager.vpnPlugin is not None:
+            plugin = self.param.wanManager.vpnPlugin
+            ret["wvpn-plugin"] = dict()
+            ret["wvpn-plugin"]["name"] = plugin.full_name
+            if plugin.is_alive():
+                ret["wvpn-plugin"]["alive"] = True
+            else:
+                ret["wvpn-plugin"]["alive"] = False
 
-    @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='s')
-    def GetIp(self):
-        if self.param.lanManager is None:
-            return None
-        else:
-            return WrtCommon.bridgeGetIp(self.param.lanManager.defaultBridge)
+        ret["default-bridge"] = dict()
+        if True:
+            ret["default-bridge"] = dict()
+            ret["default-bridge"]["ip"] = WrtCommon.bridgeGetIp(self.param.lanManager.defaultBridge)
+            ret["default-bridge"]["mask"] = self.param.lanManager.defaultBridge.get_prefix()[1]
 
-    @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='s')
-    def GetMask(self):
-        if self.param.lanManager is None:
-            return None
-        else:
-            return self.param.lanManager.defaultBridge.get_mask()
+        ret["lif-plugin"] = dict()
+        for plugin in self.param.lanManager.lifPluginList:
+            ret["lif-plugin"][plugin.full_name] = dict()
 
-#    @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='a(sssb)')
-    @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='a(s)')
-    def GetClients(self):
-        return self.param.lanManager.get_clients()
+        ret["vpns-plugin"] = dict()
+        for plugin in self.param.lanManager.vpnsPluginList:
+            ret["vpns-plugin"][plugin.full_name] = dict()
+            ret["vpns-plugin"][plugin.full_name]["bridge"] = dict()
+            ret["vpns-plugin"][plugin.full_name]["bridge"]["name"] = plugin.get_bridge().get_name()
+            ret["vpns-plugin"][plugin.full_name]["bridge"]["ip"] = WrtCommon.bridgeGetIp(plugin.get_bridge())
+            ret["vpns-plugin"][plugin.full_name]["bridge"]["mask"] = plugin.get_bridge().get_prefix()[1]
+
+        return json.dumps(ret)
 
     @dbus.service.method('org.fpemud.WRT', in_signature='ss', out_signature='ss')
-    def GenerateClientScript(self, lif_plugin_id, os_type):
+    def GenerateClientScript(self, vpns_plugin_full_name, os_type):
         if os_type not in ["linux", "win32"]:
             raise Exception("Invalid OS type.")
 
         pluginObj = None
-        for po in self.param.lanManager.get_plugins():
-            if po.plugin_id == lif_plugin_id:
+        for po in self.param.lanManager.vpnsPluginList:
+            if po.full_name == vpns_plugin_full_name:
                 pluginObj = po
                 break
         if pluginObj is None:

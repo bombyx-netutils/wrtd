@@ -35,7 +35,7 @@ class WrtWanManager:
         self.wanConnPlugin = None
 
         self.vpnPlugin = None
-        self.apiClient = None
+        self.vpnApiClient = None
         self.vpnUpstreamDict = None             # ordereddict<upstream-id, data>
         self.subHostDict = None                 # dict<upstream-ip, subhost-ip>
 
@@ -59,26 +59,26 @@ class WrtWanManager:
         else:
             self.logger.info("No internet connection configured.")
 
-        cfgfile = os.path.join(self.param.etcDir, "wan-vpn.json")
+        cfgfile = os.path.join(self.param.etcDir, "cascade-vpn.json")
         if os.path.exists(cfgfile):
             cfgObj = None
             with open(cfgfile, "r") as f:
                 cfgObj = json.load(f)
-            self.vpnPlugin = WrtCommon.getWanVpnPlugin(self.param, cfgObj["plugin"])
+            self.vpnPlugin = WrtCommon.getCascadeVpnPlugin(self.param, cfgObj["plugin"])
             tdir = os.path.join(self.param.tmpDir, "wvpn-%s" % (cfgObj["plugin"]))
             os.mkdir(tdir)
             self.vpnPlugin.init2(cfgObj, tdir, self.on_wvpn_up, self.on_wvpn_down)
             self.vpnPlugin.start()
-            self.logger.info("VPN activated, plugin: %s." % (cfgObj["plugin"]))
+            self.logger.info("Cascade VPN activated, plugin: %s." % (cfgObj["plugin"]))
         else:
-            self.logger.info("No VPN configured.")
+            self.logger.info("No cascade VPN configured.")
 
     def dispose(self):
         if self.vpnPlugin is not None:
             GLib.source_remove(self.vpnTimer)
             self.vpnPlugin.stop()
             self.vpnPlugin = None
-            self.logger.info("VPN deactivated.")
+            self.logger.info("Cascade VPN deactivated.")
         if self.wanConnPlugin is not None:
             with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
                 f.write("0")
@@ -105,7 +105,7 @@ class WrtWanManager:
                         plist.append(p1)
             if len(plist) > 0:
                 self.logger.error("Upstream prefix duplicates with internet connection, tell upstream and restart myself (ah, unfair).")
-                self.apiClient.prefixConflict(plist)
+                self.vpnApiClient.prefixConflict(plist)
                 os.kill(os.getpid(), signal.SIGHUP)
                 return
 
@@ -141,10 +141,10 @@ class WrtWanManager:
                 raise _Excp1()
 
             # connect to the upstream cascade api server
-            self.apiClient = WrtCascadeApiClient(self.vpnPlugin.get_remote_ip(), self.param.cascadeApiPort)
+            self.vpnApiClient = WrtCascadeApiClient(self.vpnPlugin.get_remote_ip(), self.param.cascadeApiPort)
             initData = None
             try:
-                initData = self.apiClient.connect()
+                initData = self.vpnApiClient.connect()
             except socket.error as e:
                 self.logger.error("Cascade API error: %s. Restart VPN plugin.", e)
                 raise _Excp2()
@@ -193,7 +193,7 @@ class WrtWanManager:
                             plist.append(p1)
                 if len(plist) > 0:
                     self.logger.error("Upstream prefix duplicates with internet connection, tell upstream and restart myself (ah, unfair).")
-                    self.apiClient.prefixConflict(plist)
+                    self.vpnApiClient.prefixConflict(plist)
                     raise _Excp1()
         except _Excp1:
             self._wvpnDown()
@@ -211,7 +211,7 @@ class WrtWanManager:
 
         if self.vpnPlugin is None:
             return
-        if self.apiClient is None:
+        if self.vpnApiClient is None:
             return
 
         ipDataDict2 = dict()
@@ -227,14 +227,14 @@ class WrtWanManager:
             self._addNftRuleVpnSubHost(ip, empty)
             self.subHostDict[empty] = ip
             ipDataDict2[empty] = data
-        self.apiClient.addSubhost(ipDataDict2)
+        self.vpnApiClient.addSubhost(ipDataDict2)
 
     def on_host_disappear(self, ipList):
         assert threading.get_ident() == self.mainThreadId
 
         if self.vpnPlugin is None:
             return
-        if self.apiClient is None:
+        if self.vpnApiClient is None:
             return
 
         ipList2 = []
@@ -248,7 +248,7 @@ class WrtWanManager:
                         ip.addr("delete", index=idx, address=k)
                     ipList2.append(k)
                     break
-        self.apiClient.removeSubhost(ipList2)
+        self.vpnApiClient.removeSubhost(ipList2)
 
     def _wvpnDown(self):
         self.param.daemon.getPrefixPool().removeExcludePrefixList("upstream-lan")
@@ -257,9 +257,9 @@ class WrtWanManager:
         self.subHostDict = None
         self.vpnUpstreamDict = None
 
-        if self.apiClient is not None:
-            self.apiClient.dispose()
-            self.apiClient = None
+        if self.vpnApiClient is not None:
+            self.vpnApiClient.dispose()
+            self.vpnApiClient = None
 
         self.param.daemon.getPrefixPool().removeExcludePrefixList("vpn")
 

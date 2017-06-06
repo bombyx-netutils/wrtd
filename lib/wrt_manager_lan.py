@@ -10,7 +10,6 @@ import subprocess
 import logging
 import ipaddress
 import pyroute2
-from collections import OrderedDict
 from gi.repository import GLib
 from gi.repository import GObject
 from wrt_util import WrtUtil
@@ -21,7 +20,8 @@ class WrtLanManager:
 
     def __init__(self, param):
         self.param = param
-        self.pluginDict = OrderedDict()             # <name, object>
+        self.lifPluginList = []
+        self.vpnsPluginList = []
         self.defaultBridge = None
         self.clientDict = dict()                    # <client-ip, client-info>
 
@@ -42,80 +42,50 @@ class WrtLanManager:
         logging.info("Default bridge started.")
 
         # start all lan interface plugins
-        bridgeNo = 2
         for name in WrtCommon.getLanInterfacePluginList(self.param):
-            tlist = []
-            for fn in glob.glob(os.path.join(self.param.etcDir, "lan-interface-%s*.json" % (name))):
-                bn = os.path.basename(fn)
-                instanceName = bn[len("lan-interface-%s" % (name)):len(".json") * -1]
-                if instanceName != "":
-                    instanceName = instanceName.lstrip("-")
-                tlist.append((instanceName, fn))
-            if len(tlist) == 0:
-                tlist.append(("", None))
-
-            for instanceName, cfgFile in tlist:
-                cfgObj = dict()
-                if cfgFile is not None and os.path.getsize(cfgFile) > 0:
-                    with open(cfgFile, "r") as f:
-                        cfgObj = json.load(f)
-
-                if instanceName != "":
-                    tname = "%s-%s" % (name, instanceName)
-                else:
-                    tname = name
-                tmpdir = os.path.join(self.param.tmpDir, "lif-%s" % (tname))
+            for instanceName, cfgObj, tmpdir, vardir in self._getInstanceAndInfoFromEtcDir("lif", "lan-interface", name):
                 os.mkdir(tmpdir)
-                vardir = os.path.join(self.param.varDir, "lif-%s" % (tname))
                 WrtUtil.ensureDir(vardir)
 
-                p = WrtCommon.getLanInterfacePlugin(self.param, name)
-                p.plugin_id = tname
+                p = WrtCommon.getLanInterfacePlugin(self.param, name, instanceName)
+                p.init2(instanceName, cfgObj, tmpdir, vardir)
+                p.start()
+                self.lifPluginList.append(p)
+                logging.info("LAN interface plugin \"%s\" activated." % (p.full_name))
+
+        # start all vpn server plugins
+        for name in WrtCommon.getVpnServerPluginList(self.param):
+            for instanceName, cfgObj, tmpdir, vardir in self._getInstanceAndInfoFromEtcDir("vpns", "vpn-server", name):
+                os.mkdir(tmpdir)
+                WrtUtil.ensureDir(vardir)
+
+                p = WrtCommon.getVpnServerPlugin(self.param, name, instanceName)
                 p.init2(instanceName,
                         cfgObj,
                         tmpdir,
                         vardir,
-                        lambda x: self._apiFirewallAllowFunc("lif-%s" % (tname), x))
-                if p.get_bridge() is not None:
-                    p.get_bridge().init2("wrtd-br%d" % (bridgeNo),
-                                         self.param.daemon.getPrefixPool().usePrefix(),
-                                         self.param.trafficManager.get_l2_nameserver_port(),
-                                         self.on_client_appear,
-                                         self.on_client_change,
-                                         self.on_client_disappear)
-                    bridgeNo += 1
+                        self.param.daemon.getPrefixPool().usePrefix(),
+                        self.param.trafficManager.get_l2_nameserver_port(),
+                        self.on_client_appear,
+                        self.on_client_change,
+                        self.on_client_disappear,
+                        lambda x: self._apiFirewallAllowFunc(p.full_name, x))
                 p.start()
-
-                self.pluginDict[tname] = p
-                logging.info("Interface plugin \"%s\" activated." % (tname))
+                self.vpnsPluginList.append(p)
+                logging.info("VPN server plugin \"%s\" activated." % (p.full_name))
 
     def dispose(self):
-        for tname, p in self.pluginDict.items():
-            if p.get_bridge() is not None:
-                p.get_bridge().dispose()
+        for p in self.vpnsPluginList:
             p.stop()
-            logging.info("Interface plugin \"%s\" deactivated." % (tname))
+            logging.info("VPN server plugin \"%s\" deactivated." % (p.full_name))
+        for p in self.lifPluginList:
+            p.stop()
+            logging.info("LAN interface plugin \"%s\" deactivated." % (p.full_name))
         if self.defaultBridge is not None:
             self.defaultBridge.dispose()
             self.defaultBridge = None
             logging.info("Default bridge destroyed.")
         logging.info("Terminated.")
-
-    def get_plugins(self):
-        return self.pluginDict.values()
-
-    def get_bridges(self):
-        ret = set()
-        for plugin in self.pluginDict.values():
-            bridge = plugin.get_bridge()
-            if bridge is None:
-                ret.add(self.defaultBridge)
-            else:
-                ret.add(bridge)
-        return list(ret)
-
-    def get_clients(self):
-        return self.clientDict.keys()
 
     def on_client_appear(self, sourceBridgeId, ipDataDict):
         assert all(ip not in self.clientDict for ip in ipDataDict.keys())
@@ -125,7 +95,7 @@ class WrtLanManager:
             self.clientDict[ip] = data
 
         # notify all bridges
-        for bridge in self.get_bridges():
+        for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             if sourceBridgeId == bridge.get_bridge_id():
                 continue
             bridge.on_host_appear(sourceBridgeId, ipDataDict)
@@ -151,7 +121,7 @@ class WrtLanManager:
             del self.clientDict[ip]
 
         # notify all bridges
-        for bridge in self.get_bridges():
+        for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             if sourceBridgeId == bridge.get_bridge_id():
                 continue
             bridge.on_host_disappear(sourceBridgeId, ipList)
@@ -172,6 +142,43 @@ class WrtLanManager:
         data = _Stub
         data.firewall_allow = [rule]
         self.param.trafficManager.set_data(owner, data)
+
+    def _getInstanceAndInfoFromEtcDir(self, pluginPrefix, cfgfilePrefix, name):
+        # Returns (instanceName, cfgobj, tmpdir, vardir)
+
+        ret = []
+        for fn in glob.glob(os.path.join(self.param.etcDir, "%s-%s*.json" % (cfgfilePrefix, name))):
+            bn = os.path.basename(fn)
+
+            instanceName = bn[len("%s-%s" % (cfgfilePrefix, name)):len(".json") * -1]
+            if instanceName != "":
+                instanceName = instanceName.lstrip("-")
+
+            if instanceName != "":
+                fullName = "%s-%s" % (name, instanceName)
+            else:
+                fullName = name
+
+            if os.path.getsize(fn) > 0:
+                with open(fn, "r") as f:
+                    cfgObj = json.load(f)
+            else:
+                cfgObj = dict()
+
+            tmpdir = os.path.join(self.param.tmpDir, "%s-%s" % (pluginPrefix, fullName))
+            vardir = os.path.join(self.param.varDir, "%s-%s" % (pluginPrefix, fullName))
+
+            ret.append((instanceName, cfgObj, tmpdir, vardir))
+
+        if len(ret) == 0:
+            instanceName = ""
+            fullName = name
+            cfgObj = dict()
+            tmpdir = os.path.join(self.param.tmpDir, "%s-%s" % (pluginPrefix, fullName))
+            vardir = os.path.join(self.param.varDir, "%s-%s" % (pluginPrefix, fullName))
+            ret.append((instanceName, fullName, cfgObj, tmpdir, vardir))
+
+        return ret
 
 
 class _DefaultBridge:

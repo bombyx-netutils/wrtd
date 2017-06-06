@@ -189,7 +189,7 @@ class WrtCascadeApiServer:
         self.bridge.on_host_appear(self._source_id(addr), ipDataDict)
 
         # notify other bridges
-        for bridge in self.param.lanManager.get_bridges():
+        for bridge in WrtCommon.getAllBridges(self.param):
             if bridge == self.bridge:
                 continue
             bridge.on_host_appear(self.bridge.get_bridge_id(), ipDataDict)
@@ -203,7 +203,7 @@ class WrtCascadeApiServer:
         self.bridge.on_host_disappear(self._source_id(addr), ipList)
 
         # notify other bridges
-        for bridge in self.param.lanManager.get_bridges():
+        for bridge in WrtCommon.getAllBridges(self.param):
             if bridge == self.bridge:
                 continue
             bridge.on_host_disappear(self.bridge.get_bridge_id(), ipList)
@@ -240,7 +240,7 @@ class WrtCascadeApiClient:
 
     def _notifyHostRefresh(self, ipDataDict):
         # notify all bridges
-        for bridge in self.param.lanManager.get_bridges():
+        for bridge in WrtCommon.getAllBridges(self.param):
             bridge.on_host_refresh(self.upstreamId, ipDataDict)
 
         # notify subhost owners

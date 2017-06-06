@@ -15,41 +15,29 @@ class WrtSubCmdMain:
         dbusObj = dbus.SystemBus().get_object('org.fpemud.WRT', '/org/fpemud/WRT')
         if dbusObj is None:
             raise Exception("not started")
+        info = json.loads(dbusObj.GetRouterInfo(dbus_interface="org.fpemud.WRT"))
 
         print("Internet Connection:")
-        print(self._addIndent(dbusObj.GetWanConnInfo(dbus_interface="org.fpemud.WRT")))
+        print("")
+
+        print("Cascade VPN:")
         print("")
 
         print("LAN Interface:")
-        print(self._addIndent(dbusObj.GetLanInterfaceInfo(dbus_interface="org.fpemud.WRT")))
         print("")
 
         print("Clients:")
-        msg = "\n".join(dbusObj.GetClients(dbus_interface="org.fpemud.WRT"))
-        print(self._addIndent(msg))
         print("")
-
-        # iplist = []
-        # for fn in glob.glob(os.path.join(self.param.tmpDir, "vpn-*-self.hosts")):
-        #     for ip, hostname in WrtUtil.readDnsmasqHostFile(fn):
-        #         self._showOneClient(ip, hostname)
-        #         iplist.append(ip)
-        # for fn in glob.glob(os.path.join(self.param.tmpDir, "*.leases")):
-        #     for mac, ip, hostname in WrtUtil.readDnsmasqLeaseFile(fn):
-        #         if ip in iplist:
-        #             continue
-        #         assert hostname is ""
-        #         self._showOneClient(ip, hostname)
 
         print("Upstream Hosts:")
         print("?")
 
-    def cmdGenerateClientScript(self, lif_plugin_id, ostype):
+    def cmdGenerateClientScript(self, vpns_plugin_full_name, ostype):
         dbusObj = dbus.SystemBus().get_object('org.fpemud.WRT', '/org/fpemud/WRT')
         if dbusObj is None:
             raise Exception("not started")
 
-        fn, buf = dbusObj.GenerateClientScript(lif_plugin_id, ostype, dbus_interface="org.fpemud.WRT")
+        fn, buf = dbusObj.GenerateClientScript(vpns_plugin_full_name, ostype, dbus_interface="org.fpemud.WRT")
         with open(fn, "w") as f:
             f.write(buf)
         os.chmod(fn, 0o755)

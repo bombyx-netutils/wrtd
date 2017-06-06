@@ -16,23 +16,30 @@ class WrtCommon:
         return str(ipaddress.IPv4Address(bridge.get_prefix()[0]) + 1)
 
     @staticmethod
+    def getAllBridges(param):
+        ret = [param.lanManager.defaultBridge]
+        for plugin in param.lanManager.vpnsPluginList:
+            ret.append(plugin.get_bridge())
+        return ret
+
+    @staticmethod
     def getWanConnectionPluginList(param):
         return WrtCommon._getPluginList(param, "wconn")
 
     @staticmethod
     def getWanConnectionPlugin(param, name):
-        ret = WrtCommon._getPlugin(param, "wconn", name)
+        ret = WrtCommon._getPlugin(param, "wconn", name, "")
         if ret is None:
             raise Exception("wan connection type plugin %s does not exists" % (name))
         return ret
 
     @staticmethod
-    def getWanVpnPluginList(param):
+    def getCascadeVpnPluginList(param):
         return WrtCommon._getPluginList(param, "wvpn")
 
     @staticmethod
-    def getWanVpnPlugin(param, name):
-        ret = WrtCommon._getPlugin(param, "wvpn", name)
+    def getCascadeVpnPlugin(param, name):
+        ret = WrtCommon._getPlugin(param, "wvpn", name, "")
         if ret is None:
             raise Exception("wan vpn plugin %s does not exists" % (name))
         return ret
@@ -42,10 +49,21 @@ class WrtCommon:
         return WrtCommon._getPluginList(param, "lif")
 
     @staticmethod
-    def getLanInterfacePlugin(param, name):
-        ret = WrtCommon._getPlugin(param, "lif", name)
+    def getLanInterfacePlugin(param, name, instanceName):
+        ret = WrtCommon._getPlugin(param, "lif", name, instanceName)
         if ret is None:
             raise Exception("lan interface plugin %s does not exists" % (name))
+        return ret
+
+    @staticmethod
+    def getVpnServerPluginList(param):
+        return WrtCommon._getPluginList(param, "vpns")
+
+    @staticmethod
+    def getVpnServerPlugin(param, name, instanceName):
+        ret = WrtCommon._getPlugin(param, "vpns", name, instanceName)
+        if ret is None:
+            raise Exception("vpn server plugin %s does not exists" % (name))
         return ret
 
     @staticmethod
@@ -60,7 +78,7 @@ class WrtCommon:
         return ret
 
     @staticmethod
-    def _getPlugin(param, prefix, name):
+    def _getPlugin(param, prefix, name, instance_name):
         for fn in glob.glob(os.path.join(param.libDir, "plugins", prefix + "_*")):
             modname = fn
             modname = modname[len(param.libDir + "/"):]
@@ -68,6 +86,10 @@ class WrtCommon:
             exec("import %s" % (modname))
             if name in eval("%s.get_plugin_list()" % (modname)):
                 obj = eval("%s.get_plugin(\"%s\")" % (modname, name))
+                if instance_name != "":
+                    obj.full_name = name + "-" + instance_name
+                else:
+                    obj.full_name = name
                 return obj
         return None
 
@@ -210,12 +232,6 @@ class PrefixPool:
 
 class TemplateBridge:
 
-    def init2(self, brname, prefix, l2DnsPort, clientAppearFunc, clientChangeFunc, clientDisappearFunc):
-        assert False
-
-    def dispose(self):
-        assert False
-
     def get_name(self):
         assert False
 
@@ -289,9 +305,9 @@ class PluginTemplateWanConnection:
 
 
 # plugin module name: plugins.wvpn_*
-# config file: ${ETC}/wan-vpn.json
+# config file: ${ETC}/cascade-vpn.json
 # only allow one plugin be loaded
-class PluginTemplateWanVpn:
+class PluginTemplateCascadeVpn:
 
     def init2(self, cfg, tmpDir, upCallback, downCallback):
         assert False
@@ -326,18 +342,13 @@ class PluginTemplateWanVpn:
 # allow multiple plugins be loaded, and one plugin can have multiple instances
 class TemplatePluginLanInterface:
 
-    def init2(self, instanceName, cfg, tmpDir, varDir, firewallAllowFunc):
+    def init2(self, instanceName, cfg, tmpDir, varDir):
         assert False
 
     def start(self):
         assert False
 
     def stop(self):
-        assert False
-
-    def get_bridge(self):
-        # return None means using default bridge
-        # must be called after start()
         assert False
 
     def interface_appear(self, bridge, ifname):
@@ -349,8 +360,26 @@ class TemplatePluginLanInterface:
         # must be called after start()
         assert False
 
+
+# plugin module name: plugins.vpns_*
+# config file: ${ETC}/vpn-server-(PLUGIN_NAME)-(INSTANCE_NAME).json
+# allow multiple plugins be loaded, and one plugin can have multiple instances
+class TemplatePluginVpnServer:
+
+    def init2(self, instanceName, cfg, tmpDir, varDir, bridgePrefix, l2DnsPort, clientAppearFunc, clientChangeFunc, clientDisappearFunc, firewallAllowFunc):
+        assert False
+
+    def start(self):
+        assert False
+
+    def stop(self):
+        assert False
+
+    def get_bridge(self):
+        # must be called after start()
+        assert False
+
     def generate_client_script(self, wan_ip, os_type):
-        # optional method
         # returns (suggested-script-filename, script-content)
         assert False
 

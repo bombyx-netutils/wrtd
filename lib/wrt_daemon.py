@@ -13,6 +13,7 @@ from gi.repository import GLib
 from gi.repository import GObject
 from dbus.mainloop.glib import DBusGMainLoop
 from wrt_util import WrtUtil
+from wrt_common import WrtCommon
 from wrt_common import PrefixPool
 from wrt_manager_traffic import WrtTrafficManager
 from wrt_manager_lan import WrtLanManager
@@ -91,7 +92,7 @@ class WrtDaemon:
             logging.info("SGW-API server started.")
 
             # start CASCADE API server
-            for bridge in self.param.lanManager.get_bridges():
+            for bridge in WrtCommon.getAllBridges(self.param):
                 self.param.cascadeApiServerList.append(WrtCascadeApiServer(self.param, bridge))
             logging.info("CASCADE-API servers started.")
 
@@ -173,11 +174,8 @@ class WrtDaemon:
                     continue
 
                 # lan interface plugin
-                for plugin in self.param.lanManager.get_plugins():
-                    bridge = plugin.get_bridge()
-                    if bridge is None:
-                        bridge = self.param.lanManager.defaultBridge
-                    if plugin.interface_appear(bridge, intf):
+                for plugin in self.param.lanManager.lifPluginList:
+                    if plugin.interface_appear(self.param.lanManager.defaultBridge, intf):
                         self.interfaceDict[intf] = plugin
                         break
                 if intf in self.interfaceDict:
