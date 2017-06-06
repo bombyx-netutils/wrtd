@@ -6,6 +6,7 @@ import re
 import json
 import signal
 import logging
+import socket
 import pyroute2
 import ipaddress
 import threading
@@ -96,21 +97,20 @@ class WrtWanManager:
             return
 
         # check prefix and tell upstream
-        if self.apiClient is not None:
+        if self.wanConnPlugin.is_alive() and self.vpnUpstreamDict is not None:
             plist = []
-            for p1 in self.vpnPlugin.get_prefix_list():
+            for p1 in sum(self.vpnUpstreamDict.values()):
                 for p2 in self.wanConnPlugin.get_prefix_list():
                     if WrtUtil.prefixConflic(p1, p2):
                         plist.append(p1)
             if len(plist) > 0:
-                self.logger.error("Upstream prefix duplicates with internet connection, tell upstream and restart myself (ah, sucks).")
+                self.logger.error("Upstream prefix duplicates with internet connection, tell upstream and restart myself (ah, unfair).")
                 self.apiClient.prefixConflict(plist)
                 os.kill(os.getpid(), signal.SIGHUP)
                 return
 
         # change firewall rules
-        intf = self.wanConnPlugin.get_interface()
-        self.param.trafficManager.set_wan_interface(intf)
+        self.param.trafficManager.set_wan_interface(self.wanConnPlugin.get_interface())
 
     def on_wconn_down(self):
         assert threading.get_ident() == self.mainThreadId
@@ -119,84 +119,92 @@ class WrtWanManager:
         self.param.trafficManager.set_wan_interface(None)
 
         # remove exclude prefix
-        ret = self.param.daemon.getPrefixPool().setExcludePrefixList("wan", [])
-        assert not ret
+        self.param.daemon.getPrefixPool().removeExcludePrefixList("wan")
 
     def on_wvpn_up(self):
         assert threading.get_ident() == self.mainThreadId
 
-        # check prefix and restart if neccessary
-        if self.param.daemon.getPrefixPool().setExcludePrefixList("vpn", self.vpnPlugin.get_prefix_list()):
-            self.logger.error("Bridge prefix duplicates with VPN connection, restart automatically.")
-            os.kill(os.getpid(), signal.SIGHUP)
-            return
+        class _Excp1(Exception):
+            pass
+
+        class _Excp2(Exception):
+            pass
+
+        def _RestartVpn():
+            self.vpnPlugin.stop()
+            self.vpnPlugin.start()
 
         try:
-            self.apiClient = WrtCascadeApiClient(self.vpnPlugin.get_remote_ip(), self.param.cascadeApiPort)
-            initData = self.apiClient.connect()
+            # check vpn prefix and restart if neccessary
+            if self.param.daemon.getPrefixPool().setExcludePrefixList("vpn", self.vpnPlugin.get_prefix_list()):
+                self.logger.error("Bridge prefix duplicates with VPN connection, restart automatically.")
+                raise _Excp1()
 
+            # connect to the upstream cascade api server
+            self.apiClient = WrtCascadeApiClient(self.vpnPlugin.get_remote_ip(), self.param.cascadeApiPort)
+            initData = None
+            try:
+                initData = self.apiClient.connect()
+            except socket.error as e:
+                self.logger.error("Cascade API error: %s. Restart VPN plugin.", e)
+                raise _Excp2()
+
+            # get upstream info
             self.vpnUpstreamDict = OrderedDict()
             for k, v in initData["upstream"]:
                 self.vpnUpstreamDict[k] = _UpStreamInfo(v)
 
+            # get subhost info
             self.subHostDict = dict()
             if True:
-                ip = initData["subhost-start"]
-                while ip != initData["subhost-end"]:
-                    self.subHostDict[ip] = None
-                    ip = str(ipaddress.IPv4Address(ip) + 1)
-                self.subHostDict[ip] = None
-        except Exception as e:
-            self.vpnPlugin.stop()
-            self.vpnPlugin.start()
-            self.logger.error("Cascade API error, restart VPN plugin, %s", e)
-            return
+                ip1 = ipaddress.IPv4Address(initData["subhost-start"])
+                ip2 = ipaddress.IPv4Address(initData["subhost-end"])
+                if ip1 > ip2:
+                    self.logger.error("Cascade API error: invalid subhost IP range. Restart VPN plugin.")
+                    raise _Excp2()
+                while ip1 != ip2:
+                    self.subHostDict[str(ip1)] = None
+                    ip1 = ip1 + 1
+                self.subHostDict[str(ip1)] = None
 
-        # check upstream uuid and restart if neccessary
-        if self.vpnUpstreamDict is not None:
+            # check upstream uuid and restart if neccessary
             if self.param.uuid in self.vpnUpstreamDict.keys():
                 self.logger.error("Router UUID duplicates with upstream, restart automatically.")
-                os.kill(os.getpid(), signal.SIGHUP)
-                return
+                raise _Excp1()
 
-        # check upstream prefix and restart if neccessary
-        tl = []
-        if self.vpnUpstreamDict is not None:
-            for uinfo in self.vpnUpstreamDict:
-                tl += uinfo.prefixList
-        if self.param.daemon.getPrefixPool().setExcludePrefixList("vpn-upstream", tl):
-            self.logger.error("Bridge prefix duplicates with upstream, restart automatically.")
+            # check upstream wan-prefix and restart if neccessary
+            tl = sum([x.wanPrefixList for x in self.vpnUpstreamDict.values()])
+            if self.param.daemon.getPrefixPool().setExcludePrefixList("upstream-wan", tl):
+                self.logger.error("Bridge prefix duplicates with upstream, restart automatically.")
+                raise _Excp1()
+
+            # check upstream lan-prefix and restart if neccessary
+            tl = sum([x.lanPrefixList for x in self.vpnUpstreamDict.values()])
+            if self.param.daemon.getPrefixPool().setExcludePrefixList("upstream-lan", tl):
+                self.logger.error("Bridge prefix duplicates with upstream, restart automatically.")
+                raise _Excp1()
+
+            # check prefix and tell upstream
+            if self.wanConnPlugin.is_alive():
+                plist = []
+                for p1 in sum(self.vpnUpstreamDict.values()):
+                    for p2 in self.wanConnPlugin.get_prefix_list():
+                        if WrtUtil.prefixConflic(p1, p2):
+                            plist.append(p1)
+                if len(plist) > 0:
+                    self.logger.error("Upstream prefix duplicates with internet connection, tell upstream and restart myself (ah, unfair).")
+                    self.apiClient.prefixConflict(plist)
+                    raise _Excp1()
+        except _Excp1:
+            self._wvpnDown()
             os.kill(os.getpid(), signal.SIGHUP)
-            return
-
-        # check prefix and tell upstream
-        if self.wanConnPlugin.is_alive():
-            plist = []
-            for p1 in self.vpnPlugin.get_prefix_list():
-                for p2 in self.wanConnPlugin.get_prefix_list():
-                    if WrtUtil.prefixConflic(p1, p2):
-                        plist.append(p1)
-            if len(plist) > 0:
-                self.logger.error("Upstream prefix duplicates with internet connection, tell upstream and restart myself (ah, sucks).")
-                self.apiClient.prefixConflict(plist)
-                os.kill(os.getpid(), signal.SIGHUP)
-                return
+        except _Excp2:
+            self._wvpnDown()
+            WrtUtil.idleInvoke(_RestartVpn)
 
     def on_wvpn_down(self):
         assert threading.get_ident() == self.mainThreadId
-
-        self.subHostDict = None
-
-        self.vpnUpstreamDict = None
-        ret = self.param.daemon.getPrefixPool().setExcludePrefixList("vpn-upstream", [])
-        assert not ret
-
-        if self.apiClient is not None:
-            self.apiClient.dispose()
-            self.apiClient = None
-
-        ret = self.param.daemon.getPrefixPool().setExcludePrefixList("vpn", [])
-        assert not ret
+        self._wvpnDown()
 
     def on_host_appear(self, ipDataDict):
         assert threading.get_ident() == self.mainThreadId
@@ -242,6 +250,19 @@ class WrtWanManager:
                     break
         self.apiClient.removeSubhost(ipList2)
 
+    def _wvpnDown(self):
+        self.param.daemon.getPrefixPool().removeExcludePrefixList("upstream-lan")
+        self.param.daemon.getPrefixPool().removeExcludePrefixList("upstream-wan")
+
+        self.subHostDict = None
+        self.vpnUpstreamDict = None
+
+        if self.apiClient is not None:
+            self.apiClient.dispose()
+            self.apiClient = None
+
+        self.param.daemon.getPrefixPool().removeExcludePrefixList("vpn")
+
     def _addNftRuleVpnSubHost(self, subHostIp, natIp):
         WrtUtil.shell('/sbin/nft add rule wrtd natpre ip daddr %s iif %s dnat %s' % (natIp, self.vpnPlugin.get_interface(), subHostIp))
         WrtUtil.shell('/sbin/nft add rule wrtd natpost ip saddr %s oif %s snat %s' % (subHostIp, self.vpnPlugin.get_interface(), natIp))
@@ -261,4 +282,5 @@ class WrtWanManager:
 class _UpStreamInfo:
 
     def __init__(self, jsonObj):
-        self.prefixList = jsonObj["prefix-list"]
+        self.lanPrefixList = jsonObj["lan-prefix-list"]
+        self.wanPrefixList = jsonObj["wan-prefix-list"]

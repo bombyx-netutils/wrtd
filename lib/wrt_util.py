@@ -15,11 +15,17 @@ import subprocess
 import threading
 import ipaddress
 import queue
+import urllib.request
 from collections import OrderedDict
 from gi.repository import GLib
 
 
 class WrtUtil:
+
+    @staticmethod
+    def isIpPublic(self, ip):
+        ip2 = urllib.request.urlopen("https://ipinfo.io/ip").read().decode("UTF-8").strip()
+        return ip == ip2
 
     @staticmethod
     def prefixConflict(prefix1, prefix2):

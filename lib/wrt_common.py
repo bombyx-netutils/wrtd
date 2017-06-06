@@ -130,6 +130,10 @@ class PrefixPool:
         self._save()
         return ret
 
+    def removeExcludePrefixlist(self, key):
+        if key in self.excludePrefixDict:
+            del self.excludePrefixDict[key]
+
     def usePrefix(self):
         # use a prefix in pool
         for i in range(0, len(self.prefixList)):
@@ -265,6 +269,9 @@ class PluginTemplateWanConnection:
     def is_alive(self):
         assert False
 
+    def get_ip(self):
+        assert False
+
     def get_interface(self):
         assert False
 
@@ -342,8 +349,9 @@ class TemplatePluginLanInterface:
         # must be called after start()
         assert False
 
-    def generate_client_script(self, ostype):
+    def generate_client_script(self, wan_ip, os_type):
         # optional method
+        # returns (suggested-script-filename, script-content)
         assert False
 
 
