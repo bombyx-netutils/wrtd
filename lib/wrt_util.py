@@ -23,7 +23,7 @@ from gi.repository import GLib
 class WrtUtil:
 
     @staticmethod
-    def isIpPublic(self, ip):
+    def isIpPublic(ip):
         ip2 = urllib.request.urlopen("https://ipinfo.io/ip").read().decode("UTF-8").strip()
         return ip == ip2
 
