@@ -90,9 +90,6 @@ class DbusMainObject(dbus.service.Object):
         if pluginObj is None:
             raise Exception("The specified plugin does not exist.")
 
-        if not hasattr(pluginObj, "generate_client_script"):
-            raise Exception("The specified plugin has no client script capability.")
-
         if self.param.wanManager.wanConnPlugin is None:
             raise Exception("No internet connection.")
         if not self.param.wanManager.wanConnPlugin.is_alive():
