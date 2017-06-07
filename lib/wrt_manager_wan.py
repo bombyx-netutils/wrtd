@@ -107,7 +107,7 @@ class WrtWanManager:
             return
 
         # check prefix and tell upstream
-        if self.wanConnPlugin.is_alive() and self.vpnUpstreamDict is not None:
+        if self.vpnUpstreamDict is not None:
             plist = []
             for p1 in sum(self.vpnUpstreamDict.values()):
                 for p2 in self.wanConnPlugin.get_prefix_list():
@@ -121,6 +121,11 @@ class WrtWanManager:
 
         # change firewall rules
         self.param.trafficManager.set_wan_interface(self.wanConnPlugin.get_interface())
+
+        # check dns name
+        if self.param.dnsName is not None:
+            if socket.gethostbyname(self.param.dnsName) != self.wanConnPlugin.get_ip():
+                self.logger.warn("Invalid DNS name %s." % (self.param.dnsName))
 
     def on_wconn_down(self):
         assert threading.get_ident() == self.mainThreadId

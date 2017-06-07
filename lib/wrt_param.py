@@ -16,6 +16,7 @@ class WrtParam:
         self.varDir = "/var/wrtd"
         self.ownResolvConf = os.path.join(self.tmpDir, "resolv.conf")
 
+        self.dnsName = None
         self.uuid = None
 
         self.mainloop = None

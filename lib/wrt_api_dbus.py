@@ -4,6 +4,7 @@
 import json
 import dbus
 import dbus.service
+import socket
 from wrt_util import WrtUtil
 from wrt_common import WrtCommon
 
@@ -18,8 +19,8 @@ from wrt_common import WrtCommon
 # Object path           /
 #
 # Methods:
-# info:json                                    GetRouterInfo()
-# (suggested_filename:str,content:str)         GenerateClientScript(lif_plugin_id:str, os_type:str)
+# info:json                                                GetRouterInfo()
+# (suggested_filename:str,content:str,warn_msg:str-list)   GenerateClientScript(lif_plugin_id:str, os_type:str)
 #
 class DbusMainObject(dbus.service.Object):
 
@@ -77,7 +78,7 @@ class DbusMainObject(dbus.service.Object):
 
         return json.dumps(ret)
 
-    @dbus.service.method('org.fpemud.WRT', in_signature='ss', out_signature='ss')
+    @dbus.service.method('org.fpemud.WRT', in_signature='ss', out_signature='ssas')
     def GenerateClientScript(self, vpns_plugin_full_name, os_type):
         if os_type not in ["linux", "win32"]:
             raise Exception("Invalid OS type.")
@@ -90,15 +91,24 @@ class DbusMainObject(dbus.service.Object):
         if pluginObj is None:
             raise Exception("The specified plugin does not exist.")
 
-        if self.param.wanManager.wanConnPlugin is None:
-            raise Exception("No internet connection.")
-        if not self.param.wanManager.wanConnPlugin.is_alive():
-            raise Exception("No internet connection.")
-        ip = self.param.wanManager.wanConnPlugin.get_ip()
-        if not WrtUtil.isIpPublic(ip):
-            raise Exception("Internet connection is behind NAT.")
-
-        return pluginObj.generate_client_script(ip, os_type)
+        if self.param.dnsName is not None:
+            suggested_filename, content = pluginObj.generate_client_script(self.param.dnsName, os_type)
+            if self.param.wanManager.wanConnPlugin is None or not self.param.wanManager.wanConnPlugin.is_alive():
+                return (suggested_filename, content, ["Domain name %s is not validated." % (self.param.dnsName)])
+            elif socket.gethostbyname(self.param.dnsName) != self.param.wanManager.wanConnPlugin.get_ip():
+                return (suggested_filename, content, ["Domain name %s does not resolve to WAN IP address \"%s\"." % (self.param.dnsName, self.param.wanManager.wanConnPlugin.get_ip())])
+            else:
+                return (suggested_filename, content, [])
+        else:
+            if self.param.wanManager.wanConnPlugin is None:
+                raise Exception("No internet connection.")
+            if not self.param.wanManager.wanConnPlugin.is_alive():
+                raise Exception("No internet connection.")
+            ip = self.param.wanManager.wanConnPlugin.get_ip()
+            if not WrtUtil.isIpPublic(ip):
+                raise Exception("Internet connection is behind NAT.")
+            suggested_filename, content = pluginObj.generate_client_script(ip, os_type)
+            return (suggested_filename, content, ["No domain name specified, using WAN IP address %s as cloud server address." % (ip)])
 
 
 ################################################################################

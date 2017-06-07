@@ -55,12 +55,14 @@ class WrtSubCmdMain:
         if dbusObj is None:
             raise Exception("not started")
 
-        fn, buf = dbusObj.GenerateClientScript(vpns_plugin_full_name, ostype, dbus_interface="org.fpemud.WRT")
+        fn, buf, warnList = dbusObj.GenerateClientScript(vpns_plugin_full_name, ostype, dbus_interface="org.fpemud.WRT")
         with open(fn, "w") as f:
             f.write(buf)
         os.chmod(fn, 0o755)
 
-        print("Client script generated as ./%s" % (fn))
+        print("Client script generated as \"./%s\"." % (fn))
+        for warn in warnList:
+            print("WARN: %s" % (warn))
 
     def _showOneClient(self, ip, hostname):
         if hostname != "":

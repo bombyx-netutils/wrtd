@@ -48,6 +48,9 @@ class WrtDaemon:
             logging.getLogger().setLevel(WrtUtil.getLoggingLevel(self.param.logLevel))
             logging.info("Program begins.")
 
+            # load configuration
+            self._loadCfg()
+
             # load UUID
             if self._loadUuid():
                 logging.info("UUID generated: \"%s\"." % (self.param.uuid))
@@ -137,6 +140,13 @@ class WrtDaemon:
         self.bRestart = True
         self.param.mainloop.quit()
         return True
+
+    def _loadCfg(self):
+        if os.path.exists(self.cfgFile):
+            cfgObj = None
+            with open(self.cfgFile, "r") as f:
+                cfgObj = json.load(f)
+            self.param.dnsName = cfgObj["dns-name"]
 
     def _loadUuid(self):
         if os.path.exists(self.dataFile):
