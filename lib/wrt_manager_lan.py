@@ -25,54 +25,66 @@ class WrtLanManager:
         self.defaultBridge = None
         self.clientDict = dict()                    # <client-ip, client-info>
 
-        logging.info("Start.")
+        try:
+            # create default bridge
+            tmpdir = os.path.join(self.param.tmpDir, "bridge-default")
+            os.mkdir(tmpdir)
+            vardir = os.path.join(self.param.varDir, "bridge-default")
+            WrtUtil.ensureDir(vardir)
+            self.defaultBridge = _DefaultBridge(tmpdir, vardir)
+            self.defaultBridge.init2("wrtd-br",
+                                     self.param.daemon.getPrefixPool().usePrefix(),
+                                     self.param.trafficManager.get_l2_nameserver_port(),
+                                     self.on_client_appear,
+                                     self.on_client_change,
+                                     self.on_client_disappear)
+            logging.info("Default bridge started.")
 
-        # create default bridge
-        tmpdir = os.path.join(self.param.tmpDir, "bridge-default")
-        os.mkdir(tmpdir)
-        vardir = os.path.join(self.param.varDir, "bridge-default")
-        WrtUtil.ensureDir(vardir)
-        self.defaultBridge = _DefaultBridge(tmpdir, vardir)
-        self.defaultBridge.init2("wrtd-br",
-                                 self.param.daemon.getPrefixPool().usePrefix(),
-                                 self.param.trafficManager.get_l2_nameserver_port(),
-                                 self.on_client_appear,
-                                 self.on_client_change,
-                                 self.on_client_disappear)
-        logging.info("Default bridge started.")
+            # start all lan interface plugins
+            for name in WrtCommon.getLanInterfacePluginList(self.param):
+                for instanceName, cfgObj, tmpdir, vardir in self._getInstanceAndInfoFromEtcDir("lif", "lan-interface", name):
+                    os.mkdir(tmpdir)
+                    WrtUtil.ensureDir(vardir)
 
-        # start all lan interface plugins
-        for name in WrtCommon.getLanInterfacePluginList(self.param):
-            for instanceName, cfgObj, tmpdir, vardir in self._getInstanceAndInfoFromEtcDir("lif", "lan-interface", name):
-                os.mkdir(tmpdir)
-                WrtUtil.ensureDir(vardir)
+                    p = WrtCommon.getLanInterfacePlugin(self.param, name, instanceName)
+                    p.init2(instanceName, cfgObj, tmpdir, vardir)
+                    p.start()
+                    self.lifPluginList.append(p)
+                    logging.info("LAN interface plugin \"%s\" activated." % (p.full_name))
 
-                p = WrtCommon.getLanInterfacePlugin(self.param, name, instanceName)
-                p.init2(instanceName, cfgObj, tmpdir, vardir)
-                p.start()
-                self.lifPluginList.append(p)
-                logging.info("LAN interface plugin \"%s\" activated." % (p.full_name))
+            # start all vpn server plugins
+            for name in WrtCommon.getVpnServerPluginList(self.param):
+                for instanceName, cfgObj, tmpdir, vardir in self._getInstanceAndInfoFromEtcDir("vpns", "vpn-server", name):
+                    os.mkdir(tmpdir)
+                    WrtUtil.ensureDir(vardir)
 
-        # start all vpn server plugins
-        for name in WrtCommon.getVpnServerPluginList(self.param):
-            for instanceName, cfgObj, tmpdir, vardir in self._getInstanceAndInfoFromEtcDir("vpns", "vpn-server", name):
-                os.mkdir(tmpdir)
-                WrtUtil.ensureDir(vardir)
-
-                p = WrtCommon.getVpnServerPlugin(self.param, name, instanceName)
-                p.init2(instanceName,
-                        cfgObj,
-                        tmpdir,
-                        vardir,
-                        self.param.daemon.getPrefixPool().usePrefix(),
-                        self.param.trafficManager.get_l2_nameserver_port(),
-                        self.on_client_appear,
-                        self.on_client_change,
-                        self.on_client_disappear,
-                        lambda x: self._apiFirewallAllowFunc(p.full_name, x))
-                p.start()
-                self.vpnsPluginList.append(p)
-                logging.info("VPN server plugin \"%s\" activated." % (p.full_name))
+                    p = WrtCommon.getVpnServerPlugin(self.param, name, instanceName)
+                    p.init2(instanceName,
+                            cfgObj,
+                            tmpdir,
+                            vardir,
+                            self.param.daemon.getPrefixPool().usePrefix(),
+                            self.param.trafficManager.get_l2_nameserver_port(),
+                            self.on_client_appear,
+                            self.on_client_change,
+                            self.on_client_disappear,
+                            lambda x: self._apiFirewallAllowFunc(p.full_name, x))
+                    p.start()
+                    self.vpnsPluginList.append(p)
+                    logging.info("VPN server plugin \"%s\" activated." % (p.full_name))
+        except:
+            for p in self.vpnsPluginList:
+                p.stop()
+                logging.info("VPN server plugin \"%s\" deactivated." % (p.full_name))
+            for p in self.lifPluginList:
+                p.stop()
+                logging.info("LAN interface plugin \"%s\" deactivated." % (p.full_name))
+            if self.defaultBridge is not None:
+                self.defaultBridge.dispose()
+                self.defaultBridge = None
+                logging.info("Default bridge destroyed.")
+            raise
+        logging.info("Started.")
 
     def dispose(self):
         for p in self.vpnsPluginList:
@@ -176,7 +188,7 @@ class WrtLanManager:
             cfgObj = dict()
             tmpdir = os.path.join(self.param.tmpDir, "%s-%s" % (pluginPrefix, fullName))
             vardir = os.path.join(self.param.varDir, "%s-%s" % (pluginPrefix, fullName))
-            ret.append((instanceName, fullName, cfgObj, tmpdir, vardir))
+            ret.append((instanceName, cfgObj, tmpdir, vardir))
 
         return ret
 

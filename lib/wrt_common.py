@@ -152,7 +152,7 @@ class PrefixPool:
         self._save()
         return ret
 
-    def removeExcludePrefixlist(self, key):
+    def removeExcludePrefixList(self, key):
         if key in self.excludePrefixDict:
             del self.excludePrefixDict[key]
 

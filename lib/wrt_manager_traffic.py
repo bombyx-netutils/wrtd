@@ -21,14 +21,17 @@ class WrtTrafficManager:
 
         self.ownerDict = dict()
 
-        logging.info("TMAN: Start.")
-
-        self._runDnsmasq()
-        logging.info("TMAN: Level 2 nameserver started.")
+        try:
+            self._runDnsmasq()
+            logging.info("Level 2 nameserver started.")
+        except:
+            self._stopDnsmasq()
+            raise
+        logging.info("Started.")
 
     def dispose(self):
         self._stopDnsmasq()
-        logging.info("TMAN: Terminated.")
+        logging.info("Terminated.")
 
     def get_l2_nameserver_port(self):
         return self.dnsPort

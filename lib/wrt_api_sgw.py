@@ -89,8 +89,7 @@ class WrtSgwApiServer:
         self.param = param
         self.subhostOwnerDict = dict()
 
-        ipList = ["127.0.0.1"]
-        ipList += [WrtCommon.bridgeGetIp(x) for x in WrtCommon.getAllBridges(param, True)]
+        ipList = ["127.0.0.1"] + [WrtCommon.bridgeGetIp(x) for x in WrtCommon.getAllBridges(param)]
         self.realServer = JsonApiServer(ipList, self.param.sgwApiPort)
 
         self.realServer.addCommand("get-host-list", self._cmdGetHostList)
