@@ -72,6 +72,11 @@ class WrtLanManager:
                     p.start()
                     self.vpnsPluginList.append(p)
                     logging.info("VPN server plugin \"%s\" activated." % (p.full_name))
+
+            # start cascade API server for all the bridges
+            for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
+                self.param.cascadeManager.startApiServer(bridge)
+            logging.info("CASCADE-API servers started.")
         except:
             for p in self.vpnsPluginList:
                 p.stop()

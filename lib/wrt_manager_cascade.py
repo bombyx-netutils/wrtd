@@ -15,15 +15,37 @@ from wrt_common import WrtCommon
 # {
 #     "command": "register",
 #     "data": {
-#         "router-id": "c5facfa6-d8c3-4bce-ac13-6abab49c86fc",
+#         "my-id": "c5facfa6-d8c3-4bce-ac13-6abab49c86fc",
+#         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc": {
+#             "parent": "c6f7cdad-d2ce-3478-cabc-a3b5445bdfee",
+#             "wan-prefix-list": ["192.168.0.0/255.255.255.0", "192.168.1.0/255.255.255.0"],
+#             "lan-prefix-list": ["192.168.2.0/255.255.255.0", "192.168.3.0/255.255.255.0"],
+#             "client-list": {
+#                 "1.2.3.4": {
+#                     "hostname": "abcd",
+#                     "wakeup-mac": "01-02-03-04-05-06",
+#                 },
+#             },
+#         },
 #     },
 # }
 # Response:
 # {
 #     "return": {
-#         "router-id": "c5facfa6-d8c3-4bce-ac13-6abab49c86fc",
+#         "my-id": "c5facfa6-d8c3-4bce-ac13-6abab49c86fc",
 #         "subhost-start": "192.168.1.100",
 #         "subhost-end": "192.168.1.200",
+#         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc": {
+#             "parent": "c6f7cdad-d2ce-3478-cabc-a3b5445bdfee",
+#             "wan-prefix-list": ["192.168.0.0/255.255.255.0", "192.168.1.0/255.255.255.0"],
+#             "lan-prefix-list": ["192.168.2.0/255.255.255.0", "192.168.3.0/255.255.255.0"],
+#             "client-list": {
+#                 "1.2.3.4": {
+#                     "hostname": "abcd",
+#                     "wakeup-mac": "01-02-03-04-05-06",
+#                 },
+#             },
+#         },
 #     },
 # }
 #
@@ -322,17 +344,40 @@ from wrt_common import WrtCommon
 #
 
 
+class WrtCascadeManager:
+
+    def __init__(self, param):
+        self.param = param
+        self.apiServerList = []
+
+    def startApiServer(self, bridge):
+        self.apiServerList.append(WrtCascadeApiServer(self, bridge))
+
+    def startApiClient(self, remote_ip):
+        self.apiClient = WrtCascadeApiClient(self, remote_ip)
+        return self.apiClient
+
+    def stopApiClient(self):
+        assert self.apiClient is not None
+        self.apiClient.dispose()
+
+    def dispose(self):
+        assert self.apiClient is None
+        for s in self.apiServerList:
+            s.dispose()
+
+
 class WrtCascadeApiServer:
 
-    def __init__(self, param, bridge):
-        self.param = param
+    def __init__(self, pObj, bridge):
+        self.pObj = pObj
         self.bridge = bridge
 
         self.globalLock = threading.Lock()
         self.freeIpRange = self.bridge.get_subhost_ip_range()
         self.subhostOwnerDict = dict()
 
-        self.realServer = JsonApiServer([WrtCommon.bridgeGetIp(bridge)], self.param.cascadeApiPort)
+        self.realServer = JsonApiServer([WrtCommon.bridgeGetIp(bridge)], self.pObj.param.cascadeApiPort)
 
         self.realServer.setValidClient(True)
         self.realServer.setOneClientPerIp(True)
@@ -424,9 +469,9 @@ class WrtCascadeApiServer:
 
 class WrtCascadeApiClient:
 
-    def __init__(self, param, ip, port):
-        self.param = param
-        self.realClient = JsonApiClient(ip, port)
+    def __init__(self, pObj, ip):
+        self.pObj = pObj
+        self.realClient = JsonApiClient(ip, self.pObj.param.cascadeApiPort)
         self.realClient.registerNotifyCallback("host-refresh", self._notifyHostRefresh)
         self.upstreamId = "upstream-%s" % (self.realClient.get_server_ip())
 

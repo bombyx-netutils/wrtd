@@ -32,6 +32,7 @@ class WrtParam:
 
         self.daemon = None
         self.trafficManager = None
+        self.cascadeManager = None
         self.lanManager = None
         self.wanManager = None
         self.sgwApiServer = None

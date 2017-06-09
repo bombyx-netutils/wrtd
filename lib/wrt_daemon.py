@@ -16,6 +16,7 @@ from wrt_util import WrtUtil
 from wrt_common import WrtCommon
 from wrt_common import PrefixPool
 from wrt_manager_traffic import WrtTrafficManager
+from wrt_manager_cascade import WrtCascadeManager
 from wrt_manager_lan import WrtLanManager
 from wrt_manager_wan import WrtWanManager
 from wrt_api_dbus import DbusMainObject
@@ -81,6 +82,7 @@ class WrtDaemon:
 
             # business initialize
             self.param.trafficManager = WrtTrafficManager(self.param)
+            self.param.cascadeManager = WrtCascadeManager(self.param)
             self.param.wanManager = WrtWanManager(self.param)
             self.param.lanManager = WrtLanManager(self.param)
             self.interfaceTimer = GObject.timeout_add_seconds(10, self._interfaceTimerCallback)
@@ -94,11 +96,6 @@ class WrtDaemon:
             self.param.sgwApiServer = WrtSgwApiServer(self.param)
             logging.info("SGW-API server started.")
 
-            # start CASCADE API server
-            for bridge in WrtCommon.getAllBridges(self.param):
-                self.param.cascadeApiServerList.append(WrtCascadeApiServer(self.param, bridge))
-            logging.info("CASCADE-API servers started.")
-
             # start main loop
             logging.info("Mainloop begins.")
             GLib.unix_signal_add(GLib.PRIORITY_HIGH, signal.SIGINT, self._sigHandlerINT, None)
@@ -107,8 +104,6 @@ class WrtDaemon:
             self.param.mainloop.run()
             logging.info("Mainloop exits.")
         finally:
-            for s in self.param.cascadeApiServerList:
-                s.dispose()
             if self.param.sgwApiServer is not None:
                 self.param.sgwApiServer.dispose()
             if self.interfaceTimer is not None:
@@ -117,6 +112,8 @@ class WrtDaemon:
                 self.param.lanManager.dispose()
             if self.param.wanManager is not None:
                 self.param.wanManager.dispose()
+            if self.param.cascadeManager is not None:
+                self.param.cascadeManager.dispose()
             if self.param.trafficManager is not None:
                 self.param.trafficManager.dispose()
             WrtUtil.nftForceDeleteTable("wrtd")

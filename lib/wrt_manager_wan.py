@@ -156,7 +156,7 @@ class WrtWanManager:
                 raise _Excp1()
 
             # connect to the upstream cascade api server
-            self.vpnApiClient = WrtCascadeApiClient(self.vpnPlugin.get_remote_ip(), self.param.cascadeApiPort)
+            self.vpnApiClient = self.param.daemon.cascadeManager.startApiClient(self.vpnPlugin.get_remote_ip())
             initData = None
             try:
                 initData = self.vpnApiClient.connect()
@@ -273,7 +273,7 @@ class WrtWanManager:
         self.vpnUpstreamDict = None
 
         if self.vpnApiClient is not None:
-            self.vpnApiClient.dispose()
+            self.param.cascadeManager.stopApiClient()
             self.vpnApiClient = None
 
         self.param.daemon.getPrefixPool().removeExcludePrefixList("vpn")
