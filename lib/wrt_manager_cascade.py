@@ -516,65 +516,64 @@ class _ApiClientNotifyDownProcessor:
         self.pObj = pObj
         self.pObj.apiClient.registerNotifyCallback("router-add",
             lambda data: self.pObj.apiClientIdleQueue.add(self._idleFunc,
-                                                          self._router_add,
-                                                          self.pObj.param.wanManager.on_cascade_upstream_router_add,
+                                                          self.on_router_add,
                                                           data))
         self.pObj.apiClient.registerNotifyCallback("router-remove",
             lambda data: self.pObj.apiClientIdleQueue.add(self._idleFunc,
-                                                          self._router_remove,
-                                                          self.pObj.param.wanManager.on_cascade_upstream_router_add,
+                                                          self.on_router_remove,
                                                           data))
         self.pObj.apiClient.registerNotifyCallback("router-wan-prefix-list-change",
             lambda data: self.pObj.apiClientIdleQueue.add(self._idleFunc,
-                                                          self._router_wan_prefix_list_change, 
-                                                          self.pObj.param.wanManager.on_cascade_upstream_router_add, 
+                                                          self.on_router_wan_prefix_list_change, 
                                                           data))
         self.pObj.apiClient.registerNotifyCallback("router-lan-prefix-list-change",
             lambda data: self.pObj.apiClientIdleQueue.add(self._idleFunc,
-                                                          self._router_lan_prefix_list_change, 
-                                                          self.pObj.param.wanManager.on_cascade_upstream_router_add, 
+                                                          self.on_router_lan_prefix_list_change, 
                                                           data))
         self.pObj.apiClient.registerNotifyCallback("router-client-add-or-change",
             lambda data: self.pObj.apiClientIdleQueue.add(self._idleFunc, 
-                                                          self._router_client_add_or_change, 
-                                                          self.pObj.param.wanManager.on_cascade_upstream_router_add, 
+                                                          self.on_router_client_add_or_change, 
                                                           data))
         self.pObj.apiClient.registerNotifyCallback("router-client-remove",
             lambda data: self.pObj.apiClientIdleQueue.add(self._idleFunc, 
-                                                          self._router_client_remove, 
-                                                          self.pObj.param.wanManager.on_cascade_upstream_router_add, 
+                                                          self.on_router_client_remove, 
                                                           data))
 
-    def _router_add(self, data):
+    def on_router_add(self, data):
         self.pObj.upstreamRouterInfo.update(data)
+        self.pObj.param.wanManager.on_cascade_upstream_router_add(data)
 
-    def _router_remove(self, data):
+    def on_router_remove(self, data):
         for router_id in data:
             del self.pObj.upstreamRouterInfo[router_id]
+        self.pObj.param.wanManager.on_cascade_upstream_router_remove(data)
 
-    def _router_wan_prefix_list_change(self, data):
+    def on_router_wan_prefix_list_change(self, data):
         for router_id, prefix_list in data:
             self.pObj.upstreamRouterInfo[router_id]["wan-prefix-list"] = prefix_list
+        self.pObj.param.wanManager.on_cascade_upstream_router_wan_prefix_list_change(data)
 
-    def _router_lan_prefix_list_change(self, data):
+    def on_router_lan_prefix_list_change(self, data):
         for router_id, prefix_list in data:
             self.pObj.upstreamRouterInfo[router_id]["lan-prefix-list"] = prefix_list
+        self.pObj.param.wanManager.on_cascade_upstream_router_lan_prefix_list_change(data)
 
-    def _router_client_add_or_change(self, data):
+    def on_router_client_add_or_change(self, data):
         for router_id, client_list in data:
             self.pObj.upstreamRouterInfo[router_id]["client-list"] = client_list
+        self.pObj.param.wanManager.on_cascade_upstream_router_client_add_or_change(data)
 
-    def _router_client_remove(self, data):
+    def on_router_client_remove(self, data):
         for router_id, ip_list in data:
             o = self.pObj.upstreamRouterInfo[router_id]["client-list"]
             for ip in ip_list:
                 if ip in o:
                     del o[ip]
+        self.pObj.param.wanManager.on_cascade_upstream_router_client_remove(data)
 
-    def _idleFunc(self, callback1, callback2, data):
+    def _idleFunc(self, callback, data):
         try:
-            callback1(data)
-            callback2(data)
+            callback(data)
         except Exception as e:
             logging.error("Cascade API communication error, %s", e)
             self.pObj.disposeApiClient()
