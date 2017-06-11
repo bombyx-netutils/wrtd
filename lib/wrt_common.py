@@ -274,6 +274,12 @@ class TemplateBridge:
 class PluginTemplateWanConnection:
 
     def init2(self, tmpDir, ownResolvConf, upCallback, downCallback):
+        # upCallback:
+        #   is_alive() should return True in upCallback().
+        #   exception raised by upCallback() would make the plugin bring down the connection.
+        # downCallback:
+        #   is_alive() should return False in downCallback().
+        #   no exception is allowed in downCallback().
         assert False
 
     def start(self):
@@ -310,12 +316,21 @@ class PluginTemplateWanConnection:
 class PluginTemplateCascadeVpn:
 
     def init2(self, cfg, tmpDir, upCallback, downCallback):
+        # upCallback:
+        #   is_alive() should return True in upCallback().
+        #   exception raised by upCallback() would make the plugin bring down the connection.
+        # downCallback:
+        #   is_alive() should return False in downCallback().
+        #   no exception is allowed in downCallback().
         assert False
 
     def start(self):
         assert False
 
     def stop(self):
+        assert False
+
+    def disconnect(self):
         assert False
 
     def is_alive(self):

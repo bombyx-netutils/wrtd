@@ -38,7 +38,7 @@ class WrtUtil:
         def _idleCallback(func, *args):
             func(*args)
             return False
-        GLib.idle_add(_idleCallback, func, *args)
+        return GLib.idle_add(_idleCallback, func, *args)
 
     @staticmethod
     def restartProgram():
@@ -305,12 +305,42 @@ class NewMountNamespace:
         self.parentfd = None
 
 
+class IdleQueue:
+
+    def __init__(self):
+        self.queue = queue.Queue()
+        self.consumer = None
+
+    def add(self, idleCallback, *args):
+        self.queue.put((idleCallback, args))
+        if self.consumer is None:
+            self.consumer = GLib.idle_add(self._consumeFunc)
+
+    def clear(self):
+        if self.consumer is not None:
+            GLib.source_remove(self.consumer)
+            self.consumer = None
+        self.queue = queue.Queue()
+
+    def _consumeFunc(self):
+        # add() and clear() may be called in _consumeFunc()
+        if not self.queue.empty():
+            idleCallback, args = self.queue.get()
+            self.queue.task_done()
+            idleCallback(*args)
+        if not self.queue.empty():
+            return True
+        self.consumer = None
+        return False
+
+
 class JsonApiServer:
 
-    def __init__(self, ipList, port):
+    def __init__(self, clientProcessorClass, ipList, port):
         self.flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
 
         self.serverSockList = []
+        self.clientProcessorClass = clientProcessorClass
 
         self.globalLock = threading.Lock()
         self.threadDict = dict()
@@ -340,7 +370,7 @@ class JsonApiServer:
                 serverSock.close()
             self.serverSockList = []
 
-    def setValidClient(self, value):
+    def setClientValidating(self, value):
         assert isinstance(value, bool)
         self.bValidClient = value
 
@@ -380,6 +410,9 @@ class JsonApiServer:
                 self._stopClient(sock)
         while len(self.threadDict) > 0:
             time.sleep(1.0)
+
+    def getClients(self):
+        pass
 
     def sendNotify(self, notify, data, include=None, exclude=None):
         assert include is None or exclude is None
@@ -579,9 +612,6 @@ class JsonApiClient:
 
         return ret
 
-    def get_server_ip(self):
-        return self.sock.getpeername()[0]
-
     def execCommand(self, command, data=None, timeout=None):
         jsonObj = dict()
         jsonObj["command"] = command
@@ -627,11 +657,14 @@ class _RecvThread(threading.Thread):
                 if "notify" in jsonObj:
                     if jsonObj["notify"] not in self.pObj.notifyCallbackDict:
                         raise Exception("notify %s not supported" % (jsonObj["notify"]))
-                    self.pObj.notifyCallbackDict[jsonObj["notify"]]()
+                    if "data" in jsonObj:
+                        self.pObj.notifyCallbackDict[jsonObj["notify"]](jsonObj["data"])
+                    else:
+                        self.pObj.notifyCallbackDict[jsonObj["notify"]]()
                 elif "return" in jsonObj:
                     self.queue.put(jsonObj["return"])
                 else:
                     raise Exception("invalid content")
             except Exception as e:
                 logging.error("Failed to process API command from %s, %s", self.addr, e)
-                logging.debug("_CommandThread.run: Exception, %s, %s", e.__class__, e)
+                logging.debug("_RecvThread.run: Exception, %s, %s", e.__class__, e)
