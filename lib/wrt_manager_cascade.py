@@ -374,7 +374,7 @@ class _ApiClientStartThread(threading.Thread):
         try:
             apiClient = JsonApiClient(self.remove_ip, self.pObj.param.cascadeApiPort)
             ret = self._register(apiClient, self.pObj.param.uuid, self.pObj.routerInfo, self.pObj.routerInfoDownstream)     # fixme, maybe we shoule copy routerInfo and routerInfoDownstream here instead using it directly
-            self.pObj.apiClientIdleQueue.add(self.._idleFuncUpCallback, apiClient, ret)
+            self.pObj.apiClientIdleQueue.add(self._idleFuncUpCallback, apiClient, ret)
             break
         except Exception as e:
             apiClient.dispose()

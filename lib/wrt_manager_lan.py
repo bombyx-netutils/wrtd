@@ -73,8 +73,18 @@ class WrtLanManager:
                     self.vpnsPluginList.append(p)
                     logging.info("VPN server plugin \"%s\" activated." % (p.full_name))
 
+            # get all bridges
+            all_bridges = [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]
+
+            # send other-bridge-create event
+            for bridge in all_bridges:
+                for other_bridge in all_bridges:
+                    if bridge == other_bridge:
+                        continue
+                    bridge.on_other_bridge_created(other_bridge)
+
             # start cascade API server for all the bridges
-            for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
+            for bridge in all_bridges:
                 self.param.cascadeManager.startApiServer(bridge)
             logging.info("CASCADE-API servers started.")
         except:
@@ -274,12 +284,12 @@ class _DefaultBridge:
             i += 50
         return subhostIpRange
 
-    def on_other_bridge_created(self, id):
-        with open(os.path.join(self.hostsDir, id), "w") as f:
+    def on_other_bridge_created(self, bridge):
+        with open(os.path.join(self.hostsDir, bridge.get_bridge_id()), "w") as f:
             f.write("")
 
-    def on_other_bridge_destroyed(self, id):
-        os.unlink(os.path.join(self.hostsDir, id))
+    def on_other_bridge_destroyed(self, bridge):
+        os.unlink(os.path.join(self.hostsDir, bridge.get_bridge_id()))
 
     def on_subhost_owner_connected(self, id):
         with open(os.path.join(self.hostsDir, id), "w") as f:

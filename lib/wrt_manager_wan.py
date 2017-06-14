@@ -157,7 +157,7 @@ class WrtWanManager:
         ip1 = ipaddress.IPv4Address(data["subhost-start"])
         ip2 = ipaddress.IPv4Address(data["subhost-end"])
         if ip1 > ip2:
-            raise Exception("invalid subhost IP range, %s~%s" % (data["subhost-start"], data["subhost-end"])
+            raise Exception("invalid subhost IP range, %s~%s" % (data["subhost-start"], data["subhost-end"]))
         self.subHostDict = dict()
         while ip1 != ip2:
             self.subHostDict[str(ip1)] = None
