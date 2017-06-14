@@ -8,7 +8,7 @@ from wrt_common import WrtCommon
 
 
 ################################################################################
-# Command: register
+# client2server: command: register
 ################################################################################
 #
 # Request:
@@ -54,12 +54,11 @@ from wrt_common import WrtCommon
 # }
 #
 ################################################################################
-# Command: new-router
+# client2server: notification: new-router
 ################################################################################
 #
-# Request:
 # {
-#     "command": "new-router",
+#     "notification": "new-router",
 #     "data": {
 #         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc": {
 #             "parent": "c6f7cdad-d2ce-3478-cabc-a3b5445bdfee",
@@ -74,74 +73,50 @@ from wrt_common import WrtCommon
 #         },
 #     },
 # }
-# Response:
-# {
-#     "return": {
-#     },
-# }
 #
 ################################################################################
-# Command: delete-router
+# client2server: notification: delete-router
 ################################################################################
 #
-# Request:
 # {
-#     "command": "delete-router",
+#     "notification": "delete-router",
 #     "data": [
 #         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc",
 #     ],
 # }
-# Response:
-# {
-#     "return": {
-#     },
-# }
 #
 ################################################################################
-# Command: update-router-wan-prefix-list
+# client2server: notification: update-router-wan-prefix-list
 ################################################################################
 #
-# Request:
 # {
-#     "command": "update-router-wan-prefix-list",
+#     "notification": "update-router-wan-prefix-list",
 #     "data": {
 #         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
 #             "wan-prefix-list": ["192.168.0.0/255.255.255.0", "192.168.1.0/255.255.255.0"],
 #         }
 #     },
 # }
-# Response:
-# {
-#     "return": {
-#     },
-# }
 #
 ################################################################################
-# Command: update-router-lan-prefix-list
+# client2server: notification: update-router-lan-prefix-list
 ################################################################################
 #
-# Request:
 # {
-#     "command": "update-router-lan-prefix-list",
+#     "notification": "update-router-lan-prefix-list",
 #     "data": {
 #         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
 #             "lan-prefix-list": ["192.168.0.0/255.255.255.0", "192.168.1.0/255.255.255.0"],
 #         }
 #     },
 # }
-# Response:
-# {
-#     "return": {
-#     },
-# }
 #
 ################################################################################
-# Command: new-or-update-router-client
+# client2server: notification: new-or-update-router-client
 ################################################################################
 #
-# Request:
 # {
-#     "command": "new-or-update-router-client",
+#     "notification": "new-or-update-router-client",
 #     "data": {
 #         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
 #             "client-list": {
@@ -154,19 +129,13 @@ from wrt_common import WrtCommon
 #         ],
 #     },
 # }
-# Response:
-# {
-#     "return": {
-#     },
-# }
 #
 ################################################################################
-# Command: delete-router-client
+# client2server: notification: delete-router-client
 ################################################################################
 #
-# Request:
 # {
-#     "command": "delete-router-client",
+#     "notification": "delete-router-client",
 #     "data": {
 #         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
 #             "client-list": [
@@ -175,18 +144,13 @@ from wrt_common import WrtCommon
 #         },
 #     },
 # }
-# Response:
-# {
-#     "return": {
-#     },
-# }
 #
 ################################################################################
-# Notify: router-add
+# server2client: notification: router-add
 ################################################################################
 #
 # {
-#     "notify": "router-add",
+#     "notification": "router-add",
 #     "data": {
 #         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc": {
 #             "parent": "c6f7cdad-d2ce-3478-cabc-a3b5445bdfee",
@@ -203,22 +167,22 @@ from wrt_common import WrtCommon
 # }
 #
 ################################################################################
-# Notify: router-remove
+# server2client: notification: router-remove
 ################################################################################
 #
 # {
-#     "notify": "router-remove",
+#     "notification": "router-remove",
 #     "data": [
 #         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc",
 #     ],
 # }
 #
 ################################################################################
-# Notify: router-wan-prefix-list-change
+# server2client: notification: router-wan-prefix-list-change
 ################################################################################
 #
 # {
-#     "notify": "router-wan-prefix-list-change",
+#     "notification": "router-wan-prefix-list-change",
 #     "data": {
 #         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
 #             "wan-prefix-list": ["192.168.0.0/255.255.255.0", "192.168.1.0/255.255.255.0"],
@@ -227,11 +191,11 @@ from wrt_common import WrtCommon
 # }
 #
 ################################################################################
-# Notify: router-lan-prefix-list-change
+# server2client: notification: router-lan-prefix-list-change
 ################################################################################
 #
 # {
-#     "notify": "router-lan-prefix-list-change",
+#     "notification": "router-lan-prefix-list-change",
 #     "data": {
 #         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
 #             "lan-prefix-list": ["192.168.0.0/255.255.255.0", "192.168.1.0/255.255.255.0"],
@@ -240,11 +204,11 @@ from wrt_common import WrtCommon
 # }
 #
 ################################################################################
-# Notify: router-client-add-or-change
+# server2client: notification: router-client-add-or-change
 ################################################################################
 #
 # {
-#     "notify": "router-client-add-or-change",
+#     "notification": "router-client-add-or-change",
 #     "data": {
 #         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
 #             "client-list": {
@@ -259,11 +223,11 @@ from wrt_common import WrtCommon
 # }
 #
 ################################################################################
-# Notify: router-client-remove
+# server2client: notification: router-client-remove
 ################################################################################
 #
 # {
-#     "notify": "router-client-remove",
+#     "notification": "router-client-remove",
 #     "data": {
 #         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
 #             "client-list": [

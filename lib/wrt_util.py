@@ -414,29 +414,6 @@ class JsonApiServer:
     def getClients(self):
         pass
 
-    def sendNotify(self, notify, data, include=None, exclude=None):
-        assert include is None or exclude is None
-        assert notify in self.notifyList
-
-        jsonObj = dict()
-        jsonObj["notify"] = notify
-        if data is not None:
-            jsonObj["data"] = data
-
-        with self.globalLock:
-            tSendList = []
-            for k, v in self.threadDict.items():
-                if include is not None:
-                    if k.getpeeraddr() not in include:
-                        continue
-                elif exclude is not None:
-                    if k.getpeeraddr() in exclude:
-                        continue
-                tSendList.append(v[1])
-            for tSend in tSendList:
-                if tSend is not None:
-                    tSend.queue.put(jsonObj)
-
     def _onServerAccept(self, source, cb_condition):
         assert not (cb_condition & self.flagError)
 
@@ -508,228 +485,139 @@ class JsonApiServer:
                 sock.close()
 
 
-class _CommandThread(threading.Thread):
-
-    def __init__(self, pObj, sock, addr, sendLock):
-        threading.Thread.__init__(self)
-        self.pObj = pObj
-        self.sock = sock
-        self.addr = addr
-        self.sendLock = sendLock
-
-    def run(self):
-        try:
-            while True:
-                buf = WrtUtil.recvLine(self.sock).decode("utf-8")
-                if len(buf) == 0:
-                    break
-                try:
-                    jsonObj = json.loads(buf, object_pairs_hook=OrderedDict)
-                    if "command" not in jsonObj:
-                        raise Exception("invalid command")
-                    if jsonObj["command"] not in self.pObj.commandDict:
-                        raise Exception("command %s not supported" % (jsonObj["command"]))
-
-                    if "data" in jsonObj:
-                        self.pObj.commandDict[jsonObj["command"]](self.addr)
-                    else:
-                        self.pObj.commandDict[jsonObj["command"]](self.addr, jsonObj["data"])
-                    logging.info("Process API command \"%s\" from \"%s\"", jsonObj["command"], self.addr)
-                except Exception as e:
-                    logging.error("Failed to process API command from %s, %s", self.addr, e)
-                    logging.debug("_CommandThread.run: Exception, %s, %s", e.__class__, e)
-        finally:
-            self.pObj._disposeClient(self.sock, 0)
-
-
-class _NotifyThread(threading.Thread):
-
-    def __init__(self, pObj, sock, addr, sendLock):
-        threading.Thread.__init__(self)
-        self.pObj = pObj
-        self.sock = sock
-        self.addr = addr
-        self.sendLock = sendLock
-        self.queue = queue.queue()
-        self.bStop = False
-
-    def run(self):
-        try:
-            while True:
-                if self.bStop:
-                    break
-                try:
-                    jsonObj = self.queue.get(timeout=10)
-                except queue.Empty:
-                    continue
-
-                if self.bStop:
-                    break
-                try:
-                    buf = json.dumps(jsonObj)
-                    with self.sendLock:
-                        self.sock.send(buf)
-                    logging.info("Send notify \"%s\" to \"%s\"", jsonObj["notify"], self.addr)
-                except Exception as e:
-                    logging.error("Failed to send notify to %s, %s", self.addr, e)
-                    logging.debug("_NotifyThread.run: Exception, %s, %s", e.__class__, e)
-                finally:
-                    self.queue.task_done()
-        finally:
-            self.pObj._disposeClient(self.sock, 1)
-
-
 class JsonApiEndPoint:
 
-    def __init__(self, parent, conn):
-        self.parent = parent
-        self.conn = conn
-        self.dis = Gio.DataInputStream.new(conn)
-        self.dos = Gio.DataOutputStream.new(conn)
-        self.dis.read_line_async(0, None, self._on_receive)
-        self.pending_receive_command = None
-        self.pending_send_command = None
+    def __init__(self):
+        self.iostream = None
+        self.dis = None
+        self.dos = None
+        self.command_received = None
+        self.command_sent = None
+
+    def set_iostream_and_start(self, iostream):
+        assert self.iostream is None
+
+        self.iostream = iostream
+        self.dis = Gio.DataInputStream.new(iostream.get_input_stream())
+        self.dos = Gio.DataOutputStream.new(iostream.get_output_stream())
+        self.dis.read_line_async(0, None, self._on_receive)     # fixme: 0 should be PRIORITY_DEFAULT, but I can't find it
 
     def close(self):
-        self.conn.close()
+        if self.iostream is not None:
+            self.iostream.close()
 
-    def send_notification(self, notification, data=None):
-        assert self.pending_send_command is None
+    def send_notification(self, notification, data):
+        assert self.command_sent is None
 
         jsonObj = dict()
-        jsonObj["notify"] = notify
+        jsonObj["notification"] = notification
         if data is not None:
             jsonObj["data"] = data
         self.dos.put_string(json.dumps(jsonObj) + "\n")
 
-    def send_command(self, command, data=None):
-        assert self.pending_send_command is None
+    def exec_command(self, command, data, return_callback=None, error_callback=None):
+        assert self.command_sent is None
 
         jsonObj = dict()
         jsonObj["command"] = command
         if data is not None:
             jsonObj["data"] = data
         self.dos.put_string(json.dumps(jsonObj) + "\n")
-        self.pending_send_command = True
+        self.command_sent = (return_callback, error_callback)
 
     def _on_receive(self, source_object, res):
+        class Excp1(Exception):
+            pass
+
         line, len = source_object.read_line_finish_utf8(res)
         jsonObj = json.loads(line)
-        if "command" in jsonObj:
-            if hasattr(self, "on_command_%s" % (jsonObj["command"])):
+        try:
+            if "command" in jsonObj:
+                if self.command_received is not None:
+                    raise Excp1("unexpected \"command\" message")
+                funcname = "on_command_" + jsonObj["command"].replace("-", "_")
+                if not hasattr(self, funcname):
+                    raise Excp1("no callback for command " + jsonObj["command"])
+                getattr(self, funcname)(jsonObj.get("data", None), self._send_return, self._send_error)                
+                self.command_received = jsonObj["command"]
+                return
+
+            if "notification" in jsonObj:
+                funcname = "on_notification_" + jsonObj["notification"].replace("-", "_")
+                if not hasattr(self, funcname):
+                    raise Excp1("no callback for notification " + jsonObj["notification"])
+                getattr(self, funcname)(jsonObj.get("data", None))
+                return
+
+            if "return" in jsonObj:
+                if self.command_sent is None:
+                    raise Excp1("unexpected \"return\" message")
+                cmd, return_cb, error_cb = self.command_sent
+                if jsonObj["return"] is not None and return_cb is None:
+                    raise Excp1("no return callback specified for command " + cmd)
+                if return_cb is not None:
+                    return_cb(jsonObj["return"])
+                self.command_sent = None
+                return
+            elif "error" in jsonObj:
+                if self.command_sent is None:
+                    raise Excp1("unexpected \"error\" message")
+                cmd, return_cb, error_cb = self.command_sent
+                if error_cb is None:
+                    raise Excp1("no error callback specified for command " + cmd)
+                error_cb(jsonObj["error"])
+                self.command_sent = None
+                return
             else:
-                self.on_error("invalid command %s" % (jsonObj["command"]))
-                self.close()
-        elif "notification" in jsonObj:
-        elif "return" in jsonObj and self.pending_command is not None:
-        elif "error" in jsonObj and self.pending_command is not None:
-            if :
-                self.on_error("invalid message")
-                self.close()
-        else:
-            self.on_error("invalid message")
+                raise Excp1("invalid message")
+        except Excp1 as e:
+            self.on_error(e)
             self.close()
+        finally:
+            self.dis.read_line_async(0, None, self._on_receive)
 
-                    if "command" not in jsonObj:
-                        raise Exception("invalid command")
-                    if jsonObj["command"] not in self.pObj.commandDict:
-                        raise Exception("command %s not supported" % (jsonObj["command"]))
+    def _send_return(self, data):
+        assert self.command_received is not None
 
-                    if "data" in jsonObj:
-                        self.pObj.commandDict[jsonObj["command"]](self.addr)
-                    else:
-                        self.pObj.commandDict[jsonObj["command"]](self.addr, jsonObj["data"])
+        jsonObj = dict()
+        jsonObj["return"] = data
+        self.dos.put_string(json.dumps(jsonObj) + "\n")
+        self.command_received = None
 
+    def _send_error(self, data):
+        assert self.command_received is not None
 
-
-
-
-        self.dis.read_line_async(0, None, self._on_receive)
-
-
-    def _send
-
+        jsonObj = dict()
+        jsonObj["error"] = data
+        self.dos.put_string(json.dumps(jsonObj) + "\n")
+        self.command_received = None
 
 
 class JsonApiClient(JsonApiEndPoint):
 
-    def __init__(self, ip, port, upCallback, errorCallback):
+    def __init__(self):
+        super().__init__()
+        self.ip = None
+        self.port = None
+
+    def connect(self, ip, port):
+        assert self.ip is None and self.port is None
+
         self.ip = ip
         self.port = port
-        self.upCallback = upCallback
-        self.errorCallback = errorCallback
-        self.conn = None
-        self.queue = queue.queue()
 
-    def register_command(self, command):
-        self.command_list.append(command)
-
-    def register_notification(self, notification):
-        self.notification_list.append(notification)
-
-    def connect(self):
         sc = Gio.SocketClient.new()
         sc.set_family(Gio.SocketFamily.IPV4)
         sc.set_protocol(Gio.SocketProtocol.TCP)
-        sc.connect_to_host_async(self.ip, self.port, None, self.on_connect)
+        sc.connect_to_host_async(self.ip, self.port, None, self._on_connect)
+
+    def close(self)
+        super().close()
 
     def _on_connect(self, source_object, res):
         try:
-            self.conn = source_object.connect_to_host_async_finish(res)
-            self.upCallback()
+            conn = source_object.connect_to_host_async_finish(res)
+            self.set_iostream_and_start(conn)
+            self.on_connected()
         except GLib.Error as e:
-            self.errorCallback(e)
-
-    def execCommand(self, command, data=None, timeout=None):
-        jsonObj = dict()
-        jsonObj["command"] = command
-        if data is not None:
-            jsonObj["data"] = data
-
-        buf = json.dumps(jsonObj)
-        self.sock.send(buf)
-
-        while True:
-            try:
-                jsonObj = self.queue.get(timeout=10)
-            except queue.Empty:
-                continue
-            try:
-                if "return" in jsonObj:
-                    return jsonObj["return"]
-                else:
-                    raise Exception("fixme")
-            finally:
-                self.queue.task_done()
-
-    def dispose(self):
-        self.sock.close()
-
-
-class _RecvThread(threading.Thread):
-
-    def __init__(self, pObj):
-        threading.Thread.__init__(self)
-        self.pObj = pObj
-
-    def run(self):
-        while True:
-            buf = WrtUtil.recvLine(self.pObj.sock).decode("utf-8")
-            if len(buf) == 0:
-                break
-            try:
-                jsonObj = json.loads(buf, object_pairs_hook=OrderedDict)
-                if "notify" in jsonObj:
-                    if jsonObj["notify"] not in self.pObj.notifyCallbackDict:
-                        raise Exception("notify %s not supported" % (jsonObj["notify"]))
-                    if "data" in jsonObj:
-                        self.pObj.notifyCallbackDict[jsonObj["notify"]](jsonObj["data"])
-                    else:
-                        self.pObj.notifyCallbackDict[jsonObj["notify"]]()
-                elif "return" in jsonObj:
-                    self.queue.put(jsonObj["return"])
-                else:
-                    raise Exception("invalid content")
-            except Exception as e:
-                logging.error("Failed to process API command from %s, %s", self.addr, e)
-                logging.debug("_RecvThread.run: Exception, %s, %s", e.__class__, e)
+            self.on_error(e)
