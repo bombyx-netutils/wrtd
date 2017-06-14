@@ -486,6 +486,10 @@ class JsonApiServer:
 
 
 class JsonApiEndPoint:
+    # sub-class must implement the following functions:
+    #   on_error(self, e)
+    #   on_command_XXX(self, data)
+    #   on_notification_XXX(self, data)
 
     def __init__(self):
         self.iostream = None
@@ -621,3 +625,8 @@ class JsonApiClient(JsonApiEndPoint):
             self.on_connected()
         except GLib.Error as e:
             self.on_error(e)
+
+
+class JsonApiServer:
+
+    def __init__(self, ipList, port):
