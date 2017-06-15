@@ -530,55 +530,54 @@ class JsonApiEndPoint:
         self.command_sent = (return_callback, error_callback)
 
     def _on_receive(self, source_object, res):
-        class Excp1(Exception):
-            pass
-
         line, len = source_object.read_line_finish_utf8(res)
         jsonObj = json.loads(line)
         try:
-            if "command" in jsonObj:
-                if self.command_received is not None:
-                    raise Excp1("unexpected \"command\" message")
-                funcname = "on_command_" + jsonObj["command"].replace("-", "_")
-                if not hasattr(self, funcname):
-                    raise Excp1("no callback for command " + jsonObj["command"])
-                getattr(self, funcname)(jsonObj.get("data", None), self._send_return, self._send_error)                
-                self.command_received = jsonObj["command"]
-                return
+            while True:
+                if "command" in jsonObj:
+                    if self.command_received is not None:
+                        raise Exception("unexpected \"command\" message")
+                    funcname = "on_command_" + jsonObj["command"].replace("-", "_")
+                    if not hasattr(self, funcname):
+                        raise Exception("no callback for command " + jsonObj["command"])
+                    getattr(self, funcname)(jsonObj.get("data", None), self._send_return, self._send_error)                
+                    self.command_received = jsonObj["command"]
+                    break
 
-            if "notification" in jsonObj:
-                funcname = "on_notification_" + jsonObj["notification"].replace("-", "_")
-                if not hasattr(self, funcname):
-                    raise Excp1("no callback for notification " + jsonObj["notification"])
-                getattr(self, funcname)(jsonObj.get("data", None))
-                return
+                if "notification" in jsonObj:
+                    funcname = "on_notification_" + jsonObj["notification"].replace("-", "_")
+                    if not hasattr(self, funcname):
+                        raise Exception("no callback for notification " + jsonObj["notification"])
+                    getattr(self, funcname)(jsonObj.get("data", None))
+                    break
 
-            if "return" in jsonObj:
-                if self.command_sent is None:
-                    raise Excp1("unexpected \"return\" message")
-                cmd, return_cb, error_cb = self.command_sent
-                if jsonObj["return"] is not None and return_cb is None:
-                    raise Excp1("no return callback specified for command " + cmd)
-                if return_cb is not None:
-                    return_cb(jsonObj["return"])
-                self.command_sent = None
-                return
-            elif "error" in jsonObj:
-                if self.command_sent is None:
-                    raise Excp1("unexpected \"error\" message")
-                cmd, return_cb, error_cb = self.command_sent
-                if error_cb is None:
-                    raise Excp1("no error callback specified for command " + cmd)
-                error_cb(jsonObj["error"])
-                self.command_sent = None
-                return
-            else:
-                raise Excp1("invalid message")
-        except Excp1 as e:
+                if "return" in jsonObj:
+                    if self.command_sent is None:
+                        raise Exception("unexpected \"return\" message")
+                    cmd, return_cb, error_cb = self.command_sent
+                    if jsonObj["return"] is not None and return_cb is None:
+                        raise Exception("no return callback specified for command " + cmd)
+                    if return_cb is not None:
+                        return_cb(jsonObj["return"])
+                    self.command_sent = None
+                    break
+
+                if "error" in jsonObj:
+                    if self.command_sent is None:
+                        raise Exception("unexpected \"error\" message")
+                    cmd, return_cb, error_cb = self.command_sent
+                    if error_cb is None:
+                        raise Exception("no error callback specified for command " + cmd)
+                    error_cb(jsonObj["error"])
+                    self.command_sent = None
+                    break
+
+                raise Exception("invalid message")
+
+            self.dis.read_line_async(0, None, self._on_receive)
+        except Exception as e:
             self.on_error(e)
             self.close()
-        finally:
-            self.dis.read_line_async(0, None, self._on_receive)
 
     def _send_return(self, data):
         assert self.command_received is not None
@@ -595,38 +594,3 @@ class JsonApiEndPoint:
         jsonObj["error"] = data
         self.dos.put_string(json.dumps(jsonObj) + "\n")
         self.command_received = None
-
-
-class JsonApiClient(JsonApiEndPoint):
-
-    def __init__(self):
-        super().__init__()
-        self.ip = None
-        self.port = None
-
-    def connect(self, ip, port):
-        assert self.ip is None and self.port is None
-
-        self.ip = ip
-        self.port = port
-
-        sc = Gio.SocketClient.new()
-        sc.set_family(Gio.SocketFamily.IPV4)
-        sc.set_protocol(Gio.SocketProtocol.TCP)
-        sc.connect_to_host_async(self.ip, self.port, None, self._on_connect)
-
-    def close(self)
-        super().close()
-
-    def _on_connect(self, source_object, res):
-        try:
-            conn = source_object.connect_to_host_async_finish(res)
-            self.set_iostream_and_start(conn)
-            self.on_connected()
-        except GLib.Error as e:
-            self.on_error(e)
-
-
-class JsonApiServer:
-
-    def __init__(self, ipList, port):

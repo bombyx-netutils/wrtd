@@ -256,28 +256,11 @@ class WrtCascadeManager:
         self.upstreamUuid = None
         self.upstreamRouterInfo = None
 
-        self.apiClientUpCallback = None
-        self.apiClientErrorCallback = None
-        self.upstreamRouterAddCallback = None
-        self.upstreamRouterRemoveCallback = None
-        self.upstreamRouterWanPrefixListChangedCallback = None
-        self.upstreamRouterLanPrefixListChangedCallback = None
-        self.upstreamRouterClientAddOrChangeCallback = None
-        self.upstreamRouterClientRemoveCallback = None
-
-        self.apiClientStartThread = None
-        self.apiClientIdleQueue = None
-        self.apiClientNotifyUpThread = None
-        self.apiClientNotifyDownProcessor = None
-
         # server api
         self.apiServerList = []
         self.routerInfoDownstream = dict()          # dict<api-server, router-json>
 
-    def startApiClient(self, remote_ip, apiClientUpCallback, apiClientErrorCallback, upstreamRouterAddCallback,
-                       upstreamRouterRemoveCallback, upstreamRouterWanPrefixListChangedCallback,
-                       upstreamRouterLanPrefixListChangedCallback, upstreamRouterClientAddOrChangeCallback,
-                       upstreamRouterClientRemoveCallback):
+    def startApiClient(self, remote_ip):
         # exception in any callback function would make WrtCascadeManager bring down the cascade api client.
         # no exception is allowed in apiClientErrorCallback().
         # apiClientErrorCallback() would be called if there's error in cascade-api connection after startApiClient() returns.
@@ -286,49 +269,15 @@ class WrtCascadeManager:
 
         logging.info("Establishing Cascade API connection.")
 
-        self.apiClientUpCallback = apiClientUpCallback
-        self.apiClientErrorCallback = apiClientErrorCallback
-        self.upstreamRouterAddCallback = upstreamRouterAddCallback
-        self.upstreamRouterRemoveCallback = upstreamRouterRemoveCallback
-        self.upstreamRouterWanPrefixListChangedCallback = upstreamRouterWanPrefixListChangedCallback
-        self.upstreamRouterLanPrefixListChangedCallback = upstreamRouterLanPrefixListChangedCallback
-        self.upstreamRouterClientAddOrChangeCallback = upstreamRouterClientAddOrChangeCallback
-        self.upstreamRouterClientRemoveCallback = upstreamRouterClientRemoveCallback
-
-        self.apiClientIdleQueue = WrtUtil.IdleQueue()
-        self.apiClientStartThread = _ApiClientStartThread(self, remote_ip)
+        self.apiClient = _ApiClient(self, remote_ip)
+        self.apiClient.connect(remoet_ip, self.param.cascadeApiPort)
 
     def disposeApiClient(self):
-        self.apiClientNotifyDownProcessor = None
-
-        if self.apiClientNotifyUpThread is not None:
-            self.apiClientNotifyUpThread.stop()
-            self.apiClientNotifyUpThread.join()
-            self.apiClientNotifyUpThread = None
-
         self.upstreamRouterInfo = None
         self.upstreamUuid = None
-
         if self.apiClient is not None:
             self.apiClient.dispose()
             self.apiClient = None
-
-        if self.apiClientStartThread is not None:
-            self.apiClientStartThread.join()
-            self.apiClientStartThread = None
-
-        if self.apiClientIdleQueue is not None:
-            self.apiClientIdleQueue.clear()
-            self.apiClientIdleQueue = None
-
-        self.apiClientUpCallback = None
-        self.apiClientErrorCallback = None
-        self.upstreamRouterAddCallback = None
-        self.upstreamRouterRemoveCallback = None
-        self.upstreamRouterWanPrefixListChangedCallback = None
-        self.upstreamRouterLanPrefixListChangedCallback = None
-        self.upstreamRouterClientAddOrChangeCallback = None
-        self.upstreamRouterClientRemoveCallback = None
 
     def startApiServer(self, bridge):
         obj = _ApiServer(self, bridge)
@@ -337,25 +286,33 @@ class WrtCascadeManager:
 
     def wanPrefixListChanged(self, prefixList):
         self.routerInfo[self.param.uuid]["wan-prefix-list"] = prefixList
-        if self.apiClient is not None:
-            self.apiClientNotifyUpThread.add(self.apiClient.updateRouterWanPrefixList, self.param.uuid, prefixList)
+        if self.apiClient is not None and self.apiClient.bConnected:
+            data = dict()
+            data[self.param.uuid] = prefixList
+            self.apiClient.send_notification("update-router-wan-prefix-list", data)
 
     def lanPrefixListChanged(self, prefixList):
         self.routerInfo[self.param.uuid]["lan-prefix-list"] = prefixList
-        if self.apiClient is not None:
-            self.apiClientNotifyUpThread.add(self.apiClient.updateRouterLanPrefixList, self.param.uuid, prefixList)
+        if self.apiClient is not None and self.apiClient.bConnected:
+            data = dict()
+            data[self.param.uuid] = prefixList
+            self.apiClient.send_notification("update-router-lan-prefix-list", data)
 
     def clientAdded(self, ipDataDict):
         self.routerInfo[self.param.uuid]["client-list"].update(ipDataDict)
-        if self.apiClient is not None:
-            self.apiClientNotifyUpThread.add(self.apiClient.newOrUpdateRouterClient, self.param.uuid, ipDataDict)
+        if self.apiClient is not None and self.apiClient.bConnected:
+            data = dict()
+            data[self.param.uuid] = ipDataDict
+            self.apiClient.send_notification("new-or-update-router-client", data)
 
     def clientRemoved(self, ipList):
         for ip in ipList:
             if ip in self.routerInfo[self.param.uuid]["client-list"]:
                 del self.routerInfo[self.param.uuid]["client-list"][ip]
-        if self.apiClient is not None:
-            self.apiClientNotifyUpThread.add(self.apiClient.deleteRouterClient, self.param.uuid, ipList)
+        if self.apiClient is not None and self.apiClient.bConnected:
+            data = dict()
+            data[self.param.uuid] = ipList
+            self.apiClient.send_notification("delete-router-client", data)
 
     def dispose(self):
         assert self.apiClient is None
@@ -363,185 +320,101 @@ class WrtCascadeManager:
             s.dispose()
 
 
-class _ApiClientStartThread(threading.Thread):
+class _ApiClient(JsonApiEndPoint):
 
-    def __init__(self, pObj, remote_ip):
-        threading.Thread.__init__(self)
+    def __init__(self, pObj, ip, port):
         self.pObj = pObj
-        self.remote_ip = remote_ip
+        self.bConnected = False
+        self.bRegistered = False
+        sc = Gio.SocketClient.new()
+        sc.set_family(Gio.SocketFamily.IPV4)
+        sc.set_protocol(Gio.SocketProtocol.TCP)
+        sc.connect_to_host_async(ip, port, None, self._on_connect)
 
-    def run(self):
+    def _on_connect(self, source_object, res):
         try:
-            apiClient = JsonApiClient(self.remove_ip, self.pObj.param.cascadeApiPort)
-            ret = self._register(apiClient, self.pObj.param.uuid, self.pObj.routerInfo, self.pObj.routerInfoDownstream)     # fixme, maybe we shoule copy routerInfo and routerInfoDownstream here instead using it directly
-            self.pObj.apiClientIdleQueue.add(self._idleFuncUpCallback, apiClient, ret)
-            break
+            conn = source_object.connect_to_host_async_finish(res)
+            super().set_iostream_and_start(conn)
+            self.bConnected = True
+
+            # send register command
+            data = dict()
+            data["my-id"] = self.pObj.param.uuid
+            data["router-list"] = dict()
+            if True:
+                data["router-list"].update(self.pObj.routerInfo)
+                for ri in self.pObj.routerInfoDownstream.values():
+                    ri = ri.copy()
+                    for v in ri.values:
+                        if "parent" not in v:
+                            v["parent"] = self.pObj.param.uuid
+                    data["router-list"].update(ri)
+            super().exec_command("register", data, self._on_register_return, self._on_register_error)
         except Exception as e:
-            apiClient.dispose()
-            self.pObj.apiClientIdleQueue.add(self._idleFuncErrorCallback, e)
-        finally:
-            self.pObj.apiClientStartThread = None
+            logging.info("Failed to establish cascade API connection, %s" % (e))
+            self.pObj.param.wanManager.on_cascade_client_error(e)
+            self.close()
 
-    def _register(self, apiClient, router_id, router_info, router_info_downstream):
-        data = dict()
-        data["my-id"] = router_id
-        data["router-list"] = dict()
-        if True:
-            data["router-list"].update(router_info)
-            for ri in router_info_downstream.values():
-                ri = ri.copy()
-                for v in ri.values:
-                    if "parent" not in v:
-                        v["parent"] = router_id
-                data["router-list"].update(ri)
-        return apiClient.execCommand("register", data)
+    def _on_register_return(self, data):
+        self.pObj.upstreamUuid = data["my-id"]
+        self.pObj.upstreamRouterInfo = data["router-list"]
+        self.pObj.param.wanManager.on_cascade_client_up(data)
+        self.bRegistered = True
+        logging.info("Cascade API connection established.")
 
-    def _idleFuncUpCallback(self, apiClient, data):
-        try:
-            self.pObj.apiClient = apiClient
-            self.pObj.upstreamUuid = ret["my-id"]
-            self.pObj.upstreamRouterInfo = ret["router-list"]
-            self.pObj.apiClientNotifyUpThread = _ApiClientNotifyUpThread(self)
-            self.pObj.apiClientNotifyDownProcessor = _ApiClientNotifyDownProcessor(self)
-            self.pObj.apiClientUpCallback(data)
-            logging.info("Cascade API conection established.")
-        except Exception as e:
-            logging.error("Failed to establish Cascade API connection, %s", e)
-            self.pObj.disposeApiClient()
-            self.pObj.apiClientErrorCallback(e)
+    def _on_register_error(self, excp):
+        raise excp
 
-    def _idleFuncErrorCallback(self, e):
-        logging.error("Failed to establish Cascade API connection, %s", e)
-        self.pObj.disposeApiClient()
-        self.pObj.apiClientErrorCallback(e)
+    def on_error(self, excp):
+        self.pObj.param.wanManager.on_cascade_client_error(e)
+        if not self.bRegistered:
+            logging.info("Failed to establish cascade API connection, %s" % (e))
+        else:
+            logging.info("Cascade API connection disconnected with error, %s" % (e))
 
+    def on_notification_router_add(self, data):
+        assert self.bRegistered
 
-class _ApiClientNotifyUpThread(threading.Thread):
-
-    def __init__(self, pObj):
-        threading.Thread.__init__(self)
-        self.cmdQueue = queue.Queue()
-        self.pObj = pObj
-        self.bStop = False
-
-    def stop(self):
-        assert not self.bStop
-        self.bStop = True
-
-    def newRouter(self, data):
-        self.cmdQueue.put(("new-router", data))
-
-    def deleteRouter(self, router_id_list):
-        self.cmdQueue.put(("delete-router", router_id_list))
-
-    def updateRouterWanPrefixList(self, router_id, prefix_list):
-        data = dict()
-        data[router_id] = prefix_list
-        self.cmdQueue.put(("update-router-wan-prefix-list", data))
-
-    def updateRouterLanPrefixList(self, router_id, prefix_list):
-        data = dict()
-        data[router_id] = prefix_list
-        self.cmdQueue.put(("update-router-lan-prefix-list", data))
-
-    def newOrUpdateRouterClient(self, router_id, ip_data_dict):
-        data = dict()
-        data[router_id] = ip_data_dict
-        self.cmdQueue.put(("new-or-update-router-client", data))
-
-    def deleteRouterClient(self, router_id, ip_list):
-        data = dict()
-        data[router_id] = ip_list
-        self.cmdQueue.put(("delete-router-client", data))
-
-    def run(self):
-        while not self.bStop:
-            try:
-                cmd, data = self.cmdQueue.get(timeout=1)
-                self.cmdQueue.task_done()
-                try:
-                    ret = self.pObj.apiClient.execCommand(cmd, data)
-                    assert ret == dict()
-                except Exception as e:
-                    self.pObj.apiClientIdleQueue.add(self._idleFunc, e)
-                    break
-            except queue.Queue.Empty:
-                pass
-
-    def _idleFunc(self, e):
-        logging.error("Cascade API communication error, %s", e)
-        self.pObj.disposeApiClient()
-        self.pObj.apiClientErrorCallback(e)
-
-
-class _ApiClientNotifyDownProcessor:
-
-    def __init__(self, pObj):
-        self.pObj = pObj
-        self.pObj.apiClient.registerNotifyCallback("router-add",
-            lambda data: self.pObj.apiClientIdleQueue.add(self._idleFunc,
-                                                          self.on_router_add,
-                                                          data))
-        self.pObj.apiClient.registerNotifyCallback("router-remove",
-            lambda data: self.pObj.apiClientIdleQueue.add(self._idleFunc,
-                                                          self.on_router_remove,
-                                                          data))
-        self.pObj.apiClient.registerNotifyCallback("router-wan-prefix-list-change",
-            lambda data: self.pObj.apiClientIdleQueue.add(self._idleFunc,
-                                                          self.on_router_wan_prefix_list_change, 
-                                                          data))
-        self.pObj.apiClient.registerNotifyCallback("router-lan-prefix-list-change",
-            lambda data: self.pObj.apiClientIdleQueue.add(self._idleFunc,
-                                                          self.on_router_lan_prefix_list_change, 
-                                                          data))
-        self.pObj.apiClient.registerNotifyCallback("router-client-add-or-change",
-            lambda data: self.pObj.apiClientIdleQueue.add(self._idleFunc, 
-                                                          self.on_router_client_add_or_change, 
-                                                          data))
-        self.pObj.apiClient.registerNotifyCallback("router-client-remove",
-            lambda data: self.pObj.apiClientIdleQueue.add(self._idleFunc, 
-                                                          self.on_router_client_remove, 
-                                                          data))
-
-    def on_router_add(self, data):
         self.pObj.upstreamRouterInfo.update(data)
-        self.pObj.param.wanManager.on_cascade_upstream_router_add(data)
+        self.pObj.param.wanManager.on_cascade_client_router_add(data)
 
-    def on_router_remove(self, data):
+    def on_notification_router_remove(self, data):
+        assert self.bRegistered
+
         for router_id in data:
             del self.pObj.upstreamRouterInfo[router_id]
-        self.pObj.param.wanManager.on_cascade_upstream_router_remove(data)
+        self.pObj.param.wanManager.on_cascade_client_router_remove(data)
 
-    def on_router_wan_prefix_list_change(self, data):
+    def on_notification_router_wan_prefix_list_change(self, data):
+        assert self.bRegistered
+
         for router_id, prefix_list in data:
             self.pObj.upstreamRouterInfo[router_id]["wan-prefix-list"] = prefix_list
-        self.pObj.param.wanManager.on_cascade_upstream_router_wan_prefix_list_change(data)
+        self.pObj.param.wanManager.on_cascade_client_router_wan_prefix_list_change(data)
 
-    def on_router_lan_prefix_list_change(self, data):
+    def on_notification_router_lan_prefix_list_change(self, data):
+        assert self.bRegistered
+
         for router_id, prefix_list in data:
             self.pObj.upstreamRouterInfo[router_id]["lan-prefix-list"] = prefix_list
-        self.pObj.param.wanManager.on_cascade_upstream_router_lan_prefix_list_change(data)
+        self.pObj.param.wanManager.on_cascade_client_router_lan_prefix_list_change(data)
 
-    def on_router_client_add_or_change(self, data):
+    def on_notification_router_client_add_or_change(self, data):
+        assert self.bRegistered
+
         for router_id, client_list in data:
             self.pObj.upstreamRouterInfo[router_id]["client-list"] = client_list
-        self.pObj.param.wanManager.on_cascade_upstream_router_client_add_or_change(data)
+        self.pObj.param.wanManager.on_cascade_client_router_client_add_or_change(data)
 
-    def on_router_client_remove(self, data):
+    def on_notification_router_client_remove(self, data):
+        assert self.bRegistered
+
         for router_id, ip_list in data:
             o = self.pObj.upstreamRouterInfo[router_id]["client-list"]
             for ip in ip_list:
                 if ip in o:
                     del o[ip]
-        self.pObj.param.wanManager.on_cascade_upstream_router_client_remove(data)
-
-    def _idleFunc(self, callback, data):
-        try:
-            callback(data)
-        except Exception as e:
-            logging.error("Cascade API communication error, %s", e)
-            self.pObj.disposeApiClient()
-            self.pObj.apiClientErrorCallback(e)
+        self.pObj.param.wanManager.on_cascade_client_router_client_remove(data)
 
 
 #        self.bridgeSourceId = "upstream-%s" % (ip)
@@ -570,91 +443,44 @@ class _ApiServer(JsonApiServer):
         self.addCommand("new-or-update-router-client", _ApiServerClientProcessor._new_or_update_router_client)
         self.addCommand("delete-router-client", _ApiServerClientProcessor._delete_router_client)
 
-        self.addNotify("router-add")
-        self.addNotify("router-remove")
-        self.addNotify("router-wan-prefix-list-change")
-        self.addNotify("router-lan-prefix-list-change")
-        self.addNotify("router-client-add-or-change")
-        self.addNotify("router-client-remove")
 
+class _ApiServerProcessor(JsonApiEndPoint):
 
-class _ApiServerClientProcessor(JsonApiServerClientProcessor):
-
-    def __init__(self, server_object, client_address):
-        JsonApiServerClientProcessor.__init__(self, server_object, client_address)
+    def __init__(self, pObj, conn):
+        self.pObj = pObj
         self.downstreamUuid = None
         self.routerInfo = dict()
+        super().set_iostream_and_start(conn)
 
-    def _register(self, data):
-        self.downstreamUuid = data["my-id"]
-        self.routerInfo = data["router-list"]
-
-
-
-    def _new_router(self, data):
-        pass
-
-    def _delete_router(self, data):
-        pass
-
-    def _update_router_wan_prefix_list(self, data):
-        pass
-
-    def _update_router_lan_prefix_list(self, data):
-        pass
-
-    def _new_or_update_router_client(self, data):
-        pass
-
-    def _delete_router_client(self, data):
-        pass
-
-
-
-    def _idleFunc(self, callback1, callback2, data):
+    def on_command_register(self, data, return_callback, errror_callback):
         try:
-            callback1(data)
-            callback2(data)
+            self.downstreamUuid = data["my-id"]
+            self.routerInfo = data["router-list"]
+
+            data = dict()
+            data["my-id"] = self.pObj.param.uuid
+            data["router-list"] = dict()
+            return_callback(data)
         except Exception as e:
-            logging.error("Cascade API communication error, %s", e)
-            self.pObj.disposeApiClient()
-            self.pObj.apiClientErrorCallback(e)
+            errror_callback(e)
 
+    def on_notification_new_router(self, data):
+        pass
 
+    def on_notification_delete_router(self, data):
+        pass
 
+    def on_notification_update_router_wan_prefix_list(self, data):
+        pass
 
+    def on_notification_update_router_lan_prefix_list(self, data):
+        pass
 
+    def on_notification_new_or_update_router_client(self, data):
+        pass
 
-
-    def _router_add(self, data):
-        self.pObj.upstreamRouterInfo.update(data)
-
-    def _router_remove(self, data):
-        for router_id in data:
-            del self.pObj.upstreamRouterInfo[router_id]
-
-    def _router_wan_prefix_list_change(self, data):
-        for router_id, prefix_list in data:
-            self.pObj.upstreamRouterInfo[router_id]["wan-prefix-list"] = prefix_list
-
-    def _router_lan_prefix_list_change(self, data):
-        for router_id, prefix_list in data:
-            self.pObj.upstreamRouterInfo[router_id]["lan-prefix-list"] = prefix_list
-
-    def _router_client_add_or_change(self, data):
-        for router_id, client_list in data:
-            self.pObj.upstreamRouterInfo[router_id]["client-list"] = client_list
-
-    def _router_client_remove(self, data):
-        for router_id, ip_list in data:
-            o = self.pObj.upstreamRouterInfo[router_id]["client-list"]
-            for ip in ip_list:
-                if ip in o:
-                    del o[ip]
-
-
-
-
+    def on_notification_delete_router_client(self, data):
+        pass
 
 
 

@@ -136,21 +136,13 @@ class WrtWanManager:
             raise Exception("prefix duplicates with VPN connection, autofix it and restart")
 
         # connect to the upstream cascade api server
-        self.param.cascadeManager.startApiClient(self.vpnPlugin.get_remote_ip(),
-                                                 self.on_cascade_upstream_client_up,
-                                                 self.on_cascade_upstream_client_error,
-                                                 self.on_cascade_upstream_router_add,
-                                                 self.on_cascade_upstream_router_remove,
-                                                 self.on_cascade_upstream_router_wan_prefix_list_change,
-                                                 self.on_cascade_upstream_router_lan_prefix_list_change,
-                                                 self.on_cascade_upstream_router_client_add_or_change,
-                                                 self.on_cascade_upstream_router_client_remove)
+        self.param.cascadeManager.startApiClient(self.vpnPlugin.get_remote_ip())
 
     def on_wvpn_down(self):
         assert threading.get_ident() == self.mainThreadId
         self._wvpnDown()
 
-    def on_cascade_upstream_client_up(self, data):
+    def on_cascade_client_up(self, data):
         assert threading.get_ident() == self.mainThreadId
 
         # get subhost info
@@ -165,15 +157,15 @@ class WrtWanManager:
         self.subHostDict[str(ip1)] = None
 
         # other operation
-        self.on_cascade_upstream_router_add(data["router-list"])
+        self.on_cascade_client_router_add(data["router-list"])
 
-    def on_cascade_upstream_client_error(self, reason):
+    def on_cascade_client_error(self, reason):
         assert threading.get_ident() == self.mainThreadId
 
         self.subHostDict = None
         self.vpnPlugin.disconnect()
 
-    def on_cascade_upstream_router_add(self, data):
+    def on_cascade_client_router_add(self, data):
         assert threading.get_ident() == self.mainThreadId
 
         # check upstream uuid and restart if neccessary
@@ -182,18 +174,18 @@ class WrtWanManager:
             raise Exception("router UUID duplicates, will restart")
 
         # other operation
-        self.on_cascade_upstream_router_wan_prefix_list_change(data)
-        self.on_cascade_upstream_router_lan_prefix_list_change(data)
-        self.on_cascade_upstream_router_client_add_or_change(data)
+        self.on_cascade_client_router_wan_prefix_list_change(data)
+        self.on_cascade_client_router_lan_prefix_list_change(data)
+        self.on_cascade_client_router_client_add_or_change(data)
 
-    def on_cascade_upstream_router_remove(self, data):
+    def on_cascade_client_router_remove(self, data):
         assert threading.get_ident() == self.mainThreadId
 
         for router_id in data:
             self.param.daemon.getPrefixPool().removeExcludePrefixList("upstream-lan-%s" % (router_id))
             self.param.daemon.getPrefixPool().removeExcludePrefixList("upstream-wan-%s" % (router_id))
 
-    def on_cascade_upstream_router_wan_prefix_list_change(self, data):
+    def on_cascade_client_router_wan_prefix_list_change(self, data):
         assert threading.get_ident() == self.mainThreadId
 
         # check upstream wan-prefix and restart if neccessary
@@ -205,7 +197,7 @@ class WrtWanManager:
             os.kill(os.getpid(), signal.SIGHUP)
             raise Exception("prefix duplicates with upstream router %s, autofix it and restart" % (show_router_id))
 
-    def on_cascade_upstream_router_lan_prefix_list_change(self, data):
+    def on_cascade_client_router_lan_prefix_list_change(self, data):
         assert threading.get_ident() == self.mainThreadId
 
         # check upstream lan-prefix and restart if neccessary
@@ -217,11 +209,11 @@ class WrtWanManager:
             os.kill(os.getpid(), signal.SIGHUP)
             raise Exception("prefix duplicates with upstream router %s, autofix it and restart" % (show_router_id))
 
-    def on_cascade_upstream_router_client_add_or_change(self, data):
+    def on_cascade_client_router_client_add_or_change(self, data):
         assert threading.get_ident() == self.mainThreadId
         pass
 
-    def on_cascade_upstream_router_client_remove(self, data):
+    def on_cascade_client_router_client_remove(self, data):
         assert threading.get_ident() == self.mainThreadId
         pass
 
