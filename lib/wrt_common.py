@@ -13,11 +13,11 @@ class WrtCommon:
 
     @staticmethod
     def callManagers(param, funcName, *args):
-        WrtUtil.callFunc(param.trafficManager, funcName, args)
-        WrtUtil.callFunc(param.wanManager, funcName, args)
-        WrtUtil.callFunc(param.lanManager, funcName, args)
-        WrtUtil.callFunc(param.cascadeManager, funcName, args)
-        WrtUtil.callFunc(param.sgwManager, funcName, args)
+        WrtUtil.callFunc(param.trafficManager, funcName, *args)
+        WrtUtil.callFunc(param.wanManager, funcName, *args)
+        WrtUtil.callFunc(param.lanManager, funcName, *args)
+        WrtUtil.callFunc(param.cascadeManager, funcName, *args)
+        WrtUtil.callFunc(param.sgwManager, funcName, *args)
 
     @staticmethod
     def bridgeGetIp(bridge):
@@ -384,6 +384,9 @@ class TemplatePluginLanInterface:
 class TemplatePluginVpnServer:
 
     def init2(self, instanceName, cfg, tmpDir, varDir, bridgePrefix, l2DnsPort, clientAddOrChangeCallback, clientRemoveCallback, firewallAllowFunc):
+        assert False
+
+    def set_other_bridge_list(self, bridge_list):
         assert False
 
     def start(self):

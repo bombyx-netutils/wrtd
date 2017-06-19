@@ -39,8 +39,8 @@ class WrtWanManager:
                 self.wanConnPlugin.init2(cfgObj,
                                          tdir,
                                          self.param.ownResolvConf,
-                                         lambda: WrtCommon.callManagers("on_wconn_up"),
-                                         lambda: WrtCommon.callManagers("on_wconn_down"))
+                                         lambda: WrtCommon.callManagers(self.param, "on_wconn_up"),
+                                         lambda: WrtCommon.callManagers(self.param, "on_wconn_down"))
                 self.wanConnPlugin.start()
                 self.logger.info("Internet connection activated, plugin: %s." % (cfgObj["plugin"]))
 
@@ -78,7 +78,6 @@ class WrtWanManager:
                 self.wanConnPlugin = None
                 self.logger.info("Internet connection deactivated.")
             raise
-        self.logger.info("Started.")
 
     def dispose(self):
         if self.vpnPlugin is not None:

@@ -23,7 +23,7 @@ class WrtUtil:
     @staticmethod
     def callFunc(obj, funcName, *args):
         if hasattr(obj, funcName):
-            getattr(obj, funcName)(args)
+            getattr(obj, funcName)(*args)
 
     @staticmethod
     def isIpPublic(ip):

@@ -30,7 +30,6 @@ class WrtTrafficManager:
         except BaseException:
             self._stopDnsmasq()
             raise
-        logging.info("Started.")
 
     def dispose(self):
         self._stopDnsmasq()
@@ -46,7 +45,7 @@ class WrtTrafficManager:
         del self.ownerDict[owner]
 
     def on_wconn_up(self):
-        WrtUtil.shell('/sbin/nft add rule wrtd natpost oifname %s masquerade' % (self.wanConnPlugin.get_interface()))
+        WrtUtil.shell('/sbin/nft add rule wrtd natpost oifname %s masquerade' % (self.param.wanManager.wanConnPlugin.get_interface()))
         # WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ct state established,related accept' % (intf))
         # WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ip protocol icmp accept' % (intf))
         # WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s drop' % (intf))

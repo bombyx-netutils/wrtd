@@ -193,8 +193,8 @@ class _ApiServer:
         self.pObj = pObj
 
         self.serverListener = Gio.SocketListener.new()
-        addr = Gio.InetSocketAddress.new_from_string(ip, self.pObj.param.cascadeApiPort)
-        self.serverListener.add_address(addr, Gio.SocketType.STEREAM, Gio.SocketProtocol.TCP)
+        addr = Gio.InetSocketAddress.new_from_string(ip, self.pObj.param.sgwApiPort)
+        self.serverListener.add_address(addr, Gio.SocketType.STREAM, Gio.SocketProtocol.TCP)
         self.serverListener.accept_async(None, self._on_accept)
 
         self.sprocList = []

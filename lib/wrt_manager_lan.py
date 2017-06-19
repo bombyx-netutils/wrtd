@@ -80,11 +80,6 @@ class WrtLanManager:
                     if bridge == other_bridge:
                         continue
                     bridge.on_source_add(other_bridge.get_bridge_id())
-
-            # start cascade API server for all the bridges
-            for bridge in all_bridges:
-                self.param.cascadeManager.startApiServerForBridge(bridge)
-            logging.info("CASCADE-API servers started.")
         except BaseException:
             for p in self.vpnsPluginList:
                 p.stop()
@@ -97,7 +92,6 @@ class WrtLanManager:
                 self.defaultBridge = None
                 logging.info("Default bridge destroyed.")
             raise
-        logging.info("Started.")
 
     def dispose(self):
         for p in self.vpnsPluginList:

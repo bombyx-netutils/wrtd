@@ -38,4 +38,4 @@ class WrtParam:
         self.wanManager = None
         self.lanManager = None
         self.cascadeManager = None
-        self.sgwApiServer = None
+        self.sgwManager = None
