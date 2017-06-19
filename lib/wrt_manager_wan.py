@@ -60,8 +60,8 @@ class WrtWanManager:
                 os.mkdir(tdir)
                 self.vpnPlugin.init2(cfgObj,
                                      tdir,
-                                     lambda: WrtCommon.callManagers("on_wvpn_up"),
-                                     lambda: WrtCommon.callManagers("on_wvpn_down"))
+                                     lambda: WrtCommon.callManagers(self.param, "on_wvpn_up"),
+                                     lambda: WrtCommon.callManagers(self.param, "on_wvpn_down"))
                 self.vpnPlugin.start()
                 self.logger.info("Cascade VPN activated, plugin: %s." % (cfgObj["plugin"]))
             else:

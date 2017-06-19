@@ -35,8 +35,8 @@ class WrtLanManager:
             self.defaultBridge.init2("wrtd-br",
                                      self.param.prefixPool.usePrefix(),
                                      self.param.trafficManager.get_l2_nameserver_port(),
-                                     lambda source_id, ip_data_dict: WrtCommon.callManagers("on_client_add_or_change", source_id, ip_data_dict),
-                                     lambda source_id, ip_list: WrtCommon.callManagers("on_client_remove", source_id, ip_list))
+                                     lambda source_id, ip_data_dict: WrtCommon.callManagers(self.param, "on_client_add_or_change", source_id, ip_data_dict),
+                                     lambda source_id, ip_list: WrtCommon.callManagers(self.param, "on_client_remove", source_id, ip_list))
             logging.info("Default bridge started.")
 
             # start all lan interface plugins
@@ -64,8 +64,8 @@ class WrtLanManager:
                             vardir,
                             self.param.prefixPool.usePrefix(),
                             self.param.trafficManager.get_l2_nameserver_port(),
-                            lambda source_id, ip_data_dict: WrtCommon.callManagers("on_client_add_or_change", source_id, ip_data_dict),
-                            lambda source_id, ip_list: WrtCommon.callManagers("on_client_remove", source_id, ip_list),
+                            lambda source_id, ip_data_dict: WrtCommon.callManagers(self.param, "on_client_add_or_change", source_id, ip_data_dict),
+                            lambda source_id, ip_list: WrtCommon.callManagers(self.param, "on_client_remove", source_id, ip_list),
                             lambda x: self._apiFirewallAllowFunc(p.full_name, x))
                     p.start()
                     self.vpnsPluginList.append(p)
