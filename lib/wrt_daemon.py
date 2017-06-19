@@ -13,16 +13,14 @@ from gi.repository import GLib
 from gi.repository import GObject
 from dbus.mainloop.glib import DBusGMainLoop
 from wrt_util import WrtUtil
-from wrt_common import WrtCommon
 from wrt_common import PrefixPool
 from wrt_manager_traffic import WrtTrafficManager
-from wrt_manager_cascade import WrtCascadeManager
-from wrt_manager_lan import WrtLanManager
 from wrt_manager_wan import WrtWanManager
+from wrt_manager_lan import WrtLanManager
+from wrt_manager_cascade import WrtCascadeManager
+from wrt_manager_sgw import WrtSgwManager
 from wrt_api_dbus import DbusMainObject
 from wrt_api_dbus import DbusIpForwardObject
-from wrt_api_sgw import WrtSgwApiServer
-from wrt_api_cascade import WrtCascadeApiServer
 
 
 class WrtDaemon:
@@ -31,14 +29,9 @@ class WrtDaemon:
         self.param = param
         self.cfgFile = os.path.join(self.param.etcDir, "global.json")
         self.dataFile = os.path.join(self.param.varDir, "global.json")
-        self.prefixPool = None
-        self.mainloop = None
         self.bRestart = False
         self.interfaceDict = dict()
         self.interfaceTimer = None
-
-    def getPrefixPool(self):
-        return self.prefixPool
 
     def run(self):
         WrtUtil.ensureDir(self.param.varDir)
@@ -59,7 +52,7 @@ class WrtDaemon:
                 logging.info("UUID loaded: \"%s\"." % (self.param.uuid))
 
             # load prefix pool
-            self.prefixPool = PrefixPool(os.path.join(self.param.varDir, "prefix-pool.json"))
+            self.param.prefixPool = PrefixPool(os.path.join(self.param.varDir, "prefix-pool.json"))
             logging.info("Prefix pool loaded.")
 
             # create main loop
@@ -82,19 +75,16 @@ class WrtDaemon:
 
             # business initialize
             self.param.trafficManager = WrtTrafficManager(self.param)
-            self.param.cascadeManager = WrtCascadeManager(self.param)
             self.param.wanManager = WrtWanManager(self.param)
             self.param.lanManager = WrtLanManager(self.param)
+            self.param.cascadeManager = WrtCascadeManager(self.param)
+            self.param.sgwManager = WrtSgwManager(self.param)
             self.interfaceTimer = GObject.timeout_add_seconds(10, self._interfaceTimerCallback)
 
             # start DBUS API server
             self.param.dbusMainObject = DbusMainObject(self.param)
             self.param.dbusIpForwardObject = DbusIpForwardObject(self.param)
             logging.info("DBUS-API server started.")
-
-            # start SGW API server
-            self.param.sgwApiServer = WrtSgwApiServer(self.param)
-            logging.info("SGW-API server started.")
 
             # start main loop
             logging.info("Mainloop begins.")
@@ -104,16 +94,16 @@ class WrtDaemon:
             self.param.mainloop.run()
             logging.info("Mainloop exits.")
         finally:
-            if self.param.sgwApiServer is not None:
-                self.param.sgwApiServer.dispose()
+            if self.param.sgwManager is not None:
+                self.param.sgwManager.dispose()
             if self.interfaceTimer is not None:
                 GLib.source_remove(self.interfaceTimer)
+            if self.param.cascadeManager is not None:
+                self.param.cascadeManager.dispose()
             if self.param.lanManager is not None:
                 self.param.lanManager.dispose()
             if self.param.wanManager is not None:
                 self.param.wanManager.dispose()
-            if self.param.cascadeManager is not None:
-                self.param.cascadeManager.dispose()
             if self.param.trafficManager is not None:
                 self.param.trafficManager.dispose()
             WrtUtil.nftForceDeleteTable("wrtd")

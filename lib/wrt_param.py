@@ -16,8 +16,12 @@ class WrtParam:
         self.varDir = "/var/wrtd"
         self.ownResolvConf = os.path.join(self.tmpDir, "resolv.conf")
 
+        self.daemon = None
+
         self.dnsName = None
         self.uuid = None
+        self.prefixPool = None
+        self.cascade = None
 
         self.mainloop = None
         self.dbusMainObject = None
@@ -30,10 +34,8 @@ class WrtParam:
         self.logLevel = None
         self.config = None
 
-        self.daemon = None
         self.trafficManager = None
-        self.cascadeManager = None
-        self.lanManager = None
         self.wanManager = None
+        self.lanManager = None
+        self.cascadeManager = None
         self.sgwApiServer = None
-        self.cascadeApiServerList = []

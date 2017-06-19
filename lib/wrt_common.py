@@ -12,6 +12,14 @@ from wrt_util import WrtUtil
 class WrtCommon:
 
     @staticmethod
+    def callManagers(param, funcName, *args):
+        WrtUtil.callFunc(param.trafficManager, funcName, args)
+        WrtUtil.callFunc(param.wanManager, funcName, args)
+        WrtUtil.callFunc(param.lanManager, funcName, args)
+        WrtUtil.callFunc(param.cascadeManager, funcName, args)
+        WrtUtil.callFunc(param.sgwManager, funcName, args)
+
+    @staticmethod
     def bridgeGetIp(bridge):
         return str(ipaddress.IPv4Address(bridge.get_prefix()[0]) + 1)
 
@@ -245,25 +253,19 @@ class TemplateBridge:
         # return list(start_ip, end_ip)
         assert False
 
-    def on_other_bridge_created(self, bridge):
+    def on_source_add(self, source_id):
+        pass
+
+    def on_source_remove(self, source_id):
+        pass
+
+    def on_host_add_or_change(self, source_id, ip_data_dict):
         assert False
 
-    def on_other_bridge_destroyed(self, bridge):
+    def on_host_remove(self, source_id, ip_list):
         assert False
 
-    def on_upstream_connected(self, sourceId):
-        assert False
-
-    def on_upstream_disconnected(self, sourceId):
-        assert False
-
-    def on_host_appear(self, sourceId, ipDataDict):
-        assert False
-
-    def on_host_disappear(self, sourceId, ipList):
-        assert False
-
-    def on_host_refresh(self, sourceId, ipDataDict):
+    def on_host_refresh(self, source_id, ip_data_dict):
         assert False
 
 
@@ -288,7 +290,7 @@ class PluginTemplateWanConnection:
     def stop(self):
         assert False
 
-    def is_alive(self):
+    def is_connected(self):
         assert False
 
     def get_ip(self):
@@ -317,10 +319,10 @@ class PluginTemplateCascadeVpn:
 
     def init2(self, cfg, tmpDir, upCallback, downCallback):
         # upCallback:
-        #   is_alive() should return True in upCallback().
+        #   is_connected() should return True in upCallback().
         #   exception raised by upCallback() would make the plugin bring down the connection.
         # downCallback:
-        #   is_alive() should return False in downCallback().
+        #   is_connected() should return False in downCallback().
         #   no exception is allowed in downCallback().
         assert False
 
@@ -333,7 +335,7 @@ class PluginTemplateCascadeVpn:
     def disconnect(self):
         assert False
 
-    def is_alive(self):
+    def is_connected(self):
         assert False
 
     def get_local_ip(self):
@@ -381,7 +383,7 @@ class TemplatePluginLanInterface:
 # allow multiple plugins be loaded, and one plugin can have multiple instances
 class TemplatePluginVpnServer:
 
-    def init2(self, instanceName, cfg, tmpDir, varDir, bridgePrefix, l2DnsPort, clientAppearFunc, clientChangeFunc, clientDisappearFunc, firewallAllowFunc):
+    def init2(self, instanceName, cfg, tmpDir, varDir, bridgePrefix, l2DnsPort, clientAddOrChangeCallback, clientRemoveCallback, firewallAllowFunc):
         assert False
 
     def start(self):

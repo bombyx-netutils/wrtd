@@ -42,21 +42,21 @@ class DbusMainObject(dbus.service.Object):
             plugin = self.param.wanManager.wanConnPlugin
             ret["wconn-plugin"] = dict()
             ret["wconn-plugin"]["name"] = plugin.full_name
-            if plugin.is_alive():
-                ret["wconn-plugin"]["alive"] = True
+            if plugin.is_connected():
+                ret["wconn-plugin"]["is-connceted"] = True
                 ret["wconn-plugin"]["ip"] = plugin.get_ip()
                 ret["wconn-plugin"]["is-ip-public"] = WrtUtil.isIpPublic(plugin.get_ip())
             else:
-                ret["wconn-plugin"]["alive"] = False
+                ret["wconn-plugin"]["is-connected"] = False
 
         if self.param.wanManager.vpnPlugin is not None:
             plugin = self.param.wanManager.vpnPlugin
             ret["wvpn-plugin"] = dict()
             ret["wvpn-plugin"]["name"] = plugin.full_name
-            if plugin.is_alive():
-                ret["wvpn-plugin"]["alive"] = True
+            if plugin.is_connected():
+                ret["wvpn-plugin"]["is-connected"] = True
             else:
-                ret["wvpn-plugin"]["alive"] = False
+                ret["wvpn-plugin"]["is-connected"] = False
 
         ret["default-bridge"] = dict()
         if True:
@@ -93,7 +93,7 @@ class DbusMainObject(dbus.service.Object):
 
         if self.param.dnsName is not None:
             suggested_filename, content = pluginObj.generate_client_script(self.param.dnsName, os_type)
-            if self.param.wanManager.wanConnPlugin is None or not self.param.wanManager.wanConnPlugin.is_alive():
+            if self.param.wanManager.wanConnPlugin is None or not self.param.wanManager.wanConnPlugin.is_connected():
                 return (suggested_filename, content, ["Domain name %s is not validated." % (self.param.dnsName)])
             elif socket.gethostbyname(self.param.dnsName) != self.param.wanManager.wanConnPlugin.get_ip():
                 return (suggested_filename, content, ["Domain name %s does not resolve to WAN IP address \"%s\"." % (self.param.dnsName, self.param.wanManager.wanConnPlugin.get_ip())])
@@ -102,7 +102,7 @@ class DbusMainObject(dbus.service.Object):
         else:
             if self.param.wanManager.wanConnPlugin is None:
                 raise Exception("No internet connection.")
-            if not self.param.wanManager.wanConnPlugin.is_alive():
+            if not self.param.wanManager.wanConnPlugin.is_connected():
                 raise Exception("No internet connection.")
             ip = self.param.wanManager.wanConnPlugin.get_ip()
             if not WrtUtil.isIpPublic(ip):

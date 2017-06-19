@@ -7,20 +7,23 @@ import sys
 import json
 import socket
 import shutil
-import time
 import logging
 import ctypes
 import errno
 import subprocess
-import threading
 import ipaddress
 import queue
 import urllib.request
-from collections import OrderedDict
+from gi.repository import Gio
 from gi.repository import GLib
 
 
 class WrtUtil:
+
+    @staticmethod
+    def callFunc(obj, funcName, *args):
+        if hasattr(obj, funcName):
+            getattr(obj, funcName)(args)
 
     @staticmethod
     def isIpPublic(ip):
@@ -334,162 +337,13 @@ class IdleQueue:
         return False
 
 
-class JsonApiServer:
-
-    def __init__(self, clientProcessorClass, ipList, port):
-        self.flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
-
-        self.serverSockList = []
-        self.clientProcessorClass = clientProcessorClass
-
-        self.globalLock = threading.Lock()
-        self.threadDict = dict()
-
-        self.bValidClient = False
-        self.clientIpSet = set()
-
-        self.bOneClientPerIp = False
-
-        self.clientInitCallback = None
-        self.clientTerminateCallback = None
-
-        self.commandDict = dict()
-        self.notifyList = []
-
-        try:
-            for ip in ipList:
-                serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                serverSock.bind((ip, port))
-                serverSock.listen(5)
-                serverSock.setblocking(0)
-                serverSourceId = GLib.io_add_watch(serverSock, GLib.IO_IN | self.flagError, self._onServerAccept)
-                self.serverSockList.append((serverSock, serverSourceId))
-        except BaseException:
-            for serverSock, serverSourceId in self.serverSockList:
-                GLib.source_remove(serverSourceId)
-                serverSock.close()
-            self.serverSockList = []
-
-    def setClientValidating(self, value):
-        assert isinstance(value, bool)
-        self.bValidClient = value
-
-    def addValidClientIp(self, ip):
-        self.clientIpSet.add(ip)
-
-    def removeValidClientIp(self, ip):
-        self.clientIpSet.remove(ip)
-
-    def setOneClientPerIp(self, value):
-        assert isinstance(value, bool)
-        self.bOneClientPerIp = value
-
-    def setClientInitCallback(self, func):
-        assert self.clientInitCallback is None
-        self.clientInitCallback = func
-
-    def setClientTerminateCallback(self, func):
-        assert self.clientTerminateCallback is None
-        self.clientTerminateCallback = func
-
-    def addCommand(self, command, func):
-        assert command not in self.commandDict
-        self.commandDict[command] = func
-
-    def addNotify(self, notify):
-        assert notify not in self.notifyList
-        self.notifyList.append(notify)
-
-    def dispose(self):
-        for serverSock, serverSourceId in self.serverSockList:
-            GLib.source_remove(serverSourceId)
-            serverSock.close()
-
-        with self.globalLock:
-            for sock in self.threadDict.keys():
-                self._stopClient(sock)
-        while len(self.threadDict) > 0:
-            time.sleep(1.0)
-
-    def getClients(self):
-        pass
-
-    def _onServerAccept(self, source, cb_condition):
-        assert not (cb_condition & self.flagError)
-
-        # accept connection
-        new_sock = None
-        addr = None
-        try:
-            new_sock, addr = source.accept()
-        except socket.error as e:
-            logging.debug("JsonApiServer.onServerAccept: Failed, %s, %s", e.__class__, e)
-            return True
-
-        # check client ip address
-        if self.bValidClient:
-            if addr[0] not in self.clientIpSet:
-                logging.debug("JsonApiServer.onServerAccept: Reject, invalid client IP address %s" % (addr[0]))
-                return True
-
-        # if only one client per ip address
-        if self.bOneClientPerIp:
-            sockList = []
-            with self.globalLock:
-                for sock in self.threadDict.keys():
-                    if sock.getpeeraddr[0] == addr[0]:
-                        sockList.append(sock)
-            for sock in sockList:
-                self._stopClient(sock)
-            while len(sockList) > 0:
-                time.sleep(1.0)
-                sockList2 = []
-                for sock in sockList:
-                    if sock in self.threadDict:
-                        sockList2.append(sock)
-                sockList = sockList2
-
-        # create threads
-        with self.globalLock:
-            sendLock = threading.Lock()
-            tRecv = _CommandThread(self, new_sock, addr[0], sendLock)
-            tSend = _NotifyThread(self, new_sock, addr[0], sendLock)
-            self.threadDict[new_sock] = (tRecv, tSend)
-            tRecv.start()
-            tSend.Start()
-
-        # send init object
-        if self.clientInitCallback is not None:
-            data = self.clientInitCallback(new_sock.getpeeraddr())
-            if data is not None:
-                jsonObj = dict()
-                jsonObj["init"] = data
-                tSend.queue.put(jsonObj)
-
-        return True
-
-    def _stopClient(self, sock):
-        tRecv, tSend = self.threadDict[sock]
-        if tRecv is not None:
-            tRecv.sock.shutdown(socket.SHUT_WR)
-        if tSend is not None:
-            tSend.bStop = True
-
-    def _disposeClient(self, sock, elem_id):
-        with self.globalLock:
-            self.threadDict[sock][elem_id] = None
-            if all(x is None for x in self.threadDict[sock]):
-                if self.clientTerminateCallback is not None:
-                    self.clientTerminateCallback(sock.getpeeraddr())
-                del self.threadDict[sock]
-                sock.close()
-
-
 class JsonApiEndPoint:
     # sub-class must implement the following functions:
-    #   on_error(self, e)
     #   on_command_XXX(self, data)
     #   on_notification_XXX(self, data)
+    #   on_error(self, excp)
+    #   on_close(self)
+    # on_close() is called before JsonApiEndPoint object is destroyed
 
     def __init__(self):
         self.iostream = None
@@ -501,14 +355,25 @@ class JsonApiEndPoint:
     def set_iostream_and_start(self, iostream):
         assert self.iostream is None
 
-        self.iostream = iostream
-        self.dis = Gio.DataInputStream.new(iostream.get_input_stream())
-        self.dos = Gio.DataOutputStream.new(iostream.get_output_stream())
-        self.dis.read_line_async(0, None, self._on_receive)     # fixme: 0 should be PRIORITY_DEFAULT, but I can't find it
+        try:
+            self.iostream = iostream
+            self.dis = Gio.DataInputStream.new(iostream.get_input_stream())
+            self.dos = Gio.DataOutputStream.new(iostream.get_output_stream())
+            self.dis.read_line_async(0, None, self._on_receive)     # fixme: 0 should be PRIORITY_DEFAULT, but I can't find it
+        except BaseException:
+            self.dis = None
+            self.dos = None
+            self.iostream = None
 
     def close(self):
         if self.iostream is not None:
+            self.on_close()
             self.iostream.close()
+        self.command_sent = None
+        self.command_received = None
+        self.dis = None
+        self.dos = None
+        self.iostream = None
 
     def send_notification(self, notification, data):
         assert self.command_sent is None
@@ -540,7 +405,7 @@ class JsonApiEndPoint:
                     funcname = "on_command_" + jsonObj["command"].replace("-", "_")
                     if not hasattr(self, funcname):
                         raise Exception("no callback for command " + jsonObj["command"])
-                    getattr(self, funcname)(jsonObj.get("data", None), self._send_return, self._send_error)                
+                    getattr(self, funcname)(jsonObj.get("data", None), self._send_return, self._send_error)
                     self.command_received = jsonObj["command"]
                     break
 

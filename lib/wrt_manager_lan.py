@@ -20,10 +20,10 @@ class WrtLanManager:
 
     def __init__(self, param):
         self.param = param
+        self.defaultBridge = None
         self.lifPluginList = []
         self.vpnsPluginList = []
-        self.defaultBridge = None
-        self.clientDict = dict()                    # <client-ip, client-info>
+        self.downstreamDict = dict()
 
         try:
             # create default bridge
@@ -33,11 +33,10 @@ class WrtLanManager:
             WrtUtil.ensureDir(vardir)
             self.defaultBridge = _DefaultBridge(tmpdir, vardir)
             self.defaultBridge.init2("wrtd-br",
-                                     self.param.daemon.getPrefixPool().usePrefix(),
+                                     self.param.prefixPool.usePrefix(),
                                      self.param.trafficManager.get_l2_nameserver_port(),
-                                     self.on_client_appear,
-                                     self.on_client_change,
-                                     self.on_client_disappear)
+                                     lambda source_id, ip_data_dict: WrtCommon.callManagers("on_client_add_or_change", source_id, ip_data_dict),
+                                     lambda source_id, ip_list: WrtCommon.callManagers("on_client_remove", source_id, ip_list))
             logging.info("Default bridge started.")
 
             # start all lan interface plugins
@@ -63,11 +62,10 @@ class WrtLanManager:
                             cfgObj,
                             tmpdir,
                             vardir,
-                            self.param.daemon.getPrefixPool().usePrefix(),
+                            self.param.prefixPool.usePrefix(),
                             self.param.trafficManager.get_l2_nameserver_port(),
-                            self.on_client_appear,
-                            self.on_client_change,
-                            self.on_client_disappear,
+                            lambda source_id, ip_data_dict: WrtCommon.callManagers("on_client_add_or_change", source_id, ip_data_dict),
+                            lambda source_id, ip_list: WrtCommon.callManagers("on_client_remove", source_id, ip_list),
                             lambda x: self._apiFirewallAllowFunc(p.full_name, x))
                     p.start()
                     self.vpnsPluginList.append(p)
@@ -81,13 +79,13 @@ class WrtLanManager:
                 for other_bridge in all_bridges:
                     if bridge == other_bridge:
                         continue
-                    bridge.on_other_bridge_created(other_bridge)
+                    bridge.on_source_add(other_bridge.get_bridge_id())
 
             # start cascade API server for all the bridges
             for bridge in all_bridges:
-                self.param.cascadeManager.startApiServer(bridge)
+                self.param.cascadeManager.startApiServerForBridge(bridge)
             logging.info("CASCADE-API servers started.")
-        except:
+        except BaseException:
             for p in self.vpnsPluginList:
                 p.stop()
                 logging.info("VPN server plugin \"%s\" deactivated." % (p.full_name))
@@ -114,54 +112,70 @@ class WrtLanManager:
             logging.info("Default bridge destroyed.")
         logging.info("Terminated.")
 
-    def on_client_appear(self, sourceBridgeId, ipDataDict):
-        assert all(ip not in self.clientDict for ip in ipDataDict.keys())
-
-        # record
-        for ip, data in ipDataDict.items():
-            self.clientDict[ip] = data
-
-        # notify all bridges
+    def on_client_add_or_change(self, source_id, ip_data_dict):
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-            if sourceBridgeId == bridge.get_bridge_id():
+            if source_id == bridge.get_bridge_id():
                 continue
-            bridge.on_host_appear(sourceBridgeId, ipDataDict)
+            bridge.on_host_add_or_change(source_id, ip_data_dict)
 
-        # notify my clients
-        if self.param.sgwApiServer is not None:
-            self.param.sgwApiServer.notifyAppear2(ipDataDict)
-
-        # notify subhost owners
-        pass
-
-        # notify upstream
-        self.param.wanManager.on_host_appear(ipDataDict)
-
-    def on_client_change(self, sourceBridgeId, ipDataDict):
-        assert False
-
-    def on_client_disappear(self, sourceBridgeId, ipList):
-        assert all(ip in self.clientDict for ip in ipList)
-
-        # record
-        for ip in ipList:
-            del self.clientDict[ip]
-
-        # notify all bridges
+    def on_client_remove(self, source_id, ip_list):
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-            if sourceBridgeId == bridge.get_bridge_id():
+            if source_id == bridge.get_bridge_id():
                 continue
-            bridge.on_host_disappear(sourceBridgeId, ipList)
+            bridge.on_host_remove(source_id, ip_list)
 
-        # notify my clients
-        if self.param.sgwApiServer is not None:
-            self.param.sgwApiServer.notifyDisappear2(ipList)
+    def on_cascade_upstream_up(self, data):
+        for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
+            bridge.on_source_add("upstream-vpn")
+        self._upstreamVpnHostRefresh()
 
-        # notify subhost owners
-        pass
+    def on_cascade_upstream_down(self, reason):
+        for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
+            bridge.on_source_remove("upstream-vpn")
 
-        # notify upstream
-        self.param.wanManager.on_host_disappear(ipList)
+    def on_cascade_upstream_router_add(self, data):
+        self._upstreamVpnHostRefresh()
+
+    def on_cascade_upstream_router_remove(self, data):
+        self._upstreamVpnHostRefresh()
+
+    def on_cascade_upstream_router_client_add_or_change(self, data):
+        self._upstreamVpnHostRefresh()
+
+    def on_cascade_upstream_router_client_remove(self, data):
+        self._upstreamVpnHostRefresh()
+
+    def on_cascade_downstream_up(self, peer_uuid, data):
+        self.downstreamDict[peer_uuid] = []
+        self.on_cascade_downstream_new_router(peer_uuid, data)
+
+    def on_cascade_downstream_down(self, peer_uuid):
+        if len(self.downstreamDict[peer_uuid]) > 0:
+            self.on_cascade_downstream_delete_router(peer_uuid, self.downstreamDict[peer_uuid])
+        del self.downstreamDict[peer_uuid]
+
+    def on_cascade_downstream_new_router(self, peer_uuid, data):
+        for router_id in data.keys():
+            self.downstreamDict[peer_uuid].append(router_id)
+            for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
+                bridge.on_source_add("downstream-" + router_id)
+        self.on_cascade_downstream_new_or_update_router_client(data)
+
+    def on_cascade_downstream_delete_router(self, peer_uuid, data):
+        for router_id in data:
+            for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
+                bridge.on_source_remove("downstream-" + router_id)
+            self.downstreamDict[peer_uuid].remove(router_id)
+
+    def on_cascade_downstream_new_or_update_router_client(self, peer_uuid, data):
+        for router_id, info in data:
+            for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
+                bridge.on_host_add_or_change("downstream-" + router_id, info["client-list"])
+
+    def on_cascade_downstream_delete_router_client(self, peer_uuid, data):
+        for router_id, info in data:
+            for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
+                bridge.on_host_remove("downstream-" + router_id, info["client-list"])
 
     def _apiFirewallAllowFunc(self, owner, rule):
         class _Stub:
@@ -169,6 +183,18 @@ class WrtLanManager:
         data = _Stub
         data.firewall_allow = [rule]
         self.param.trafficManager.set_data(owner, data)
+
+    def _upstreamVpnHostRefresh(self):
+        ipDataDict = dict()
+        for router in self.param.cascadeManager.apiClient.routerInfo.values():
+            for ip, data in router["client-list"].items():
+                if "nat-ip" in data:
+                    ip = data["nat-ip"]
+                    data = data.copy()
+                    del data["nat-ip"]
+                ipDataDict[ip] = data
+        for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
+            bridge.on_host_refresh("upstream-vpn", ipDataDict)
 
     def _getInstanceAndInfoFromEtcDir(self, pluginPrefix, cfgfilePrefix, name):
         # Returns (instanceName, cfgobj, tmpdir, vardir)
@@ -215,7 +241,6 @@ class _DefaultBridge:
         self.varDir = varDir
         self.l2DnsPort = None
         self.clientAppearFunc = None
-        self.clientChangeFunc = None
         self.clientDisappearFunc = None
 
         self.brname = None
@@ -231,7 +256,7 @@ class _DefaultBridge:
         self.leaseScanTimer = None
         self.lastScanRecord = None
 
-    def init2(self, brname, prefix, l2DnsPort, clientAppearFunc, clientChangeFunc, clientDisappearFunc):
+    def init2(self, brname, prefix, l2DnsPort, clientAppearFunc, clientDisappearFunc):
         assert prefix[1] == "255.255.255.0"
 
         self.brname = brname
@@ -242,7 +267,6 @@ class _DefaultBridge:
 
         self.l2DnsPort = l2DnsPort
         self.clientAppearFunc = clientAppearFunc
-        self.clientChangeFunc = clientChangeFunc
         self.clientDisappearFunc = clientDisappearFunc
 
         # create bridge interface
@@ -284,28 +308,14 @@ class _DefaultBridge:
             i += 50
         return subhostIpRange
 
-    def on_other_bridge_created(self, bridge):
-        with open(os.path.join(self.hostsDir, bridge.get_bridge_id()), "w") as f:
+    def on_source_add(self, source_id):
+        with open(os.path.join(self.hostsDir, source_id), "w") as f:
             f.write("")
 
-    def on_other_bridge_destroyed(self, bridge):
-        os.unlink(os.path.join(self.hostsDir, bridge.get_bridge_id()))
+    def on_source_remove(self, source_id):
+        os.unlink(os.path.join(self.hostsDir, source_id))
 
-    def on_subhost_owner_connected(self, id):
-        with open(os.path.join(self.hostsDir, id), "w") as f:
-            f.write("")
-
-    def on_subhost_owner_disconnected(self, id):
-        os.unlink(os.path.join(self.hostsDir, id))
-
-    def on_upstream_connected(self, id):
-        with open(os.path.join(self.hostsDir, id), "w") as f:
-            f.write("")
-
-    def on_upstream_disconnected(self, id):
-        os.unlink(os.path.join(self.hostsDir, id))
-
-    def on_host_appear(self, sourceId, ipDataDict):
+    def on_host_add_or_change(self, sourceId, ipDataDict):
         bChanged = False
         fn = os.path.join(self.hostsDir, sourceId)
         with open(fn, "a") as f:
@@ -317,7 +327,7 @@ class _DefaultBridge:
         if bChanged:
             self.dnsmasqProc.send_signal(signal.SIGHUP)
 
-    def on_host_disappear(self, sourceId, ipList):
+    def on_host_remove(self, sourceId, ipList):
         fn = os.path.join(self.hostsDir, sourceId)
         bChanged = False
 
