@@ -266,8 +266,9 @@ class WrtCascadeManager:
         logging.info("CASCADE-API servers started.")
 
     def dispose(self):
-        assert self.apiClient is None
         for s in self.apiServerList:
+            pass                # fixme
+        if self.apiClient is not None:
             pass                # fixme
 
     def on_wconn_up(self):
@@ -476,6 +477,7 @@ class _ApiClient(JsonApiEndPoint):
     # apiClient is disposed after on_error() is called.
 
     def __init__(self, pObj, remote_ip):
+        super().__init__()
         self.pObj = pObj
 
         sc = Gio.SocketClient.new()
@@ -491,7 +493,7 @@ class _ApiClient(JsonApiEndPoint):
 
     def _on_connect(self, source_object, res):
         try:
-            conn = source_object.connect_to_host_async_finish(res)
+            conn = source_object.connect_to_host_finish(res)
             super().set_iostream_and_start(conn)
             self.bConnected = True
 
