@@ -267,7 +267,9 @@ class WrtCascadeManager:
 
     def dispose(self):
         for s in self.apiServerList:
-            pass                # fixme
+            s.close()
+        self.apiServerList = []
+
         if self.apiClient is not None:
             pass                # fixme
 
@@ -587,18 +589,22 @@ class _ApiServer:
         conn = source_object.accept_finish(res)
         sproc = _ApiServerProcessor(self.pObj, self, conn)
         self.sprocList.append(sproc)
-        logging.info("CASCADE-API client %s accepted." % (conn.get_remote_address()))
+        print("debug1", conn)
+        #logging.info("CASCADE-API client %s accepted." % (conn.get_remote_address()))
+        self.serverListener.accept_async(None, self._on_accept)
 
 
 class _ApiServerProcessor(JsonApiEndPoint):
 
     def __init__(self, pObj, serverObj, conn):
+        super().__init__()
         self.pObj = pObj
         self.serverObj = serverObj
+        self.conn = conn
         self.bRegistered = False
         self.peerUuid = None
         self.routerInfo = dict()
-        super().set_iostream_and_start(conn)
+        super().set_iostream_and_start(self.conn)
 
     def on_error(self, e):
         # fixme: add log
