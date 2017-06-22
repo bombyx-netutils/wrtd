@@ -261,8 +261,8 @@ class WrtCascadeManager:
         self.downstreamDict = dict()
 
         # start CASCADE-API server for all the bridges
-        for bridge in [self.param.lanManager.defaultBridge] + [x.get_bridge() for x in self.param.lanManager.vpnsPluginList]:
-            self.apiServerList.append(_ApiServer(self, bridge))
+        for plugin in self.param.lanManager.vpnsPluginList:
+            self.apiServerList.append(_ApiServer(self, plugin.get_bridge()))
         logging.info("CASCADE-API servers started.")
 
     def dispose(self):
@@ -598,7 +598,7 @@ class _ApiServerProcessor(JsonApiEndPoint):
         self.bRegistered = False
         self.peerUuid = None
         self.routerInfo = dict()
-        super().set_iostream_and_start()
+        super().set_iostream_and_start(conn)
 
     def on_error(self, e):
         # fixme: add log
