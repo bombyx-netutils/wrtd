@@ -5,6 +5,7 @@ import os
 import glob
 import fcntl
 import json
+import random
 import ipaddress
 from wrt_util import WrtUtil
 
@@ -131,6 +132,11 @@ class PrefixPool:
 
     def __init__(self, dataFile):
         self.dataFile = dataFile
+        self.defaultExcludePrefixList = [
+            ("192.168.0.0", "255.255.255.0"),
+            ("192.168.1.0", "255.255.255.0"),
+            ("192.168.2.0", "255.255.255.0"),
+        ]
         self.excludePrefixDict = dict()     # dict<key, list<prefix-ip, prefix-mask>>
         self.prefixList = []                # list<prefix-ip, prefix-mask, used-flag>
         self._load()
@@ -161,7 +167,7 @@ class PrefixPool:
 
         # create new prefix for conflict items
         for i in idxList:
-            pip, pmask = PrefixPool._createNewPrefix(refList + prefixList)
+            pip, pmask = self._createNewPrefix(refList + prefixList)
             self.prefixList[i] = (pip, pmask, False)
 
         self.excludePrefixDict[key] = prefixList
@@ -186,7 +192,7 @@ class PrefixPool:
             tl += l
 
         # create a new prefix
-        pip, pmask = PrefixPool._createNewPrefix(tl)
+        pip, pmask = self._createNewPrefix(tl)
         self.prefixList.append((pip, pmask, True))
         self._save()
         return (pip, pmask)
@@ -224,26 +230,17 @@ class PrefixPool:
         with open(self.dataFile, "w") as f:
             f.write(json.dumps(cfgObj))
 
-    @staticmethod
-    def _createNewPrefix(excludeList):
-        pip = None
-        pmask = None
-        for i in range(0, 256):
-            pip = "192.168.%d.0" % (i)
-            pmask = "255.255.255.0"
-            overlap = False
-            netobj = ipaddress.IPv4Network(pip + "/" + pmask)
-            for item in excludeList:
-                ip2 = item[0]
-                mask2 = item[1]
-                if netobj.overlaps(ipaddress.IPv4Network(ip2 + "/" + mask2)):
-                    overlap = True
-                    break
-            if overlap:
+    def _createNewPrefix(self, excludeList):
+        item = None
+        while True:
+            item = ("192.168.%d.0" % (random.randint(0, 255)), "255.255.255.0")
+            if WrtUtil.prefixConflictWithPrefixList(item, self.defaultExcludePrefixList):
+                continue
+            if WrtUtil.prefixConflictWithPrefixList(item, excludeList):
                 continue
             break
-        assert pip is not None and pmask is not None
-        return (pip, pmask)
+        assert item is not None
+        return item
 
 
 class TemplateBridge:
