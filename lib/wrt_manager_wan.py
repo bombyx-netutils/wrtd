@@ -62,15 +62,13 @@ class WrtWanManager:
                                      tdir,
                                      lambda: WrtCommon.callManagers(self.param, "on_wvpn_up"),
                                      lambda: WrtCommon.callManagers(self.param, "on_wvpn_down"))
-                self.vpnPlugin.start()
-                self.logger.info("Cascade VPN activated, plugin: %s." % (cfgObj["plugin"]))
+                self.logger.info("Cascade-VPN activated, plugin: %s." % (cfgObj["plugin"]))
             else:
-                self.logger.info("No cascade VPN configured.")
+                self.logger.info("No Cascade-VPN configured.")
         except BaseException:
             if self.vpnPlugin is not None:
-                self.vpnPlugin.stop()
                 self.vpnPlugin = None
-                self.logger.info("Cascade VPN deactivated.")
+                self.logger.info("Cascade-VPN deactivated.")
             if self.wanConnPlugin is not None:
                 with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
                     f.write("0")
@@ -83,7 +81,7 @@ class WrtWanManager:
         if self.vpnPlugin is not None:
             self.vpnPlugin.stop()
             self.vpnPlugin = None
-            self.logger.info("Cascade VPN deactivated.")
+            self.logger.info("Cascade-VPN deactivated.")
         if self.wanConnPlugin is not None:
             with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
                 f.write("0")
@@ -104,14 +102,18 @@ class WrtWanManager:
             if socket.gethostbyname(self.param.dnsName) != self.wanConnPlugin.get_ip():
                 self.logger.warn("Invalid DNS name %s." % (self.param.dnsName))
 
+        # start vpn plugin
+        self.vpnPlugin.start()
+
     def on_wconn_down(self):
+        self.vpnPlugin.stop()
         self.param.prefixPool.removeExcludePrefixList("wan")
 
     def on_wvpn_up(self):
         # check vpn prefix and restart if neccessary
         if self.param.prefixPool.setExcludePrefixList("vpn", self.vpnPlugin.get_prefix_list()):
             os.kill(os.getpid(), signal.SIGHUP)
-            raise Exception("prefix duplicates with VPN connection, autofix it and restart")
+            raise Exception("prefix duplicates with Cascade-VPN connection, autofix it and restart")
 
     def on_wvpn_down(self):
         self.param.prefixPool.removeExcludePrefixList("vpn")
