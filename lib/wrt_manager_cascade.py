@@ -585,12 +585,16 @@ class _ApiServer:
 
         self.sprocList = []
 
+    def close(self):
+        for sproc in self.sprocList:
+            sproc.close()
+        self.serverListener.close()
+
     def _on_accept(self, source_object, res):
-        conn = source_object.accept_finish(res)
+        conn, dummy = source_object.accept_finish(res)
         sproc = _ApiServerProcessor(self.pObj, self, conn)
         self.sprocList.append(sproc)
-        print("debug1", conn)
-        #logging.info("CASCADE-API client %s accepted." % (conn.get_remote_address()))
+        logging.info("CASCADE-API client %s accepted." % (conn.get_remote_address()))
         self.serverListener.accept_async(None, self._on_accept)
 
 
@@ -605,6 +609,9 @@ class _ApiServerProcessor(JsonApiEndPoint):
         self.peerUuid = None
         self.routerInfo = dict()
         super().set_iostream_and_start(self.conn)
+
+    def close(self):
+        pass            # fixme
 
     def on_error(self, e):
         # fixme: add log
