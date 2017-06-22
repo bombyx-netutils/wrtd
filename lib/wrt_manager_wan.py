@@ -6,6 +6,7 @@ import json
 import signal
 import logging
 import socket
+from wrt_util import WrtUtil
 from wrt_common import WrtCommon
 
 
@@ -93,9 +94,8 @@ class WrtWanManager:
     def on_wconn_up(self):
         # set exclude prefix and restart if neccessary
         if self.param.prefixPool.setExcludePrefixList("wan", self.wanConnPlugin.get_prefix_list()):
-            self.logger.error("Bridge prefix duplicates with internet connection, restart automatically.")
             os.kill(os.getpid(), signal.SIGHUP)
-            return
+            raise Exception("bridge prefix duplicates with internet connection, autofix it and restart")
 
         # check dns name
         if self.param.dnsName is not None:
@@ -103,17 +103,22 @@ class WrtWanManager:
                 self.logger.warn("Invalid DNS name %s." % (self.param.dnsName))
 
         # start vpn plugin
-        self.vpnPlugin.start()
+        if self.vpnPlugin is not None:
+            self.vpnPlugin.start()
 
     def on_wconn_down(self):
-        self.vpnPlugin.stop()
+        if self.vpnPlugin is not None:
+            self.vpnPlugin.stop()
         self.param.prefixPool.removeExcludePrefixList("wan")
 
     def on_wvpn_up(self):
+        if WrtUtil.prefixListConflict(self.vpnPlugin.get_prefix_list(), self.wanConnPlugin.get_prefix_list()):
+            raise Exception("cascade-VPN prefix duplicates with internet connection")
+
         # check vpn prefix and restart if neccessary
         if self.param.prefixPool.setExcludePrefixList("vpn", self.vpnPlugin.get_prefix_list()):
             os.kill(os.getpid(), signal.SIGHUP)
-            raise Exception("prefix duplicates with Cascade-VPN connection, autofix it and restart")
+            raise Exception("bridge prefix duplicates with Cascade-VPN connection, autofix it and restart")
 
     def on_wvpn_down(self):
         self.param.prefixPool.removeExcludePrefixList("vpn")

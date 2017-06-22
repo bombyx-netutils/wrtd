@@ -96,16 +96,22 @@ class WrtDaemon:
         finally:
             if self.param.sgwManager is not None:
                 self.param.sgwManager.dispose()
+                self.param.sgwManager = None
             if self.interfaceTimer is not None:
                 GLib.source_remove(self.interfaceTimer)
+                self.interfaceTimer = None
             if self.param.cascadeManager is not None:
                 self.param.cascadeManager.dispose()
+                self.param.cascadeManager = None
             if self.param.lanManager is not None:
                 self.param.lanManager.dispose()
+                self.param.lanManager = None
             if self.param.wanManager is not None:
                 self.param.wanManager.dispose()
+                self.param.wanManager = None
             if self.param.trafficManager is not None:
                 self.param.trafficManager.dispose()
+                self.param.trafficManager = None
             WrtUtil.nftForceDeleteTable("wrtd")
             logging.shutdown()
             shutil.rmtree(self.param.tmpDir)

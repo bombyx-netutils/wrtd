@@ -13,11 +13,16 @@ class WrtCommon:
 
     @staticmethod
     def callManagers(param, funcName, *args):
-        WrtUtil.callFunc(param.trafficManager, funcName, *args)
-        WrtUtil.callFunc(param.wanManager, funcName, *args)
-        WrtUtil.callFunc(param.lanManager, funcName, *args)
-        WrtUtil.callFunc(param.cascadeManager, funcName, *args)
-        WrtUtil.callFunc(param.sgwManager, funcName, *args)
+        if param.trafficManager is not None:
+            WrtUtil.callFunc(param.trafficManager, funcName, *args)
+        if param.wanManager is not None:
+            WrtUtil.callFunc(param.wanManager, funcName, *args)
+        if param.lanManager is not None:
+            WrtUtil.callFunc(param.lanManager, funcName, *args)
+        if param.cascadeManager is not None:
+            WrtUtil.callFunc(param.cascadeManager, funcName, *args)
+        if param.sgwManager is not None:
+            WrtUtil.callFunc(param.sgwManager, funcName, *args)
 
     @staticmethod
     def bridgeGetIp(bridge):
@@ -133,17 +138,20 @@ class PrefixPool:
     def setExcludePrefixList(self, key, prefixList):
         """Returns True means conflict is found and solved, reboot needed"""
 
+        # no conflict should exist in exclude prefix lists
+        for excPrefixList in self.excludePrefixDict.values():
+            assert not WrtUtil.prefixListConflict(excPrefixList, prefixList)
+
         ret = False
 
         # get conflict items
         idxList = []
         for i in range(0, len(self.prefixList)):
-            for p2 in prefixList:
-                if WrtUtil.prefixConflict(self.prefixList[i], p2):
-                    idxList.append(i)
-                    if self.prefixList[i][2]:
-                        ret = True              # program restart needed
-                    break
+            if WrtUtil.prefixConflictWithPrefixList(self.prefixList[i], prefixList):
+                idxList.append(i)
+                if self.prefixList[i][2]:
+                    ret = True              # program restart needed
+                break
 
         # get a reference list for create new prefix
         refList = []

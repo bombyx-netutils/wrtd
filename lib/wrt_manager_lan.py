@@ -81,29 +81,11 @@ class WrtLanManager:
                         continue
                     bridge.on_source_add(other_bridge.get_bridge_id())
         except BaseException:
-            for p in self.vpnsPluginList:
-                p.stop()
-                logging.info("VPN server plugin \"%s\" deactivated." % (p.full_name))
-            for p in self.lifPluginList:
-                p.stop()
-                logging.info("LAN interface plugin \"%s\" deactivated." % (p.full_name))
-            if self.defaultBridge is not None:
-                self.defaultBridge.dispose()
-                self.defaultBridge = None
-                logging.info("Default bridge destroyed.")
+            self._dispose()
             raise
 
     def dispose(self):
-        for p in self.vpnsPluginList:
-            p.stop()
-            logging.info("VPN server plugin \"%s\" deactivated." % (p.full_name))
-        for p in self.lifPluginList:
-            p.stop()
-            logging.info("LAN interface plugin \"%s\" deactivated." % (p.full_name))
-        if self.defaultBridge is not None:
-            self.defaultBridge.dispose()
-            self.defaultBridge = None
-            logging.info("Default bridge destroyed.")
+        self._dispose()
         logging.info("Terminated.")
 
     def on_client_add_or_change(self, source_id, ip_data_dict):
@@ -123,7 +105,7 @@ class WrtLanManager:
             bridge.on_source_add("upstream-vpn")
         self._upstreamVpnHostRefresh()
 
-    def on_cascade_upstream_down(self, reason):
+    def on_cascade_upstream_down(self):
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             bridge.on_source_remove("upstream-vpn")
 
@@ -226,6 +208,22 @@ class WrtLanManager:
             ret.append((instanceName, cfgObj, tmpdir, vardir))
 
         return ret
+
+    def _dispose(self):
+        for p in self.vpnsPluginList:
+            p.stop()
+            logging.info("VPN server plugin \"%s\" deactivated." % (p.full_name))
+        self.vpnsPluginList = []
+
+        for p in self.lifPluginList:
+            p.stop()
+            logging.info("LAN interface plugin \"%s\" deactivated." % (p.full_name))
+        self.lifPluginList = []
+
+        if self.defaultBridge is not None:
+            self.defaultBridge.dispose()
+            self.defaultBridge = None
+            logging.info("Default bridge destroyed.")
 
 
 class _DefaultBridge:

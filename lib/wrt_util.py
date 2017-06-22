@@ -31,10 +31,23 @@ class WrtUtil:
         return ip == ip2
 
     @staticmethod
-    def prefixConflict(prefix1, prefix2):
-        netobj1 = ipaddress.IPv4Network(prefix1[0] + "/" + prefix1[1])
-        netobj2 = ipaddress.IPv4Network(prefix2[0] + "/" + prefix2[1])
-        return netobj1.overlaps(netobj2)
+    def prefixListConflict(prefixList1, prefixList2):
+        for prefix1 in prefixList1:
+            for prefix2 in prefixList2:
+                netobj1 = ipaddress.IPv4Network(prefix1[0] + "/" + prefix1[1])
+                netobj2 = ipaddress.IPv4Network(prefix2[0] + "/" + prefix2[1])
+                if netobj1.overlaps(netobj2):
+                    return True
+        return False
+
+    @staticmethod
+    def prefixConflictWithPrefixList(prefix, prefixList):
+        for prefix2 in prefixList:
+            netobj1 = ipaddress.IPv4Network(prefix[0] + "/" + prefix[1])
+            netobj2 = ipaddress.IPv4Network(prefix2[0] + "/" + prefix2[1])
+            if netobj1.overlaps(netobj2):
+                return True
+        return False
 
     @staticmethod
     def idleInvoke(func, *args):
