@@ -408,9 +408,12 @@ class JsonApiEndPoint:
         self.command_sent = (return_callback, error_callback)
 
     def _on_receive(self, source_object, res):
-        line, len = source_object.read_line_finish_utf8(res)
-        jsonObj = json.loads(line)
         try:
+            line, len = source_object.read_line_finish_utf8(res)
+            if line is None:
+                raise Exception("socket closed by peer")
+
+            jsonObj = json.loads(line)
             while True:
                 if "command" in jsonObj:
                     if self.command_received is not None:
