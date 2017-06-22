@@ -260,7 +260,7 @@ class WrtCascadeManager:
         self.apiServerList = []
         self.downstreamDict = dict()
 
-        # start cascade API server for all the bridges
+        # start CASCADE-API server for all the bridges
         for bridge in [self.param.lanManager.defaultBridge] + [x.get_bridge() for x in self.param.lanManager.vpnsPluginList]:
             self.apiServerList.append(_ApiServer(self, bridge))
         logging.info("CASCADE-API servers started.")
@@ -471,7 +471,7 @@ class WrtCascadeManager:
 
 class _ApiClient(JsonApiEndPoint):
 
-    # exception in any callback function would make WrtCascadeManager bring down the cascade api client.
+    # exception in any callback function would make WrtCascadeManager bring down the CASCADE-API client.
     # no exception is allowed in on_error().
     # on_error() would be called if there's error in cascade-api connection after _ApiClient is initialized.
     # apiClient is disposed after on_error() is called.
@@ -484,7 +484,7 @@ class _ApiClient(JsonApiEndPoint):
         sc.set_family(Gio.SocketFamily.IPV4)
         sc.set_protocol(Gio.SocketProtocol.TCP)
 
-        logging.info("Establishing Cascade API connection.")
+        logging.info("Establishing CASCADE-API connection.")
         self.peerUuid = None
         self.routerInfo = None
         self.bConnected = False
@@ -508,7 +508,7 @@ class _ApiClient(JsonApiEndPoint):
                     data["router-list"][sproc.peerUuid]["parent"] = self.pObj.param.uuid
             super().exec_command("register", data, self._on_register_return, self._on_register_error)
         except Exception as e:
-            logging.info("Failed to establish cascade API connection, %s" % (e))
+            logging.info("Failed to establish CASCADE-API connection, %s" % (e))
             WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_error", e)
             self.close()
 
@@ -517,7 +517,7 @@ class _ApiClient(JsonApiEndPoint):
         self.routerInfo = data["router-list"]
         WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_up", data)
         self.bRegistered = True
-        logging.info("Cascade API connection established.")
+        logging.info("CASCADE-API connection established.")
 
     def _on_register_error(self, reason):
         raise Exception(reason)
@@ -525,9 +525,9 @@ class _ApiClient(JsonApiEndPoint):
     def on_error(self, e):
         WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_error", e)
         if not self.bRegistered:
-            logging.info("Failed to establish cascade API connection, %s" % (e))
+            logging.info("Failed to establish CASCADE-API connection, %s" % (e))
         else:
-            logging.info("Cascade API connection disconnected with error, %s" % (e))
+            logging.info("CASCADE-API connection disconnected with error, %s" % (e))
 
     def on_close(self):
         WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_down")
