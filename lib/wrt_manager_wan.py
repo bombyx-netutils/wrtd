@@ -123,6 +123,9 @@ class WrtWanManager:
     def on_wvpn_down(self):
         self.param.prefixPool.removeExcludePrefixList("vpn")
 
+    def on_cascade_upstream_fail(self, reason):
+        self.vpnPlugin.disconnect()
+
     def on_cascade_upstream_down(self):
         self.vpnPlugin.disconnect()
 

@@ -474,9 +474,9 @@ class WrtCascadeManager:
 class _ApiClient(JsonApiEndPoint):
 
     # exception in any callback function would make WrtCascadeManager bring down the CASCADE-API client.
-    # no exception is allowed in on_error().
-    # on_error() would be called if there's error in cascade-api connection after _ApiClient is initialized.
-    # apiClient is disposed after on_error() is called.
+    # no exception is allowed in on_XXX_fail() and on_XXX_error().
+    # on_XXX_fail() would be called if there's error before client is registered.
+    # on_XXX_error() would be called if there's error after client is registered.
 
     def __init__(self, pObj, remote_ip):
         super().__init__()
@@ -511,7 +511,7 @@ class _ApiClient(JsonApiEndPoint):
             super().exec_command("register", data, self._on_register_return, self._on_register_error)
         except Exception as e:
             logging.info("Failed to establish CASCADE-API connection, %s" % (e))
-            WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_error", e)
+            WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_fail", e)
             self.close()
 
     def _on_register_return(self, data):
