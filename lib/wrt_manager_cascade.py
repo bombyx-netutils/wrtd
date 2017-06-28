@@ -594,7 +594,7 @@ class _ApiServer:
         conn, dummy = source_object.accept_finish(res)
         sproc = _ApiServerProcessor(self.pObj, self, conn)
         self.sprocList.append(sproc)
-        logging.info("CASCADE-API client %s accepted." % (conn.get_remote_address().get_address()))
+        logging.info("CASCADE-API client %s accepted." % (conn.get_remote_address().get_address().to_string()))
         self.serverListener.accept_async(None, self._on_accept)
 
 
@@ -619,7 +619,7 @@ class _ApiServerProcessor(JsonApiEndPoint):
 
     def on_close(self):
         WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_down", self.peerUuid)
-        logging.info("CASCADE-API client %s(UUID:%s) disconnected." % (self.conn.get_remote_address().get_address(), self.peerUuid))
+        logging.info("CASCADE-API client %s(UUID:%s) disconnected." % (self.conn.get_remote_address().get_address().to_string(), self.peerUuid))
 
     def on_command_register(self, data, return_callback, errror_callback):
         # receive data
@@ -644,7 +644,7 @@ class _ApiServerProcessor(JsonApiEndPoint):
 
         # registered
         self.bRegistered = True
-        logging.info("CASCADE-API client %s(UUID:%s) registered." % (self.conn.get_remote_address().get_address(), self.peerUuid))
+        logging.info("CASCADE-API client %s(UUID:%s) registered." % (self.conn.get_remote_address().get_address().to_string(), self.peerUuid))
 
     def on_notification_new_router(self, data):
         assert self.bRegistered
