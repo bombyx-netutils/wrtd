@@ -84,11 +84,11 @@ class WrtSgwManager:
         # fixme
         pass
 
-    def on_client_add_or_change(self, ip_data_dict):
+    def on_client_add_or_change(self, source_id, ip_data_dict):
         for sproc in self.getAllValidApiServerProcessors():
             sproc.send_notification("host-add-or-change", ip_data_dict)
 
-    def on_client_remove(self, ip_list):
+    def on_client_remove(self, source_id, ip_list):
         for sproc in self.getAllValidApiServerProcessors():
             sproc.send_notification("host-remove", ip_list)
 

@@ -617,7 +617,7 @@ class _ApiServerProcessor(JsonApiEndPoint):
         pass            # fixme
 
     def on_error(self, e):
-        # fixme: add log
+        logging.info("debugXXXXXXXXXXXX", e)            # fixme
         self.serverObj.sprocList.remove(self)
 
     def on_close(self):
