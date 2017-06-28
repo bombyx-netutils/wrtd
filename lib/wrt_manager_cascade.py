@@ -532,7 +532,8 @@ class _ApiClient(JsonApiEndPoint):
             logging.info("CASCADE-API connection disconnected with error, %s" % (e))
 
     def on_close(self):
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_down")
+        if self.bRegistered:
+            WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_down")
 
     def on_notification_router_add(self, data):
         assert self.bRegistered
@@ -618,14 +619,15 @@ class _ApiServerProcessor(JsonApiEndPoint):
         self.serverObj.sprocList.remove(self)
 
     def on_close(self):
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_down", self.peerUuid)
+        if self.bRegistered:
+            WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_down", self.peerUuid)
         logging.info("CASCADE-API client %s(UUID:%s) disconnected." % (self.conn.get_remote_address().get_address().to_string(), self.peerUuid))
 
     def on_command_register(self, data, return_callback, errror_callback):
         # receive data
         self.peerUuid = data["my-id"]
         self.routerInfo = data["router-list"]
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_up", self.peerUuid, data)
+        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_up", self.peerUuid, data)
 
         # send data
         data = dict()
