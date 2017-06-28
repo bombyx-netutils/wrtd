@@ -473,10 +473,9 @@ class WrtCascadeManager:
 
 class _ApiClient(JsonApiEndPoint):
 
-    # exception in any callback function would make WrtCascadeManager bring down the CASCADE-API client.
-    # no exception is allowed in on_XXX_fail() and on_XXX_error().
-    # on_XXX_fail() would be called if there's error before client is registered.
-    # on_XXX_error() would be called if there's error after client is registered.
+    # no exception is allowed in on_cascade_upstream_fail(),  on_cascade_upstream_error(),  on_cascade_upstream_down().
+    # on_cascade_upstream_fail() would be called if there's error before client is registered.
+    # on_cascade_upstream_error() would be called if there's error after client is registered.
 
     def __init__(self, pObj, remote_ip):
         super().__init__()
@@ -517,22 +516,25 @@ class _ApiClient(JsonApiEndPoint):
     def _on_register_return(self, data):
         self.peerUuid = data["my-id"]
         self.routerInfo = data["router-list"]
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_up", data)
         self.bRegistered = True
         logging.info("CASCADE-API connection established.")
+        WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_up", data)
 
     def _on_register_error(self, reason):
         raise Exception(reason)
 
-    def on_error(self, e):
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_error", e)
+    def on_error(self, excp):
         if not self.bRegistered:
-            logging.info("Failed to establish CASCADE-API connection, %s" % (e))
+            logging.info("Failed to establish CASCADE-API connection, %s" % (excp))
+            WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_fail", excp)
         else:
-            logging.info("CASCADE-API connection disconnected with error, %s" % (e))
+            logging.info("CASCADE-API connection disconnected with error, %s" % (excp))
+            WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_error", excp)
 
     def on_close(self):
-        if self.bRegistered:
+        if not self.bRegistered:
+            pass
+        else:
             WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_down")
 
     def on_notification_router_add(self, data):

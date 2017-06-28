@@ -358,6 +358,7 @@ class JsonApiEndPoint:
     #   on_error(self, excp)
     #   on_close(self)
     #
+    # exception in on_command_XXX_return(), on_command_XXX_error(), on_notification_XXX() would close the object and iostream
     # no exception is allowed in on_error(), on_close().
     # close(), send_notification(), exec_command() should not be called in on_XXX().
     # This class is not thread-safe.
