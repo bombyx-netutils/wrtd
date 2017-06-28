@@ -352,11 +352,15 @@ class IdleQueue:
 
 class JsonApiEndPoint:
     # sub-class must implement the following functions:
-    #   on_command_XXX(self, data)
+    #   on_command_XXX_return(self, data)
+    #   on_command_XXX_error(self, reason)
     #   on_notification_XXX(self, data)
     #   on_error(self, excp)
     #   on_close(self)
-    # on_close() is called before JsonApiEndPoint object is destroyed
+    #
+    # no exception is allowed in on_error(), on_close().
+    # close(), send_notification(), exec_command() should not be called in on_XXX().
+    # This class is not thread-safe.
 
     def __init__(self):
         self.iostream = None
