@@ -131,12 +131,10 @@ class WrtWanManager:
 
     def on_cascade_downstream_up(self, peer_uuid, data):
         self.downstreamDict[peer_uuid] = []
-        if len(data["router-list"]) > 0:
-            self.on_cascade_downstream_new_router(peer_uuid, data["router-list"])
+        self.on_cascade_downstream_new_router(peer_uuid, data["router-list"])
 
     def on_cascade_downstream_down(self, peer_uuid):
-        if len(self.downstreamDict[peer_uuid]) > 0:
-            self.on_cascade_downstream_delete_router(peer_uuid, self.downstreamDict[peer_uuid])
+        self.on_cascade_downstream_delete_router(peer_uuid, self.downstreamDict[peer_uuid])
         del self.downstreamDict[peer_uuid]
 
     def on_cascade_downstream_new_router(self, peer_uuid, data):

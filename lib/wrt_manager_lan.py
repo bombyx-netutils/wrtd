@@ -89,12 +89,14 @@ class WrtLanManager:
         logging.info("Terminated.")
 
     def on_client_add_or_change(self, source_id, ip_data_dict):
+        assert len(ip_data_dict) > 0
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             if source_id == bridge.get_bridge_id():
                 continue
             bridge.on_host_add_or_change(source_id, ip_data_dict)
 
     def on_client_remove(self, source_id, ip_list):
+        assert len(ip_list) > 0
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             if source_id == bridge.get_bridge_id():
                 continue
@@ -145,6 +147,8 @@ class WrtLanManager:
 
     def on_cascade_downstream_new_or_update_router_client(self, peer_uuid, data):
         for router_id, info in data.items():
+            if "client-list" not in info:
+                continue
             for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
                 bridge.on_host_add_or_change("downstream-" + router_id, info["client-list"])
 
@@ -163,6 +167,8 @@ class WrtLanManager:
     def _upstreamVpnHostRefresh(self):
         ipDataDict = dict()
         for router in self.param.cascadeManager.apiClient.routerInfo.values():
+            if "client-list" not in router:
+                continue
             for ip, data in router["client-list"].items():
                 if "nat-ip" in data:
                     ip = data["nat-ip"]

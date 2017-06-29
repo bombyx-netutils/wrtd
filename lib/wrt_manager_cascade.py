@@ -289,6 +289,8 @@ class WrtCascadeManager:
             self.apiClient = None
 
     def on_client_add_or_change(self, source_id, ip_data_dict):
+        assert len(ip_data_dict) > 0
+
         # process by myself
         self.routerInfo[self.param.uuid]["client-list"].update(ip_data_dict)
 
@@ -297,8 +299,8 @@ class WrtCascadeManager:
             data = dict()
             data[self.param.uuid] = dict()
             data[self.param.uuid]["client-list"] = ip_data_dict.copy()
-            for ip, data in data[self.param.uuid]["client-list"]:
-                data["nat-ip"] = self.param.trafficManager.sourceIpDict[source_id][ip][1]
+            for ip, data2 in data[self.param.uuid]["client-list"]:
+                data2["nat-ip"] = self.param.trafficManager.sourceIpDict[source_id][ip][1]
             self.apiClient.send_notification("new-or-update-router-client", data)
 
         # notify downstream
@@ -309,6 +311,8 @@ class WrtCascadeManager:
             sproc.send_notification("router-client-add-or-change", data)
 
     def on_client_remove(self, ip_list):
+        assert len(ip_list) > 0
+
         # process by myself
         for ip in ip_list:
             if ip in self.routerInfo[self.param.uuid]["client-list"]:
@@ -337,14 +341,16 @@ class WrtCascadeManager:
             self.on_cascade_upstream_router_remove(self.apiClient.routerInfo.keys())
 
     def on_cascade_upstream_router_add(self, data):
+        assert len(data) > 0
+
         # process by myself
         if self.param.uuid in data.keys():
             os.kill(os.getpid(), signal.SIGHUP)
             raise Exception("router UUID duplicates, will restart")
         ret = False
         for router_id, item in data.items():
-            ret |= self.param.prefixPool.setExcludePrefixList("upstream-wan-%s" % (router_id), item["wan-prefix-list"])
-            ret |= self.param.prefixPool.setExcludePrefixList("upstream-lan-%s" % (router_id), item["lan-prefix-list"])
+            ret |= self.param.prefixPool.setExcludePrefixList("upstream-wan-%s" % (router_id), item.get("wan-prefix-list", []))
+            ret |= self.param.prefixPool.setExcludePrefixList("upstream-lan-%s" % (router_id), item.get("lan-prefix-list", []))
         if ret:
             os.kill(os.getpid(), signal.SIGHUP)
             raise Exception("prefix duplicates with upstream router %s, autofix it and restart" % (router_id))
