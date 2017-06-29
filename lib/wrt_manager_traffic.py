@@ -134,14 +134,14 @@ class WrtTrafficManager:
         del self.downstreamDict[peer_uuid][router_id]
 
     def on_cascade_downstream_new_or_update_router_client(self, peer_uuid, data):
-        for router_id, info in data:
+        for router_id, info in data.items():
             if "client-list" not in info:
                 continue
             self.downstreamDict[peer_uuid][router_id] |= set(info["client-list"].keys())
             self.on_client_add_or_change("downstream-%s" % (router_id), info["client-list"])
 
     def on_cascade_downstream_delete_router_client(self, peer_uuid, data):
-        for router_id, info in data:
+        for router_id, info in data.items():
             self.on_client_remove("downstream-%s" % (router_id), info["client-list"])
             self.downstreamDict[peer_uuid][router_id] -= set(info["client-list"])
 
