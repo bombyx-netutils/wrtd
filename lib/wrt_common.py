@@ -144,10 +144,6 @@ class PrefixPool:
     def setExcludePrefixList(self, key, prefixList):
         """Returns True means conflict is found and solved, reboot needed"""
 
-        # no conflict should exist in exclude prefix lists
-        for excPrefixList in self.excludePrefixDict.values():
-            assert not WrtUtil.prefixListConflict(excPrefixList, prefixList)
-
         ret = False
 
         # get conflict items
