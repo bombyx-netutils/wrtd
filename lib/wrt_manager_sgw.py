@@ -122,7 +122,7 @@ class WrtSgwManager:
         notifyData = dict()
 
         for router_id in data.keys():
-            if "client-list" not in data[router_id]:
+            if data[router_id].get("client-list", dict()) == dict():
                 continue
             for ip, data2 in data[router_id]["client-list"]:
                 ip, data2 = _get_ip_data(ip, data2)
@@ -172,7 +172,7 @@ class WrtSgwManager:
         notifyData = dict()
 
         for router_id in data.keys():
-            if "client-list" not in data[router_id]:
+            if data[router_id].get("client-list", dict()) == dict():
                 continue
             for ip, data2 in data[router_id]["client-list"]:
                 ip, data2 = _get_ip_data(ip, data2)

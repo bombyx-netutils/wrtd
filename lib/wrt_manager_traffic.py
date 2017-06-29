@@ -135,7 +135,7 @@ class WrtTrafficManager:
 
     def on_cascade_downstream_new_or_update_router_client(self, peer_uuid, data):
         for router_id, info in data.items():
-            if "client-list" not in info:
+            if info.get("client-list", dict()) == dict():
                 continue
             self.downstreamDict[peer_uuid][router_id] |= set(info["client-list"].keys())
             self.on_client_add_or_change("downstream-%s" % (router_id), info["client-list"])

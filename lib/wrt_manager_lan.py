@@ -147,7 +147,7 @@ class WrtLanManager:
 
     def on_cascade_downstream_new_or_update_router_client(self, peer_uuid, data):
         for router_id, info in data.items():
-            if "client-list" not in info:
+            if info.get("client-list", dict()) == dict():
                 continue
             for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
                 bridge.on_host_add_or_change("downstream-" + router_id, info["client-list"])
@@ -167,7 +167,7 @@ class WrtLanManager:
     def _upstreamVpnHostRefresh(self):
         ipDataDict = dict()
         for router in self.param.cascadeManager.apiClient.routerInfo.values():
-            if "client-list" not in router:
+            if router.get("client-list", dict()) == dict():
                 continue
             for ip, data in router["client-list"].items():
                 if "nat-ip" in data:
