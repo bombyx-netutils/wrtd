@@ -155,7 +155,7 @@ class WrtSgwManager:
     def on_cascade_downstream_new_router(self, peer_uuid, data):
         for router_id in data.keys():
             self.downstreamClientDict[peer_uuid][router_id] = dict()
-        self.on_cascade_downstream_new_or_update_router_client(data)
+        self.on_cascade_downstream_new_or_update_router_client(peer_uuid, data)
 
     def on_cascade_downstream_delete_router(self, peer_uuid, data):
         notifyData = []
