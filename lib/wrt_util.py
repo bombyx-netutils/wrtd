@@ -426,8 +426,8 @@ class JsonApiEndPoint:
                     funcname = "on_command_" + jsonObj["command"].replace("-", "_")
                     if not hasattr(self, funcname):
                         raise Exception("no callback for command " + jsonObj["command"])
-                    getattr(self, funcname)(jsonObj.get("data", None), self._send_return, self._send_error)
                     self.command_received = jsonObj["command"]
+                    getattr(self, funcname)(jsonObj.get("data", None), self._send_return, self._send_error)
                     break
 
                 if "notification" in jsonObj:
