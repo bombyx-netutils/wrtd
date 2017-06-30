@@ -659,31 +659,31 @@ class _ApiServerProcessor(JsonApiEndPoint):
     def on_notification_new_router(self, data):
         assert self.bRegistered
         self.routerInfo.update(data)
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_new_router", data)
+        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_new_router", self.peerUuid, data)
 
     def on_notification_delete_router(self, data):
         assert self.bRegistered
         for router_id in data:
             del self.routerInfo[router_id]
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_delete_router", data)
+        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_delete_router", self.peerUuid, data)
 
     def on_notification_update_router_wan_prefix_list(self, data):
         assert self.bRegistered
         for router_id, item in data.items():
             self.routerInfo[router_id]["wan-prefix-list"] = item["wan-prefix-list"]
-            WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_update_router_wan_prefix_list", data)
+            WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_update_router_wan_prefix_list", self.peerUuid, data)
 
     def on_notification_update_router_lan_prefix_list(self, data):
         assert self.bRegistered
         for router_id, item in data.items():
             self.routerInfo[router_id]["lan-prefix-list"] = item["lan-prefix-list"]
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_update_router_lan_prefix_list", data)
+        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_update_router_lan_prefix_list", self.peerUuid, data)
 
     def on_notification_new_or_update_router_client(self, data):
         assert self.bRegistered
         for router_id, item in data.items():
             self.routerInfo[router_id]["client-list"].update(item["client-list"])
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_new_or_update_router_client", data)
+        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_new_or_update_router_client", self.peerUuid, data)
 
     def on_notification_delete_router_client(self, data):
         assert self.bRegistered
@@ -692,7 +692,4 @@ class _ApiServerProcessor(JsonApiEndPoint):
             for ip in item["client-list"]:
                 if ip in o:
                     del o[ip]
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_delete_router_client", data)
-
-
-#        self.bridgeSourceId = "upstream-%s" % (ip)
+        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_delete_router_client", self.peerUuid, data)
