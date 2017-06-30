@@ -586,6 +586,7 @@ class _ApiServer:
 
     def __init__(self, pObj, bridge):
         self.pObj = pObj
+        self.freeSubhostIpRangeList = bridge.get_subhost_ip_range()
 
         self.serverListener = Gio.SocketListener.new()
         addr = Gio.InetSocketAddress.new_from_string(WrtCommon.bridgeGetIp(bridge), self.pObj.param.cascadeApiPort)
@@ -601,7 +602,12 @@ class _ApiServer:
 
     def _on_accept(self, source_object, res):
         conn, dummy = source_object.accept_finish(res)
-        sproc = _ApiServerProcessor(self.pObj, self, conn)
+        if self.freeSubhostIpRangeList == []:
+            conn.close()
+            logging.info("CASCADE-API client %s rejected, no subhost ip range available." % (conn.get_remote_address().get_address().to_string()))
+            return
+
+        sproc = _ApiServerProcessor(self.pObj, self, conn, self.freeSubhostIpRangeList.pop(0))
         self.sprocList.append(sproc)
         logging.info("CASCADE-API client %s accepted." % (conn.get_remote_address().get_address().to_string()))
         self.serverListener.accept_async(None, self._on_accept)
@@ -609,11 +615,12 @@ class _ApiServer:
 
 class _ApiServerProcessor(JsonApiEndPoint):
 
-    def __init__(self, pObj, serverObj, conn):
+    def __init__(self, pObj, serverObj, conn, subhostIpRange):
         super().__init__()
         self.pObj = pObj
         self.serverObj = serverObj
         self.conn = conn
+        self.subhostIpRange = subhostIpRange
         self.bRegistered = False
         self.peerUuid = None
         self.routerInfo = dict()
@@ -625,6 +632,7 @@ class _ApiServerProcessor(JsonApiEndPoint):
     def on_error(self, e):
         logging.info("debugXXXXXXXXXXXX", e)            # fixme
         self.serverObj.sprocList.remove(self)
+        self.serverObj.freeSubhostIpRangeList.append(self.subhostIpRange)
 
     def on_close(self):
         if self.bRegistered:
@@ -640,6 +648,8 @@ class _ApiServerProcessor(JsonApiEndPoint):
         # send data
         data = dict()
         data["my-id"] = self.pObj.param.uuid
+        data["subhost-start"] = self.subhostIpRange[0]
+        data["subhost-end"] = self.subhostIpRange[1]
         data["router-list"] = dict()
         if True:
             data["router-list"].update(self.pObj.routerInfo)
