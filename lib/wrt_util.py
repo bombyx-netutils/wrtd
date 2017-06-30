@@ -410,7 +410,7 @@ class JsonApiEndPoint:
         if data is not None:
             jsonObj["data"] = data
         self.dos.put_string(json.dumps(jsonObj) + "\n")
-        self.command_sent = (return_callback, error_callback)
+        self.command_sent = (command, return_callback, error_callback)
 
     def _on_receive(self, source_object, res):
         try:
