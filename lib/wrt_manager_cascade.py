@@ -333,8 +333,7 @@ class WrtCascadeManager:
             sproc.send_notification("router-client-remove", data)
 
     def on_cascade_upstream_up(self, data):
-        if len(data["router-list"]) > 0:
-            self.on_cascade_upstream_router_add(data["router-list"])
+        self.on_cascade_upstream_router_add(data["router-list"])
 
     def on_cascade_upstream_down(self):
         if self.apiClient.routerInfo is not None and len(self.apiClient.routerInfo) > 0:
@@ -354,16 +353,16 @@ class WrtCascadeManager:
         if ret:
             os.kill(os.getpid(), signal.SIGHUP)
             raise Exception("prefix duplicates with upstream router %s, autofix it and restart" % (router_id))
-        self.upstreamRouterList += data.keys()
 
         # notify downstream
         for sproc in self.getAllValidApiServerProcessors():
             sproc.send_notification("router-add", data)
 
     def on_cascade_upstream_router_remove(self, data):
+        assert len(data) > 0
+
         # process by myself
         for router_id in data:
-            self.upstreamRouterList.remove(router_id)
             self.param.prefixPool.removeExcludePrefixList("upstream-lan-%s" % (router_id))
             self.param.prefixPool.removeExcludePrefixList("upstream-wan-%s" % (router_id))
 
