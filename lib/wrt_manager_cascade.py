@@ -499,8 +499,14 @@ class _ApiClient(JsonApiEndPoint):
         self.bRegistered = False
         sc.connect_to_host_async(self.remoteIp, self.pObj.param.cascadeApiPort, None, self._on_connect)
 
+    def get_peer_uuid(self):
+        return self.peerUuid
+
     def get_peer_ip(self):
         return self.remoteIp
+
+    def get_upstream_router_info(self):
+        return self.routerInfo
 
     def _on_connect(self, source_object, res):
         try:
@@ -630,8 +636,14 @@ class _ApiServerProcessor(JsonApiEndPoint):
         self.routerInfo = dict()
         super().set_iostream_and_start(self.conn)
 
+    def get_peer_uuid(self):
+        return self.peerUuid
+
     def get_peer_ip(self):
         return self.conn.get_remote_address().get_address().to_string()
+
+    def get_downstream_router_info(self):
+        return self.routerInfo
 
     def close(self):
         pass            # fixme

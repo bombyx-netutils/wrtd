@@ -18,37 +18,74 @@ class WrtSubCmdMain:
             raise Exception("not started")
         info = json.loads(dbusObj.GetRouterInfo(dbus_interface="org.fpemud.WRT"))
 
+        print("Router Information:")
+        if True:
+            print("    UUID: " + self.param.uuid)
+
         print("Internet Connection:")
         if "wconn-plugin" not in info:
             print("    None.")
         else:
             print("    Plugin: " + info["wconn-plugin"]["name"])
-            if info["wconn-plugin"]["alive"]:
+            if info["wconn-plugin"]["is-connected"]:
                 print("    Status: Connected")
                 print("    IP:     " + info["wconn-plugin"]["ip"] + " " + ("(public)" if info["wconn-plugin"]["is-ip-public"] else "(behind NAT)"))
             else:
                 print("    Status: Not connected")
         print("")
 
-        print("Cascade VPN:")
-        if "wvpn-plugin" not in info:
-            print("    None.")
-        else:
+        while True:
+            myData = info["cascade"]["router-list"][info["cascade"]["my-id"]]
+            if "parent" not in myData:
+                break
+            print("Cascade Upstream:")
             print("    Plugin: " + info["wvpn-plugin"]["name"])
-            if info["wvpn-plugin"]["alive"]:
-                print("    Status: Connected")
-            else:
-                print("    Status: Not connected")
-        print("")
+            if True:
+                upstreamId = myData["parent"]
+                upstreamData = info["cascade"]["router-list"][upstreamId]
+                if "hostname" in upstreamData:
+                    upstreamName = "%s(%s)" % (upstreamData["hostname"], upstreamId)
+                else:
+                    upstreamName = upstreamId
+                print("    Name:   " + upstreamName)
+            print("")
+            break
 
-        print("LAN Interface:")
-        print("")
+        while True:
+            downstreamIdList = []
+            for routerId, routerData in info["cascade"]["router-list"].items():
+                if routerData.get("parent", None) == info["cascade"]["my-id"]:
+                    downstreamIdList.append(routerId)
+            if len(downstreamIdList) == 0:
+                break
+            print("Cascade Downstream:")
+            for downstreamId in downstreamIdList:
+                downstreamData = info["cascade"]["router-list"][downstreamId]
+                if "hostname" in downstreamData:
+                    downstreamName = "%s(%s)" % (downstreamData["hostname"], downstreamId)
+                else:
+                    downstreamName = downstreamId
+                print("    " + downstreamName)
+            print("")
+            break
 
         print("Clients:")
+        for routerId, routerData in info["cascade"]["router-list"].items():
+            if "client-list" in routerData:
+                if "hostname" in routerData:
+                    routerName = "%s(%s)" % (routerData["hostname"], routerId)
+                else:
+                    routerName = routerId
+                print("    " + routerName + ":")
+                for clientIp, clientData in routerData["client-list"]:
+                    if "nat-ip" in clientData:
+                        clientIp = clientData["nat-ip"]
+                    if "hostname" in clientData:
+                        clientName = "%s(%s)" % (clientData["hostname"], clientIp)
+                    else:
+                        clientName = clientIp
+                    print("        " + clientName)
         print("")
-
-        print("Upstream Hosts:")
-        print("?")
 
     def cmdGenerateClientScript(self, vpns_plugin_full_name, ostype):
         dbusObj = dbus.SystemBus().get_object('org.fpemud.WRT', '/org/fpemud/WRT')
@@ -82,3 +119,35 @@ class WrtSubCmdMain:
         linelist = msg.split("\n")
         linelist = ["    " + x for x in linelist]
         return "\n".join(linelist)
+
+
+class _AsciiTree:
+
+    def __init__(self, name):
+        assert len(name) > 0
+        self.name = name
+        self.children = []
+
+    def add_child(self, name):
+        assert len(name) > 0
+        return self.children.append(_AsciiTree(name))
+
+    def get_ascii(self):
+        nameLenList = []
+        i = 0
+        while True:
+            ret = self._get_namelen(i)
+            if ret == 0:
+                break
+            nameLenList.append(ret)
+            i += 1
+        return ""           # fixme
+
+    def _get_namelen(self, level):
+        if level == 0:
+            return len(self.name)
+        else:
+            ret = 0
+            for child in self.children:
+                ret = max(ret, child._get_namelen(level - 1))
+            return ret

@@ -76,6 +76,18 @@ class DbusMainObject(dbus.service.Object):
             ret["vpns-plugin"][plugin.full_name]["bridge"]["ip"] = WrtCommon.bridgeGetIp(plugin.get_bridge())
             ret["vpns-plugin"][plugin.full_name]["bridge"]["mask"] = plugin.get_bridge().get_prefix()[1]
 
+        ret["cascade"] = dict()
+        if True:
+            ret["cascade"]["my-id"] = self.param.uuid
+            ret["cascade"]["router-list"] = dict()
+            ret["cascade"]["router-list"].update(self.param.cascadeManager.routerInfo)
+            if self.param.cascadeManager.hasValidApiClient():
+                ret["cascade"]["router-list"][self.param.uuid]["parent"] = self.param.cascadeManager.apiClient.get_peer_uuid()
+                ret["cascade"]["router-list"].update(self.param.cascadeManager.apiClient.get_upstream_router_info())
+            for sproc in self.param.cascadeManager.getAllValidApiServerProcessors():
+                ret["cascade"]["router-list"].update(sproc.get_downstream_router_info())
+                ret["cascade"]["router-list"][sproc.get_peer_uuid()]["parent"] = self.param.uuid
+
         return json.dumps(ret)
 
     @dbus.service.method('org.fpemud.WRT', in_signature='ss', out_signature='ssas')

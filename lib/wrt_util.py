@@ -12,7 +12,6 @@ import ctypes
 import errno
 import subprocess
 import ipaddress
-import queue
 import urllib.request
 from gi.repository import Gio
 from gi.repository import GLib
@@ -319,35 +318,6 @@ class NewMountNamespace:
         self._setns(self.parentfd.fileno(), 0)
         self.parentfd.close()
         self.parentfd = None
-
-
-class IdleQueue:
-
-    def __init__(self):
-        self.queue = queue.Queue()
-        self.consumer = None
-
-    def add(self, idleCallback, *args):
-        self.queue.put((idleCallback, args))
-        if self.consumer is None:
-            self.consumer = GLib.idle_add(self._consumeFunc)
-
-    def clear(self):
-        if self.consumer is not None:
-            GLib.source_remove(self.consumer)
-            self.consumer = None
-        self.queue = queue.Queue()
-
-    def _consumeFunc(self):
-        # add() and clear() may be called in _consumeFunc()
-        if not self.queue.empty():
-            idleCallback, args = self.queue.get()
-            self.queue.task_done()
-            idleCallback(*args)
-        if not self.queue.empty():
-            return True
-        self.consumer = None
-        return False
 
 
 class JsonApiEndPoint:
