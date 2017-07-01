@@ -21,6 +21,12 @@ from wrt_common import WrtCommon
 #             "hostname": "abcd",
 #             "wakeup-mac": "01-02-03-04-05-06",
 #         },
+#         "2.3.4.5": {
+#             "through-vpn": true,
+#             "wakeup-mac": "01-02-03-04-05-06",
+#         },
+#         "3.4.5.6": {
+#         },
 #     },
 # }
 #
@@ -241,15 +247,30 @@ class _ApiServerProcessor(JsonApiEndPoint):
 
         if self.pObj.param.cascadeManager.hasValidApiClient():
             for router in self.pObj.param.cascadeManager.apiClient.routerInfo.values():
-                for ip, data2 in router["client-list"]:
-                    ip, data2 = _get_ip_data(ip, data2)
-                    data[ip] = data2
+                if True:
+                    routerIp = self.pObj.param.cascadeManager.apiClient.get_peer_ip()
+                    data[routerIp] = dict()
+                    data[routerIp]["through-vpn"] = True
+                    if "hostname" in router:
+                        data[routerIp]["hostname"] = router["hostname"]
+                if "client-list" in router:
+                    for ip, data2 in router["client-list"]:
+                        ip, data2 = _get_ip_data(ip, data2)
+                        assert ip not in data
+                        data[ip] = data2
 
         for sproc in self.pObj.param.cascadeManager.getAllValidApiServerProcessors():
             for router in sproc.routerInfo.values():
-                for ip, data2 in router["client-list"]:
-                    ip, data2 = _get_ip_data(ip, data2)
-                    data[ip] = data2
+                if True:
+                    data[sproc.get_peer_ip()] = dict()
+                    data[sproc.get_peer_ip()]["through-vpn"] = True
+                    if "hostname" in router:
+                        data[sproc.get_peer_ip()]["hostname"] = router["hostname"]
+                if "client-list" in router:
+                    for ip, data2 in router["client-list"]:
+                        ip, data2 = _get_ip_data(ip, data2)
+                        assert ip not in data
+                        data[ip] = data2
 
         return_callback(data)
 
@@ -262,4 +283,8 @@ def _get_ip_data(ip, data):
         ip = data["nat-ip"]
         data = data.copy()
         del data["nat-ip"]
+        data["through-vpn"] = True
+    elif "through-vpn" not in data or not isinstance(data["through-vpn"], bool) or not data["through-vpn"]:
+        data = data.copy()
+        data["through-vpn"] = True
     return (ip, data)

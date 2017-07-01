@@ -21,6 +21,7 @@ from wrt_common import WrtCommon
 #         "router-list": {
 #             "c5facfa6-d8c3-4bce-ac13-6abab49c86fc": {
 #                 "parent": "c6f7cdad-d2ce-3478-cabc-a3b5445bdfee",
+#                 "hostname": "abc",
 #                 "wan-prefix-list": ["192.168.0.0/255.255.255.0", "192.168.1.0/255.255.255.0"],
 #                 "lan-prefix-list": ["192.168.2.0/255.255.255.0", "192.168.3.0/255.255.255.0"],
 #                 "client-list": {
@@ -485,6 +486,7 @@ class _ApiClient(JsonApiEndPoint):
     def __init__(self, pObj, remote_ip):
         super().__init__()
         self.pObj = pObj
+        self.remoteIp = remote_ip
 
         sc = Gio.SocketClient.new()
         sc.set_family(Gio.SocketFamily.IPV4)
@@ -495,7 +497,10 @@ class _ApiClient(JsonApiEndPoint):
         self.routerInfo = None
         self.bConnected = False
         self.bRegistered = False
-        sc.connect_to_host_async(remote_ip, self.pObj.param.cascadeApiPort, None, self._on_connect)
+        sc.connect_to_host_async(self.remoteIp, self.pObj.param.cascadeApiPort, None, self._on_connect)
+
+    def get_peer_ip(self):
+        return self.remoteIp
 
     def _on_connect(self, source_object, res):
         try:
@@ -625,6 +630,9 @@ class _ApiServerProcessor(JsonApiEndPoint):
         self.routerInfo = dict()
         super().set_iostream_and_start(self.conn)
 
+    def get_peer_ip(self):
+        return self.conn.get_remote_address().get_address().to_string()
+
     def close(self):
         pass            # fixme
 
@@ -636,7 +644,7 @@ class _ApiServerProcessor(JsonApiEndPoint):
     def on_close(self):
         if self.bRegistered:
             WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_down", self.peerUuid)
-        logging.info("CASCADE-API client %s(UUID:%s) disconnected." % (self.conn.get_remote_address().get_address().to_string(), self.peerUuid))
+        logging.info("CASCADE-API client %s(UUID:%s) disconnected." % (self.get_peer_ip(), self.peerUuid))
 
     def on_command_register(self, data, return_callback, errror_callback):
         # receive data
@@ -663,7 +671,7 @@ class _ApiServerProcessor(JsonApiEndPoint):
 
         # registered
         self.bRegistered = True
-        logging.info("CASCADE-API client %s(UUID:%s) registered." % (self.conn.get_remote_address().get_address().to_string(), self.peerUuid))
+        logging.info("CASCADE-API client %s(UUID:%s) registered." % (self.get_peer_ip(), self.peerUuid))
 
     def on_notification_new_router(self, data):
         assert self.bRegistered
