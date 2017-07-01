@@ -43,7 +43,7 @@ class DbusMainObject(dbus.service.Object):
             ret["wconn-plugin"] = dict()
             ret["wconn-plugin"]["name"] = plugin.full_name
             if plugin.is_connected():
-                ret["wconn-plugin"]["is-connceted"] = True
+                ret["wconn-plugin"]["is-connected"] = True
                 ret["wconn-plugin"]["ip"] = plugin.get_ip()
                 ret["wconn-plugin"]["is-ip-public"] = WrtUtil.isIpPublic(plugin.get_ip())
             else:

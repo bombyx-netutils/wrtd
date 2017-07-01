@@ -2,6 +2,7 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
+import socket
 import signal
 import logging
 from gi.repository import Gio
@@ -250,6 +251,7 @@ class WrtCascadeManager:
         # router info
         self.routerInfo = dict()
         self.routerInfo[self.param.uuid] = dict()
+        self.routerInfo[self.param.uuid]["hostname"] = socket.gethostname()
         self.routerInfo[self.param.uuid]["wan-prefix-list"] = []
         self.routerInfo[self.param.uuid]["lan-prefix-list"] = []
         self.routerInfo[self.param.uuid]["client-list"] = dict()

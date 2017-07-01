@@ -20,7 +20,9 @@ class WrtSubCmdMain:
 
         print("Router Information:")
         if True:
-            print("    UUID: " + self.param.uuid)
+            print("    Hostname: " + info["cascade"]["router-list"][info["cascade"]["my-id"]].get("hostname", "None"))
+            print("    UUID:     " + info["cascade"]["my-id"])
+        print("")
 
         print("Internet Connection:")
         if "wconn-plugin" not in info:
