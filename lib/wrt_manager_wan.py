@@ -150,6 +150,8 @@ class WrtWanManager:
         # check downstream wan-prefix and restart if neccessary
         show_router_id = None
         for router_id, item in data.items():
+            if "wan-prefix-list" not in item:
+                continue        # used when called by on_cascade_downstream_new_router()
             if self.param.prefixPool.setExcludePrefixList("downstream-wan-%s" % (router_id), item["wan-prefix-list"]):
                 show_router_id = router_id
         if show_router_id is not None:

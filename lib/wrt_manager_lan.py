@@ -147,8 +147,8 @@ class WrtLanManager:
 
     def on_cascade_downstream_new_or_update_router_client(self, peer_uuid, data):
         for router_id, info in data.items():
-            if info.get("client-list", dict()) == dict():
-                continue
+            if "client-list" not in info:
+                continue            # used when called by on_cascade_downstream_new_router()
             for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
                 bridge.on_host_add_or_change("downstream-" + router_id, info["client-list"])
 
