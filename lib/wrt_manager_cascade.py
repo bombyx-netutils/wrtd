@@ -346,7 +346,7 @@ class WrtCascadeManager:
             data = dict()
             data[self.param.uuid] = dict()
             data[self.param.uuid]["client-list"] = ip_data_dict.copy()
-            for ip, data2 in data[self.param.uuid]["client-list"]:
+            for ip, data2 in data[self.param.uuid]["client-list"].items():
                 data2["nat-ip"] = self.param.trafficManager.sourceIpDict[source_id][ip][1]
             self.apiClient.send_notification("new-or-update-router-client", data)
 
