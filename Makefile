@@ -14,6 +14,7 @@ install:
 	cp -r lib/* "$(DESTDIR)/$(prefix)/lib/wrtd"
 	find "$(DESTDIR)/$(prefix)/lib/wrtd" -path "$(DESTDIR)/$(prefix)/lib/wrtd/plugins" -prune -o -type f | xargs chmod 644
 	find "$(DESTDIR)/$(prefix)/lib/wrtd" -path "$(DESTDIR)/$(prefix)/lib/wrtd/plugins" -prune -o -type d | xargs chmod 755
+	chmod 755 "$(DESTDIR)/$(prefix)/lib/wrtd/dhcp-script.py"
 
 	install -d -m 0755 "$(DESTDIR)/etc/wrtd"
 
