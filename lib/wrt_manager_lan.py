@@ -166,15 +166,38 @@ class WrtLanManager:
 
     def _upstreamVpnHostRefresh(self):
         ipDataDict = dict()
-        for router in self.param.cascadeManager.apiClient.routerInfo.values():
-            if router.get("client-list", dict()) == dict():
-                continue
-            for ip, data in router["client-list"].items():
-                if "nat-ip" in data:
-                    ip = data["nat-ip"]
-                    data = data.copy()
-                    del data["nat-ip"]
-                ipDataDict[ip] = data
+
+        # add upstream routers into ipDataDict
+        upstreamRouterLocalIpList = []
+        if self.param.cascadeManager.hasValidApiClient():
+            curUpstreamId = self.param.cascadeManager.apiClient.get_peer_uuid()
+            curUpstreamIp = self.param.cascadeManager.apiClient.get_peer_ip()
+            curUpstreamLocalIp = self.param.wanManager.vpnPlugin.get_local_ip()
+            while True:
+                data = self.param.cascadeManager.apiClient.get_upstream_router_info()[curUpstreamId]
+
+                ipDataDict[curUpstreamIp] = dict()
+                if "hostname" in data:
+                    ipDataDict[curUpstreamIp]["hostname"] = data["hostname"]
+                upstreamRouterLocalIpList.append(curUpstreamLocalIp)
+
+                if "parent" not in data:
+                    break
+                curUpstreamId = data["parent"]
+                curUpstreamIp = data["cascade-vpn"]["remote-ip"]
+                curUpstreamLocalIp = data["cascade-vpn"]["local-ip"]
+
+        # add all clients into ipDataDict
+        for router in self.param.cascadeManager.apiClient.get_upstream_router_info().values():
+            if "client-list" in router:
+                for ip, data in router["client-list"].items():
+                    if ip in upstreamRouterLocalIpList:
+                        continue
+                    if "nat-ip" in data:
+                        ip = data["nat-ip"]
+                        data = data.copy()
+                        del data["nat-ip"]
+                    ipDataDict[ip] = data
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             bridge.on_host_refresh("upstream-vpn", ipDataDict)
 

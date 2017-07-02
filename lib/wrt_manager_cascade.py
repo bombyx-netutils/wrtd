@@ -44,6 +44,10 @@ from wrt_common import WrtCommon
 #         "router-list": {
 #             "c5facfa6-d8c3-4bce-ac13-6abab49c86fc": {
 #                 "parent": "c6f7cdad-d2ce-3478-cabc-a3b5445bdfee",
+#                 "cascade-vpn": {
+#                     "loca1-ip": "1.2.3.4",
+#                     "remote-ip": "2.3.4.5",
+#                 },
 #                 "wan-prefix-list": ["192.168.0.0/255.255.255.0", "192.168.1.0/255.255.255.0"],
 #                 "lan-prefix-list": ["192.168.2.0/255.255.255.0", "192.168.3.0/255.255.255.0"],
 #                 "client-list": {
@@ -182,6 +186,22 @@ from wrt_common import WrtCommon
 # }
 #
 ################################################################################
+# server2client: notification: router-cascade-vpn-change
+################################################################################
+#
+# {
+#     "notification": "router-cascade-vpn-change",
+#     "data": {
+#         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
+#             "cascade-vpn": {
+#                 "loca1-ip": "1.2.3.4",
+#                 "remote-ip": "2.3.4.5",
+#             },
+#         },
+#     },
+# }
+#
+################################################################################
 # server2client: notification: router-wan-prefix-list-change
 ################################################################################
 #
@@ -252,7 +272,10 @@ class WrtCascadeManager:
         self.routerInfo = dict()
         self.routerInfo[self.param.uuid] = dict()
         self.routerInfo[self.param.uuid]["hostname"] = socket.gethostname()
-        self.routerInfo[self.param.uuid]["wan-prefix-list"] = []
+        if self.param.wanManager.vpnPlugin is not None:
+            self.routerInfo[self.param.uuid]["cascade-vpn"] = dict()
+        if self.param.wanManager.wanConnPlugin is not None:
+            self.routerInfo[self.param.uuid]["wan-prefix-list"] = []
         self.routerInfo[self.param.uuid]["lan-prefix-list"] = []
         self.routerInfo[self.param.uuid]["client-list"] = dict()
 
@@ -283,13 +306,34 @@ class WrtCascadeManager:
         self._wanPrefixListChange([])
 
     def on_wvpn_up(self):
+        # process by myself
+        self.routerInfo["cascade-vpn"] = dict()
+        self.routerInfo["cascade-vpn"]["local-ip"] = self.param.wanManager.vpnPlugin.get_local_ip()
+        self.routerInfo["cascade-vpn"]["remote-ip"] = self.param.wanManager.vpnPlugin.get_remote_ip()
         assert self.apiClient is None
         self.apiClient = _ApiClient(self, self.param.wanManager.vpnPlugin.get_remote_ip())
 
+        # notify downstream
+        data = dict()
+        data[self.param.uuid] = dict()
+        data[self.param.uuid]["cascade-vpn"] = self.routerInfo["cascade-vpn"]
+        for sproc in self.getAllValidApiServerProcessors():
+            sproc.send_notification("router-cascade-vpn-change", data)
+
     def on_wvpn_down(self):
+        # process by myself
         if self.apiClient is not None:
             self.apiClient.close()
             self.apiClient = None
+        if "cascade-vpn" in self.routerInfo:
+            self.routerInfo["cascade-vpn"] = dict()
+
+        # notify downstream
+        data = dict()
+        data[self.param.uuid] = dict()
+        data[self.param.uuid]["cascade-vpn"] = self.routerInfo["cascade-vpn"]
+        for sproc in self.getAllValidApiServerProcessors():
+            sproc.send_notification("router-cascade-vpn-change", data)
 
     def on_client_add_or_change(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
@@ -565,6 +609,12 @@ class _ApiClient(JsonApiEndPoint):
         for router_id in data:
             del self.routerInfo[router_id]
         WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_router_remove", data)
+
+    def on_notification_router_cascade_vpn_change(self, data):
+        assert self.bRegistered
+        for router_id, item in data.items():
+            self.routerInfo[router_id]["cascade-vpn"] = item["cascade-vpn"]
+        WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_router_cascade_vpn_change", data)
 
     def on_notification_router_wan_prefix_list_change(self, data):
         assert self.bRegistered
