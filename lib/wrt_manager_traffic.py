@@ -60,7 +60,7 @@ class WrtTrafficManager:
         if source_id not in self.sourceIpDict:
             self.sourceIpDict[source_id] = dict()
 
-        for ip, data in ip_data_dict:
+        for ip, data in ip_data_dict.items():
             if ip in self.sourceIpDict[source_id]:
                 if self.freeIpSet is not None:
                     self._natDestroy(source_id, ip)

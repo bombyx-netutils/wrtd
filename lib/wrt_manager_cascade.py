@@ -313,7 +313,7 @@ class WrtCascadeManager:
         for sproc in self.getAllValidApiServerProcessors():
             sproc.send_notification("router-client-add-or-change", data)
 
-    def on_client_remove(self, ip_list):
+    def on_client_remove(self, source_id, ip_list):
         assert len(ip_list) > 0
 
         # process by myself
@@ -651,7 +651,7 @@ class _ApiServerProcessor(JsonApiEndPoint):
         pass            # fixme
 
     def on_error(self, e):
-        logging.info("debugXXXXXXXXXXXX", e)            # fixme
+        logging.error("debugXXXXXXXXXXXX", exc_info=True)            # fixme
         self.serverObj.sprocList.remove(self)
         self.serverObj.freeSubhostIpRangeList.append(self.subhostIpRange)
 

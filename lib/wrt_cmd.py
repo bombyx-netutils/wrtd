@@ -79,14 +79,17 @@ class WrtSubCmdMain:
                 else:
                     routerName = routerId
                 print("    " + routerName + ":")
-                for clientIp, clientData in routerData["client-list"]:
-                    if "nat-ip" in clientData:
-                        clientIp = clientData["nat-ip"]
-                    if "hostname" in clientData:
-                        clientName = "%s(%s)" % (clientData["hostname"], clientIp)
-                    else:
-                        clientName = clientIp
-                    print("        " + clientName)
+                if len(routerData["client-list"]) == 0:
+                    print("        No client.")
+                else:
+                    for clientIp, clientData in routerData["client-list"].items():
+                        if "nat-ip" in clientData:
+                            clientIp = clientData["nat-ip"]
+                        if "hostname" in clientData:
+                            clientName = "%s(%s)" % (clientData["hostname"], clientIp)
+                        else:
+                            clientName = clientIp
+                        print("        " + clientName)
         print("")
 
     def cmdGenerateClientScript(self, vpns_plugin_full_name, ostype):
