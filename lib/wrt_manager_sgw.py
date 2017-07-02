@@ -128,9 +128,9 @@ class WrtSgwManager:
         notifyData = dict()
 
         for router_id in data.keys():
-            if data[router_id].get("client-list", dict()) == dict():
-                continue
-            for ip, data2 in data[router_id]["client-list"]:
+            if "client-list" not in data[router_id]:
+                continue            # used when called by on_cascade_upstream_router_add()
+            for ip, data2 in data[router_id]["client-list"].items():
                 ip, data2 = _get_ip_data(ip, data2)
                 self.upstreamClientDict[router_id][ip] = data2
                 notifyData[ip] = data2
@@ -178,8 +178,8 @@ class WrtSgwManager:
         notifyData = dict()
 
         for router_id in data.keys():
-            if data[router_id].get("client-list", dict()) == dict():
-                continue
+            if "client-list" not in data[router_id]:
+                continue            # used when called by on_cascade_downstream_new_router()
             for ip, data2 in data[router_id]["client-list"]:
                 ip, data2 = _get_ip_data(ip, data2)
                 self.upstreamClientDict[peer_uuid][router_id][ip] = data2
