@@ -571,7 +571,7 @@ class _ApiClient(JsonApiEndPoint):
                     data["router-list"][sproc.peerUuid]["parent"] = self.pObj.param.uuid
             super().exec_command("register", data, self._on_register_return, self._on_register_error)
         except Exception as e:
-            logging.info("Failed to establish CASCADE-API connection, %s" % (e))
+            logging.error("Failed to establish CASCADE-API connection", exc_info=True)   # fixme
             WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_fail", e)
             self.close()
 
@@ -587,10 +587,10 @@ class _ApiClient(JsonApiEndPoint):
 
     def on_error(self, excp):
         if not self.bRegistered:
-            logging.info("Failed to establish CASCADE-API connection, %s" % (excp))
+            logging.error("Failed to establish CASCADE-API connection.", exc_info=True)      # fixme
             WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_fail", excp)
         else:
-            logging.info("CASCADE-API connection disconnected with error, %s" % (excp))
+            logging.error("CASCADE-API connection disconnected with error.", exc_info=True)  # fixme
             WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_error", excp)
 
     def on_close(self):
