@@ -342,7 +342,7 @@ class WrtCascadeManager:
         self.routerInfo[self.param.uuid]["client-list"].update(ip_data_dict)
 
         # notify upstream
-        if self.apiClient is not None and self.apiClient.bConnected:
+        if self._apiClientCanNotify():
             data = dict()
             data[self.param.uuid] = dict()
             data[self.param.uuid]["client-list"] = ip_data_dict.copy()
@@ -366,7 +366,7 @@ class WrtCascadeManager:
                 del self.routerInfo[self.param.uuid]["client-list"][ip]
 
         # notify upstream
-        if self.apiClient is not None and self.apiClient.bConnected:
+        if self._apiClientCanNotify():
             data = dict()
             data[self.param.uuid] = dict()
             data[self.param.uuid]["client-list"] = ip_list
@@ -500,7 +500,7 @@ class WrtCascadeManager:
         self.routerInfo[self.param.uuid]["wan-prefix-list"] = prefixList
 
         # notify upstream
-        if self.apiClient is not None and self.apiClient.bConnected:
+        if self._apiClientCanNotify():
             data = dict()
             data[self.param.uuid] = prefixList
             self.apiClient.send_notification("update-router-wan-prefix-list", data)
@@ -521,6 +521,9 @@ class WrtCascadeManager:
                 if sproc.bRegistered:
                     ret.append(sproc)
         return ret
+
+    def _apiClientCanNotify(self):
+        return self.apiClient is not None and self.apiClient.bConnected
 
 
 class _ApiClient(JsonApiEndPoint):
@@ -558,7 +561,6 @@ class _ApiClient(JsonApiEndPoint):
         try:
             conn = source_object.connect_to_host_finish(res)
             super().set_iostream_and_start(conn)
-            self.bConnected = True
 
             # send register command
             data = dict()
@@ -570,6 +572,8 @@ class _ApiClient(JsonApiEndPoint):
                     data["router-list"].update(sproc.routerInfo)
                     data["router-list"][sproc.peerUuid]["parent"] = self.pObj.param.uuid
             super().exec_command("register", data, self._on_register_return, self._on_register_error)
+
+            self.bConnected = True
         except Exception as e:
             logging.error("Failed to establish CASCADE-API connection", exc_info=True)   # fixme
             WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_fail", e)

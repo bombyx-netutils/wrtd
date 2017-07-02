@@ -364,8 +364,6 @@ class JsonApiEndPoint:
         self.iostream = None
 
     def send_notification(self, notification, data):
-        assert self.command_sent is None
-
         jsonObj = dict()
         jsonObj["notification"] = notification
         if data is not None:
