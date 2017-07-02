@@ -307,16 +307,16 @@ class WrtCascadeManager:
 
     def on_wvpn_up(self):
         # process by myself
-        self.routerInfo["cascade-vpn"] = dict()
-        self.routerInfo["cascade-vpn"]["local-ip"] = self.param.wanManager.vpnPlugin.get_local_ip()
-        self.routerInfo["cascade-vpn"]["remote-ip"] = self.param.wanManager.vpnPlugin.get_remote_ip()
+        self.routerInfo[self.param.uuid]["cascade-vpn"] = dict()
+        self.routerInfo[self.param.uuid]["cascade-vpn"]["local-ip"] = self.param.wanManager.vpnPlugin.get_local_ip()
+        self.routerInfo[self.param.uuid]["cascade-vpn"]["remote-ip"] = self.param.wanManager.vpnPlugin.get_remote_ip()
         assert self.apiClient is None
         self.apiClient = _ApiClient(self, self.param.wanManager.vpnPlugin.get_remote_ip())
 
         # notify downstream
         data = dict()
         data[self.param.uuid] = dict()
-        data[self.param.uuid]["cascade-vpn"] = self.routerInfo["cascade-vpn"]
+        data[self.param.uuid]["cascade-vpn"] = self.routerInfo[self.param.uuid]["cascade-vpn"]
         for sproc in self.getAllValidApiServerProcessors():
             sproc.send_notification("router-cascade-vpn-change", data)
 
@@ -325,13 +325,13 @@ class WrtCascadeManager:
         if self.apiClient is not None:
             self.apiClient.close()
             self.apiClient = None
-        if "cascade-vpn" in self.routerInfo:
-            self.routerInfo["cascade-vpn"] = dict()
+        if "cascade-vpn" in self.routerInfo[self.param.uuid]:
+            self.routerInfo[self.param.uuid]["cascade-vpn"] = dict()
 
         # notify downstream
         data = dict()
         data[self.param.uuid] = dict()
-        data[self.param.uuid]["cascade-vpn"] = self.routerInfo["cascade-vpn"]
+        data[self.param.uuid]["cascade-vpn"] = self.routerInfo[self.param.uuid]["cascade-vpn"]
         for sproc in self.getAllValidApiServerProcessors():
             sproc.send_notification("router-cascade-vpn-change", data)
 
