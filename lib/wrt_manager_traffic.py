@@ -96,9 +96,9 @@ class WrtTrafficManager:
         if ip1 > ip2:
             raise Exception("invalid subhost IP range, %s~%s" % (data["subhost-start"], data["subhost-end"]))
         while ip1 != ip2:
-            self.freeIpSet.add(ip1)
+            self.freeIpSet.add(str(ip1))
             ip1 = ip1 + 1
-        self.freeIpSet.add(ip1)
+        self.freeIpSet.add(str(ip1))
 
         # fill self.sourceIpDict
         for source_id, ipDict in self.sourceIpDict.items():
