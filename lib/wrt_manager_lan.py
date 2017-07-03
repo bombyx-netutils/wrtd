@@ -136,25 +136,20 @@ class WrtLanManager:
             self.downstreamDict[peer_uuid].append(router_id)
             for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
                 bridge.on_source_add("downstream-" + router_id)
-        self.on_cascade_downstream_new_or_update_router_client(peer_uuid, data)
+            self._downstreamVpnHostRefreshForRouter(peer_uuid, router_id)
 
     def on_cascade_downstream_delete_router(self, peer_uuid, data):
         for router_id in data:
             for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
                 bridge.on_source_remove("downstream-" + router_id)
-            self.downstreamDict[peer_uuid].remove(router_id)
 
     def on_cascade_downstream_new_or_update_router_client(self, peer_uuid, data):
-        for router_id, info in data.items():
-            if "client-list" not in info:
-                continue            # used when called by on_cascade_downstream_new_router()
-            for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-                bridge.on_host_add_or_change("downstream-" + router_id, info["client-list"])
+        for router_id in data.keys():
+            self._downstreamVpnHostRefreshForRouter(peer_uuid, router_id)
 
     def on_cascade_downstream_delete_router_client(self, peer_uuid, data):
-        for router_id, info in data.items():
-            for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-                bridge.on_host_remove("downstream-" + router_id, info["client-list"])
+        for router_id in data.keys():
+            self._downstreamVpnHostRefreshForRouter(peer_uuid, router_id)
 
     def _apiFirewallAllowFunc(self, owner, rule):
         class _Stub:
@@ -197,8 +192,35 @@ class WrtLanManager:
                         data = data.copy()
                         del data["nat-ip"]
                     ipDataDict[ip] = data
+
+        # refresh to all bridges
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             bridge.on_host_refresh("upstream-vpn", ipDataDict)
+
+    def _downstreamVpnHostRefreshForRouter(self, peer_uuid, router_id):
+        # get router data
+        routerData = None
+        for sproc in self.param.cascadeManager.getAllValidApiServerProcessors():
+            if sproc.get_peer_uuid() == peer_uuid:
+                for id2, data2 in sproc.get_downstream_router_info().items():
+                    if id2 == router_id:
+                        routerData = data2
+                        break
+                if routerData is not None:
+                    break
+
+        # add all clients into ipDataDict
+        ipDataDict = dict()
+        for ip, data in routerData["client-list"].items():
+            if "nat-ip" in data:
+                ip = data["nat-ip"]
+                data = data.copy()
+                del data["nat-ip"]
+            ipDataDict[ip] = data
+
+        # refresh to all bridges
+        for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
+            bridge.on_host_refresh("downstream-" + router_id, ipDataDict)
 
     def _getInstanceAndInfoFromEtcDir(self, pluginPrefix, cfgfilePrefix, name):
         # Returns (instanceName, cfgobj, tmpdir, vardir)
