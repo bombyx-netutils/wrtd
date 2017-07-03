@@ -2,6 +2,7 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
+import copy
 import socket
 import signal
 import logging
@@ -345,7 +346,7 @@ class WrtCascadeManager:
         if self._apiClientCanNotify():
             data = dict()
             data[self.param.uuid] = dict()
-            data[self.param.uuid]["client-list"] = ip_data_dict.copy()
+            data[self.param.uuid]["client-list"] = copy.deepcopy(ip_data_dict)
             for ip, data2 in data[self.param.uuid]["client-list"].items():
                 data2["nat-ip"] = self.param.trafficManager.sourceIpDict[source_id][ip][1]
             self.apiClient.send_notification("new-or-update-router-client", data)
