@@ -149,7 +149,7 @@ class WrtTrafficManager:
         oriIp, natIp = self.sourceIpDict[source_id][ip]
         intf = self.param.wanManager.vpnPlugin.get_interface()
         with pyroute2.IPRoute() as ipp:
-            idx = ip.link_lookup(ifname=intf)[0]
+            idx = ipp.link_lookup(ifname=intf)[0]
             ipp.addr("add", index=idx, address=natIp)
             WrtUtil.shell('/sbin/nft add rule wrtd natpre ip daddr %s iif %s dnat %s' % (natIp, intf, oriIp))
             WrtUtil.shell('/sbin/nft add rule wrtd natpost ip saddr %s oif %s snat %s' % (oriIp, intf, natIp))

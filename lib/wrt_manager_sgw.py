@@ -182,7 +182,7 @@ class WrtSgwManager:
                 continue            # used when called by on_cascade_downstream_new_router()
             for ip, data2 in data[router_id]["client-list"].items():
                 ip, data2 = _get_ip_data(ip, data2)
-                self.upstreamClientDict[peer_uuid][router_id][ip] = data2
+                self.downstreamClientDict[peer_uuid][router_id][ip] = data2
                 notifyData[ip] = data2
 
         if len(notifyData) > 0:
