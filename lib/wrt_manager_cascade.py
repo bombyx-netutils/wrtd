@@ -719,28 +719,28 @@ class _ApiServerProcessor(JsonApiEndPoint):
         # receive data
         self.peerUuid = data["my-id"]
         self.routerInfo = data["router-list"]
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_up", self.peerUuid, data)
 
         # send data
-        data = dict()
-        data["my-id"] = self.pObj.param.uuid
-        data["subhost-start"] = self.subhostIpRange[0]
-        data["subhost-end"] = self.subhostIpRange[1]
-        data["router-list"] = dict()
+        data2 = dict()
+        data2["my-id"] = self.pObj.param.uuid
+        data2["subhost-start"] = self.subhostIpRange[0]
+        data2["subhost-end"] = self.subhostIpRange[1]
+        data2["router-list"] = dict()
         if True:
-            data["router-list"].update(self.pObj.routerInfo)
+            data2["router-list"].update(self.pObj.routerInfo)
             if self.pObj.hasValidApiClient():
-                data["router-list"][self.pObj.param.uuid]["parent"] = self.pObj.apiClient.peerUuid
-                data["router-list"].update(self.pObj.apiClient.routerInfo)
+                data2["router-list"][self.pObj.param.uuid]["parent"] = self.pObj.apiClient.peerUuid
+                data2["router-list"].update(self.pObj.apiClient.routerInfo)
             for sproc in self.pObj.getAllValidApiServerProcessors():
                 if sproc != self:
-                    data["router-list"].update(sproc.routerInfo)
-                    data["router-list"][sproc.peerUuid]["parent"] = self.pObj.param.uuid
-        return_callback(data)
+                    data2["router-list"].update(sproc.routerInfo)
+                    data2["router-list"][sproc.peerUuid]["parent"] = self.pObj.param.uuid
+        return_callback(data2)
 
         # registered
         self.bRegistered = True
         logging.info("CASCADE-API client %s(UUID:%s) registered." % (self.get_peer_ip(), self.peerUuid))
+        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_up", self.peerUuid, data)
 
     def on_notification_new_router(self, data):
         assert self.bRegistered

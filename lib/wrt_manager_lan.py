@@ -159,6 +159,7 @@ class WrtLanManager:
         self.param.trafficManager.set_data(owner, data)
 
     def _upstreamVpnHostRefresh(self):
+        # we need to differentiate upstream router and other client, so we do refresh instead of add/change/remove
         ipDataDict = dict()
 
         # add upstream routers into ipDataDict
@@ -198,6 +199,9 @@ class WrtLanManager:
             bridge.on_host_refresh("upstream-vpn", ipDataDict)
 
     def _downstreamVpnHostRefreshForRouter(self, peer_uuid, router_id):
+        # we don't want to record "nat-ip" information, so we do refresh instead of add/change/remove
+        ipDataDict = dict()
+
         # get router data
         routerData = None
         for sproc in self.param.cascadeManager.getAllValidApiServerProcessors():
@@ -208,9 +212,9 @@ class WrtLanManager:
                         break
                 if routerData is not None:
                     break
+        assert routerData is not None
 
         # add all clients into ipDataDict
-        ipDataDict = dict()
         for ip, data in routerData["client-list"].items():
             if "nat-ip" in data:
                 ip = data["nat-ip"]
