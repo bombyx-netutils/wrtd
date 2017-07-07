@@ -10,7 +10,6 @@ import subprocess
 import logging
 import ipaddress
 import pyroute2
-from collections import OrderedDict
 from gi.repository import GLib
 from wrt_util import WrtUtil
 from wrt_common import WrtCommon
@@ -370,12 +369,8 @@ class _DefaultBridge:
 
     def on_host_add_or_change(self, source_id, ip_data_dict):
         fn = os.path.join(self.hostsDir, source_id)
+        itemDict = WrtUtil.dnsmasqHostFileToOrderedDict(fn)
         bChanged = False
-
-        itemDict = OrderedDict()
-        with open(fn, "r") as f:
-            for line in f.read().rstrip("\n").split("\n"):
-                itemDict[line.split(" ")[0]] = line.split(" ")[1]
 
         for ip, data in ip_data_dict.items():
             if ip in itemDict:
@@ -392,39 +387,26 @@ class _DefaultBridge:
                     bChanged = True
 
         if bChanged:
-            with open(fn, "w") as f:
-                for ip, hostname in itemDict.items():
-                    f.write(ip + " " + hostname + "\n")
+            WrtUtil.dictToDnsmasqHostFile(itemDict, fn)
             self.dnsmasqProc.send_signal(signal.SIGHUP)
 
     def on_host_remove(self, source_id, ip_list):
         fn = os.path.join(self.hostsDir, source_id)
+        itemDict = WrtUtil.dnsmasqHostFileToOrderedDict(fn)
         bChanged = False
 
-        lineList = []
-        with open(fn, "r") as f:
-            lineList = f.read().rstrip("\n").split("\n")
-
-        lineList2 = []
-        for line in lineList:
-            if line.split(" ")[0] not in ip_list:
-                lineList2.append(line)
-            else:
+        for ip in ip_list:
+            if ip in itemDict:
+                del itemDict[ip]
                 bChanged = True
 
         if bChanged:
-            with open(fn, "w") as f:
-                for line in lineList2:
-                    f.write(line + "\n")
+            WrtUtil.dictToDnsmasqHostFile(itemDict, fn)
             self.dnsmasqProc.send_signal(signal.SIGHUP)
 
     def on_host_refresh(self, source_id, ip_data_dict):
         fn = os.path.join(self.hostsDir, source_id)
-
-        itemDict = dict()
-        with open(fn, "r") as f:
-            for line in f.read().rstrip("\n").split("\n"):
-                itemDict[line.split(" ")[0]] = line.split(" ")[1]
+        itemDict = WrtUtil.dnsmasqHostFileToDict(fn)
 
         itemDict2 = dict()
         for ip, data in ip_data_dict.items():
@@ -432,9 +414,7 @@ class _DefaultBridge:
                 itemDict[ip] = data["hostname"]
 
         if itemDict != itemDict2:
-            with open(fn, "w") as f:
-                for ip, hostname in itemDict2:
-                    f.write(ip + " " + data["hostname"] + "\n")
+            WrtUtil.dictToDnsmasqHostFile(itemDict2, fn)
             self.dnsmasqProc.send_signal(signal.SIGHUP)
 
     def _runCmdServer(self):

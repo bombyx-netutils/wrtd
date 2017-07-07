@@ -13,6 +13,7 @@ import errno
 import subprocess
 import ipaddress
 import urllib.request
+from collections import OrderedDict
 from gi.repository import Gio
 from gi.repository import GLib
 
@@ -83,6 +84,34 @@ class WrtUtil:
         with open(filename, "w") as f:
             for item in itemList:
                 f.write(item[0] + " " + item[1] + "\n")
+
+    @staticmethod
+    def dnsmasqHostFileToDict(filename):
+        ret = dict()
+        with open(filename, "r") as f:
+            for line in f.read().split("\n"):
+                if line.startswith("#") or line.strip() == "":
+                    continue
+                t = line.split(" ")
+                ret[t[0]] = t[1]
+        return ret
+
+    @staticmethod
+    def dnsmasqHostFileToOrderedDict(filename):
+        ret = OrderedDict()
+        with open(filename, "r") as f:
+            for line in f.read().split("\n"):
+                if line.startswith("#") or line.strip() == "":
+                    continue
+                t = line.split(" ")
+                ret[t[0]] = t[1]
+        return ret
+
+    @staticmethod
+    def dictToDnsmasqHostFile(filename, ipHostnameDict):
+        with open(filename, "w") as f:
+            for ip, hostname in ipHostnameDict:
+                f.write(ip + " " + hostname + "\n")
 
     @staticmethod
     def recvUntilEof(sock):
