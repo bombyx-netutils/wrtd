@@ -51,9 +51,6 @@ class WrtTrafficManager:
         # WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ip protocol icmp accept' % (intf))
         # WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s drop' % (intf))
 
-    def on_wconn_down(self):
-        pass
-
     def on_client_add_or_change(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
 
