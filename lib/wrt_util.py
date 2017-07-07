@@ -108,7 +108,7 @@ class WrtUtil:
         return ret
 
     @staticmethod
-    def dictToDnsmasqHostFile(filename, ipHostnameDict):
+    def dictToDnsmasqHostFile(ipHostnameDict, filename):
         with open(filename, "w") as f:
             for ip, hostname in ipHostnameDict:
                 f.write(ip + " " + hostname + "\n")
