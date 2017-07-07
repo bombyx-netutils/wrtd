@@ -63,99 +63,7 @@ from wrt_common import WrtCommon
 # }
 #
 ################################################################################
-# client2server: notification: new-router
-################################################################################
-#
-# {
-#     "notification": "new-router",
-#     "data": {
-#         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc": {
-#             "parent": "c6f7cdad-d2ce-3478-cabc-a3b5445bdfee",
-#             "wan-prefix-list": ["192.168.0.0/255.255.255.0", "192.168.1.0/255.255.255.0"],
-#             "lan-prefix-list": ["192.168.2.0/255.255.255.0", "192.168.3.0/255.255.255.0"],
-#             "client-list": {
-#                 "1.2.3.4": {
-#                     "hostname": "abcd",
-#                     "wakeup-mac": "01-02-03-04-05-06",
-#                 },
-#             },
-#         },
-#     },
-# }
-#
-################################################################################
-# client2server: notification: delete-router
-################################################################################
-#
-# {
-#     "notification": "delete-router",
-#     "data": [
-#         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc",
-#     ],
-# }
-#
-################################################################################
-# client2server: notification: update-router-wan-prefix-list
-################################################################################
-#
-# {
-#     "notification": "update-router-wan-prefix-list",
-#     "data": {
-#         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
-#             "wan-prefix-list": ["192.168.0.0/255.255.255.0", "192.168.1.0/255.255.255.0"],
-#         }
-#     },
-# }
-#
-################################################################################
-# client2server: notification: update-router-lan-prefix-list
-################################################################################
-#
-# {
-#     "notification": "update-router-lan-prefix-list",
-#     "data": {
-#         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
-#             "lan-prefix-list": ["192.168.0.0/255.255.255.0", "192.168.1.0/255.255.255.0"],
-#         }
-#     },
-# }
-#
-################################################################################
-# client2server: notification: new-or-update-router-client
-################################################################################
-#
-# {
-#     "notification": "new-or-update-router-client",
-#     "data": {
-#         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
-#             "client-list": {
-#                 "1.2.3.4": {
-#                     "nat-ip": "2.3.4.5",
-#                     "hostname": "abcd",
-#                     "wakeup-mac": "01-02-03-04-05-06",
-#                 },
-#             },
-#         ],
-#     },
-# }
-#
-################################################################################
-# client2server: notification: delete-router-client
-################################################################################
-#
-# {
-#     "notification": "delete-router-client",
-#     "data": {
-#         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
-#             "client-list": [
-#                 "1.2.3.4",
-#             ],
-#         },
-#     },
-# }
-#
-################################################################################
-# server2client: notification: router-add
+# client2server: notification: router-add
 ################################################################################
 #
 # {
@@ -176,7 +84,7 @@ from wrt_common import WrtCommon
 # }
 #
 ################################################################################
-# server2client: notification: router-remove
+# client2server: notification: router-remove
 ################################################################################
 #
 # {
@@ -185,6 +93,80 @@ from wrt_common import WrtCommon
 #         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc",
 #     ],
 # }
+#
+################################################################################
+# client2server: notification: router-wan-prefix-list-changed
+################################################################################
+#
+# {
+#     "notification": "router-wan-prefix-list-changed",
+#     "data": {
+#         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
+#             "wan-prefix-list": ["192.168.0.0/255.255.255.0", "192.168.1.0/255.255.255.0"],
+#         }
+#     },
+# }
+#
+################################################################################
+# client2server: notification: router-lan-prefix-list-changed
+################################################################################
+#
+# {
+#     "notification": "router-lan-prefix-list-changed",
+#     "data": {
+#         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
+#             "lan-prefix-list": ["192.168.0.0/255.255.255.0", "192.168.1.0/255.255.255.0"],
+#         }
+#     },
+# }
+#
+################################################################################
+# client2server: notification: router-client-add-or-change
+################################################################################
+#
+# {
+#     "notification": "router-client-add-or-change",
+#     "data": {
+#         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
+#             "client-list": {
+#                 "1.2.3.4": {
+#                     "nat-ip": "2.3.4.5",
+#                     "hostname": "abcd",
+#                     "wakeup-mac": "01-02-03-04-05-06",
+#                 },
+#             },
+#         ],
+#     },
+# }
+#
+################################################################################
+# client2server: notification: router-client-remove
+################################################################################
+#
+# {
+#     "notification": "router-client-remove",
+#     "data": {
+#         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
+#             "client-list": [
+#                 "1.2.3.4",
+#             ],
+#         },
+#     },
+# }
+#
+################################################################################
+# server2client: notification: router-add
+################################################################################
+#
+# same as client2server: notification: router-add
+#
+#
+################################################################################
+# server2client: notification: router-remove
+################################################################################
+#
+# same as client2server: notification: router-remove
+#
 #
 ################################################################################
 # server2client: notification: router-cascade-vpn-change
@@ -206,61 +188,29 @@ from wrt_common import WrtCommon
 # server2client: notification: router-wan-prefix-list-change
 ################################################################################
 #
-# {
-#     "notification": "router-wan-prefix-list-change",
-#     "data": {
-#         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
-#             "wan-prefix-list": ["192.168.0.0/255.255.255.0", "192.168.1.0/255.255.255.0"],
-#         }
-#     },
-# }
+# same as client2server: notification: router-wan-prefix-list-change
+#
 #
 ################################################################################
 # server2client: notification: router-lan-prefix-list-change
 ################################################################################
 #
-# {
-#     "notification": "router-lan-prefix-list-change",
-#     "data": {
-#         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
-#             "lan-prefix-list": ["192.168.0.0/255.255.255.0", "192.168.1.0/255.255.255.0"],
-#         }
-#     },
-# }
+# same as client2server: notification: router-lan-prefix-list-change
+#
 #
 ################################################################################
 # server2client: notification: router-client-add-or-change
 ################################################################################
 #
-# {
-#     "notification": "router-client-add-or-change",
-#     "data": {
-#         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
-#             "client-list": {
-#                 "1.2.3.4": {
-#                     "nat-ip": "2.3.4.5",
-#                     "hostname": "abcd",
-#                     "wakeup-mac": "01-02-03-04-05-06",
-#                 },
-#             },
-#         ],
-#     },
-# }
+# same as client2server: notification: router-client-add-or-change
+#
 #
 ################################################################################
 # server2client: notification: router-client-remove
 ################################################################################
 #
-# {
-#     "notification": "router-client-remove",
-#     "data": {
-#         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
-#             "client-list": [
-#                 "1.2.3.4",
-#             ],
-#         },
-#     },
-# }
+# same as client2server: notification: router-client-remove
+#
 #
 
 
@@ -349,7 +299,7 @@ class WrtCascadeManager:
             data[self.param.uuid]["client-list"] = copy.deepcopy(ip_data_dict)
             for ip, data2 in data[self.param.uuid]["client-list"].items():
                 data2["nat-ip"] = self.param.trafficManager.sourceIpDict[source_id][ip][1]
-            self.apiClient.send_notification("new-or-update-router-client", data)
+            self.apiClient.send_notification("router-client-add-or-change", data)
 
         # notify downstream
         data = dict()
@@ -371,7 +321,7 @@ class WrtCascadeManager:
             data = dict()
             data[self.param.uuid] = dict()
             data[self.param.uuid]["client-list"] = ip_list
-            self.apiClient.send_notification("delete-router-client", data)
+            self.apiClient.send_notification("router-client-remove", data)
 
         # notify downstream
         data = dict()
@@ -456,46 +406,46 @@ class WrtCascadeManager:
     def on_cascade_downstream_up(self, peer_uuid, data):
         self.downstreamDict[peer_uuid] = []
         if len(data["router-list"]) > 0:
-            self.on_cascade_downstream_new_router(peer_uuid, data["router-list"])
+            self.on_cascade_downstream_router_add(peer_uuid, data["router-list"])
 
     def on_cascade_downstream_down(self, peer_uuid):
-        self.on_cascade_downstream_delete_router(peer_uuid, self.downstreamDict[peer_uuid])
+        self.on_cascade_downstream_router_remove(peer_uuid, self.downstreamDict[peer_uuid])
         del self.downstreamDict[peer_uuid]
 
-    def on_cascade_downstream_new_router(self, peer_uuid, data):
+    def on_cascade_downstream_router_add(self, peer_uuid, data):
         self.downstreamDict[peer_uuid] += data
 
         # notify upstream
         if self.hasValidApiClient():
-            self.apiClient.send_notification("new-router", data)
+            self.apiClient.send_notification("router-add", data)
 
-    def on_cascade_downstream_delete_router(self, peer_uuid, data):
+    def on_cascade_downstream_router_remove(self, peer_uuid, data):
         for router_id in data:
             self.downstreamDict[peer_uuid].remove(router_id)
 
         # notify upstream
         if self.hasValidApiClient():
-            self.apiClient.send_notification("delete-router", data)
+            self.apiClient.send_notification("router-remove", data)
 
-    def on_cascade_downstream_update_router_wan_prefix_list(self, peer_uuid, data):
+    def on_cascade_downstream_router_wan_prefix_list_changed(self, peer_uuid, data):
         # notify upstream
         if self.hasValidApiClient():
-            self.apiClient.send_notification("update-router-wan-prefix-list", data)
+            self.apiClient.send_notification("router-wan-prefix-list-changed", data)
 
-    def on_cascade_downstream_update_router_lan_prefix_list(self, peer_uuid, data):
+    def on_cascade_downstream_router_lan_prefix_list_changed(self, peer_uuid, data):
         # notify upstream
         if self.hasValidApiClient():
-            self.apiClient.send_notification("update-router-lan-prefix-list", data)
+            self.apiClient.send_notification("router-lan-prefix-list-changed", data)
 
-    def on_cascade_downstream_new_or_update_router_client(self, peer_uuid, data):
+    def on_cascade_downstream_router_client_add_or_change(self, peer_uuid, data):
         # notify upstream
         if self.hasValidApiClient():
-            self.apiClient.send_notification("new-or-update-router-client", data)
+            self.apiClient.send_notification("router-client-add-or-change", data)
 
-    def on_cascade_downstream_delete_router_client(self, peer_uuid, data):
+    def on_cascade_downstream_router_client_remove(self, peer_uuid, data):
         # notify upstream
         if self.hasValidApiClient():
-            self.apiClient.send_notification("delete-router-client", data)
+            self.apiClient.send_notification("router-client-remove", data)
 
     def _wanPrefixListChange(self, prefixList):
         self.routerInfo[self.param.uuid]["wan-prefix-list"] = prefixList
@@ -504,7 +454,7 @@ class WrtCascadeManager:
         if self._apiClientCanNotify():
             data = dict()
             data[self.param.uuid] = prefixList
-            self.apiClient.send_notification("update-router-wan-prefix-list", data)
+            self.apiClient.send_notification("router-wan-prefix-list-changed", data)
 
         # notify downstream
         for sproc in self.getAllValidApiServerProcessors():
@@ -742,40 +692,40 @@ class _ApiServerProcessor(JsonApiEndPoint):
         logging.info("CASCADE-API client %s(UUID:%s) registered." % (self.get_peer_ip(), self.peerUuid))
         WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_up", self.peerUuid, data)
 
-    def on_notification_new_router(self, data):
+    def on_notification_router_add(self, data):
         assert self.bRegistered
         self.routerInfo.update(data)
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_new_router", self.peerUuid, data)
+        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_router_add", self.peerUuid, data)
 
-    def on_notification_delete_router(self, data):
+    def on_notification_router_remove(self, data):
         assert self.bRegistered
         for router_id in data:
             del self.routerInfo[router_id]
         WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_delete_router", self.peerUuid, data)
 
-    def on_notification_update_router_wan_prefix_list(self, data):
+    def on_notification_router_wan_prefix_list_changed(self, data):
         assert self.bRegistered
         for router_id, item in data.items():
             self.routerInfo[router_id]["wan-prefix-list"] = item["wan-prefix-list"]
-            WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_update_router_wan_prefix_list", self.peerUuid, data)
+            WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_router_wan_prefix_list_changed", self.peerUuid, data)
 
-    def on_notification_update_router_lan_prefix_list(self, data):
+    def on_notification_router_lan_prefix_list_changed(self, data):
         assert self.bRegistered
         for router_id, item in data.items():
             self.routerInfo[router_id]["lan-prefix-list"] = item["lan-prefix-list"]
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_update_router_lan_prefix_list", self.peerUuid, data)
+        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_router_lan_prefix_list_changed", self.peerUuid, data)
 
-    def on_notification_new_or_update_router_client(self, data):
+    def on_notification_router_client_add_or_change(self, data):
         assert self.bRegistered
         for router_id, item in data.items():
             self.routerInfo[router_id]["client-list"].update(item["client-list"])
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_new_or_update_router_client", self.peerUuid, data)
+        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_router_client_add_or_change", self.peerUuid, data)
 
-    def on_notification_delete_router_client(self, data):
+    def on_notification_router_client_remove(self, data):
         assert self.bRegistered
         for router_id, item in data.items():
             o = self.routerInfo[router_id]["client-list"]
             for ip in item["client-list"]:
                 if ip in o:
                     del o[ip]
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_delete_router_client", self.peerUuid, data)
+        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_router_client_remove", self.peerUuid, data)

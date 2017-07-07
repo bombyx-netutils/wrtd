@@ -131,27 +131,27 @@ class WrtWanManager:
 
     def on_cascade_downstream_up(self, peer_uuid, data):
         self.downstreamDict[peer_uuid] = []
-        self.on_cascade_downstream_new_router(peer_uuid, data["router-list"])
+        self.on_cascade_downstream_router_add(peer_uuid, data["router-list"])
 
     def on_cascade_downstream_down(self, peer_uuid):
-        self.on_cascade_downstream_delete_router(peer_uuid, self.downstreamDict[peer_uuid])
+        self.on_cascade_downstream_router_remove(peer_uuid, self.downstreamDict[peer_uuid])
         del self.downstreamDict[peer_uuid]
 
-    def on_cascade_downstream_new_router(self, peer_uuid, data):
+    def on_cascade_downstream_router_add(self, peer_uuid, data):
         self.downstreamDict[peer_uuid] += data.keys()
-        self.on_cascade_downstream_update_router_wan_prefix_list(peer_uuid, data)
+        self.on_cascade_downstream_router_wan_prefix_list_changed(peer_uuid, data)
 
-    def on_cascade_downstream_delete_router(self, peer_uuid, data):
+    def on_cascade_downstream_router_remove(self, peer_uuid, data):
         for router_id in data:
             self.param.prefixPool.removeExcludePrefixList("downstream-wan-%s" % (router_id))
             self.downstreamDict[peer_uuid].remove(router_id)
 
-    def on_cascade_downstream_update_router_wan_prefix_list(self, peer_uuid, data):
+    def on_cascade_downstream_router_wan_prefix_list_changed(self, peer_uuid, data):
         # check downstream wan-prefix and restart if neccessary
         show_router_id = None
         for router_id, item in data.items():
             if "wan-prefix-list" not in item:
-                continue        # used when called by on_cascade_downstream_new_router()
+                continue        # used when called by on_cascade_downstream_router_add()
             if self.param.prefixPool.setExcludePrefixList("downstream-wan-%s" % (router_id), item["wan-prefix-list"]):
                 show_router_id = router_id
         if show_router_id is not None:

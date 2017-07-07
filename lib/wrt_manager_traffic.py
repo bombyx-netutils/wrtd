@@ -112,17 +112,17 @@ class WrtTrafficManager:
 
     def on_cascade_downstream_up(self, peer_uuid, data):
         self.downstreamDict[peer_uuid] = dict()
-        self.on_cascade_downstream_new_router(peer_uuid, data["router-list"])
+        self.on_cascade_downstream_router_add(peer_uuid, data["router-list"])
 
     def on_cascade_downstream_down(self, peer_uuid):
         for router_id, ip_set in self.downstreamDict[peer_uuid].items():
             self.on_client_remove("downstream-%s" % (router_id), list(ip_set))
         del self.downstreamDict[peer_uuid]
 
-    def on_cascade_downstream_new_router(self, peer_uuid, data):
+    def on_cascade_downstream_router_add(self, peer_uuid, data):
         for router_id in data.keys():
             self.downstreamDict[peer_uuid][router_id] = set()
-        self.on_cascade_downstream_new_or_update_router_client(peer_uuid, data)
+        self.on_cascade_downstream_router_client_add_or_change(peer_uuid, data)
 
     def on_cascade_downstream_delete_router(self, peer_uuid, data):
         for router_id in data:
@@ -130,14 +130,14 @@ class WrtTrafficManager:
             self.on_client_remove("downstream-%s" % (router_id), list(ip_set))
         del self.downstreamDict[peer_uuid][router_id]
 
-    def on_cascade_downstream_new_or_update_router_client(self, peer_uuid, data):
+    def on_cascade_downstream_router_client_add_or_change(self, peer_uuid, data):
         for router_id, info in data.items():
             if info.get("client-list", dict()) == dict():
                 continue
             self.downstreamDict[peer_uuid][router_id] |= set(info["client-list"].keys())
             self.on_client_add_or_change("downstream-%s" % (router_id), info["client-list"])
 
-    def on_cascade_downstream_delete_router_client(self, peer_uuid, data):
+    def on_cascade_downstream_router_client_remove(self, peer_uuid, data):
         for router_id, info in data.items():
             self.on_client_remove("downstream-%s" % (router_id), info["client-list"])
             self.downstreamDict[peer_uuid][router_id] -= set(info["client-list"])

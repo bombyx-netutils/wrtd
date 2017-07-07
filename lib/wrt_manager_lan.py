@@ -124,30 +124,30 @@ class WrtLanManager:
 
     def on_cascade_downstream_up(self, peer_uuid, data):
         self.downstreamDict[peer_uuid] = []
-        self.on_cascade_downstream_new_router(peer_uuid, data["router-list"])
+        self.on_cascade_downstream_router_add(peer_uuid, data["router-list"])
 
     def on_cascade_downstream_down(self, peer_uuid):
         if len(self.downstreamDict[peer_uuid]) > 0:
-            self.on_cascade_downstream_delete_router(peer_uuid, self.downstreamDict[peer_uuid])
+            self.on_cascade_downstream_router_remove(peer_uuid, self.downstreamDict[peer_uuid])
         del self.downstreamDict[peer_uuid]
 
-    def on_cascade_downstream_new_router(self, peer_uuid, data):
+    def on_cascade_downstream_router_add(self, peer_uuid, data):
         for router_id in data.keys():
             self.downstreamDict[peer_uuid].append(router_id)
             for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
                 bridge.on_source_add("downstream-" + router_id)
             self._downstreamVpnHostRefreshForRouter(peer_uuid, router_id)
 
-    def on_cascade_downstream_delete_router(self, peer_uuid, data):
+    def on_cascade_downstream_router_remove(self, peer_uuid, data):
         for router_id in data:
             for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
                 bridge.on_source_remove("downstream-" + router_id)
 
-    def on_cascade_downstream_new_or_update_router_client(self, peer_uuid, data):
+    def on_cascade_downstream_router_client_add_or_change(self, peer_uuid, data):
         for router_id in data.keys():
             self._downstreamVpnHostRefreshForRouter(peer_uuid, router_id)
 
-    def on_cascade_downstream_delete_router_client(self, peer_uuid, data):
+    def on_cascade_downstream_router_client_remove(self, peer_uuid, data):
         for router_id in data.keys():
             self._downstreamVpnHostRefreshForRouter(peer_uuid, router_id)
 
