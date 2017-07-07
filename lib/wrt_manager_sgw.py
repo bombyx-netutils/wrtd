@@ -105,7 +105,8 @@ class WrtSgwManager:
         self.on_cascade_upstream_router_add(data["router-list"])
 
     def on_cascade_upstream_down(self):
-        self.on_cascade_upstream_router_remove(self.upstreamClientDict.keys())
+        router_id_list = list(self.upstreamClientDict.keys())
+        self.on_cascade_upstream_router_remove(router_id_list)
         self.upstreamClientDict = None
 
     def on_cascade_upstream_router_add(self, data):
