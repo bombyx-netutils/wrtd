@@ -454,6 +454,7 @@ class _DefaultBridge:
         cmd += " --pid-file=%s" % (self.pidFile)
         self.dnsmasqProc = subprocess.Popen(cmd, shell=True, universal_newlines=True)
 
+        # monitor dnsmasq lease file
         self.leaseMonitor = Gio.File.new_for_path(self.leasesFile).monitor(0, None)
         self.leaseMonitor.connect("changed", self._dnsmasqLeaseChanged)
         self.lastScanRecord = []
