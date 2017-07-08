@@ -7,6 +7,7 @@ import signal
 import logging
 import socket
 from wrt_util import WrtUtil
+from wrt_util import UrlOpenAsync
 from wrt_common import WrtCommon
 
 
@@ -25,7 +26,11 @@ class WrtWanManager:
         self.logger = logging.getLogger(self.__module__ + "." + self.__class__.__name__)
 
         self.wanConnPlugin = None
+        self.wanConnIpChecker = None
+        self.wanConnIpIsPublic = None
+
         self.vpnPlugin = None
+
         self.downstreamDict = dict()
 
         try:
@@ -102,13 +107,21 @@ class WrtWanManager:
             if socket.gethostbyname(self.param.dnsName) != self.wanConnPlugin.get_ip():
                 self.logger.warn("Invalid DNS name %s." % (self.param.dnsName))
 
+        # start checking if ip is public
+        self.wconnIpChecker = UrlOpenAsync("https://ipinfo.io/ip", self._wconnIpCheckComplete, self._wconnIpCheckError)
+        self.wconnIpChecker.start()
+
         # start vpn plugin
         if self.vpnPlugin is not None:
             self.vpnPlugin.start()
 
     def on_wconn_down(self):
+        self.wanConnIpIsPublic = None
         if self.vpnPlugin is not None:
             self.vpnPlugin.stop()
+        if self.wconnIpChecker is not None:
+            self.wconnIpChecker.cancel()
+            self.wconnIpChecker = None
         self.param.prefixPool.removeExcludePrefixList("wan")
 
     def on_wvpn_up(self):
@@ -158,9 +171,10 @@ class WrtWanManager:
             os.kill(os.getpid(), signal.SIGHUP)
             self.logger.error("Prefix duplicates with downstream router %s, autofix it and restart." % (show_router_id))
 
+    def _wconnIpCheckComplete(self, ip):
+        self.wanConnIpIsPublic = (ip == self.wanConnPlugin.get_ip())
+        self.wanConnIpChecker = None
 
-class _UpStreamInfo:
-
-    def __init__(self, jsonObj):
-        self.lanPrefixList = jsonObj["lan-prefix-list"]
-        self.wanPrefixList = jsonObj["wan-prefix-list"]
+    def _wconnIpCheckError(self, returncode, msg):
+        self.logger.error("Internet IP check failed, %s" % (msg))
+        self.wanConnIpChecker = None

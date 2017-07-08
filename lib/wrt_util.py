@@ -5,14 +5,15 @@ import os
 import re
 import sys
 import json
+import time
 import socket
 import shutil
 import logging
 import ctypes
 import errno
+import threading
 import subprocess
 import ipaddress
-import urllib.request
 from collections import OrderedDict
 from gi.repository import Gio
 from gi.repository import GLib
@@ -24,11 +25,6 @@ class WrtUtil:
     def callFunc(obj, funcName, *args):
         if hasattr(obj, funcName):
             getattr(obj, funcName)(*args)
-
-    @staticmethod
-    def isIpPublic(ip):
-        ip2 = urllib.request.urlopen("https://ipinfo.io/ip").read().decode("UTF-8").strip()
-        return ip == ip2
 
     @staticmethod
     def prefixListConflict(prefixList1, prefixList2):
@@ -478,3 +474,47 @@ class JsonApiEndPoint:
         jsonObj["error"] = data
         self.dos.put_string(json.dumps(jsonObj) + "\n")
         self.command_received = None
+
+
+class UrlOpenAsync(threading.Thread):
+
+    def __init__(self, url, ok_callback, error_callback):
+        super().__init__()
+
+        self.url = url
+        self.ok_callback = ok_callback
+        self.error_callback = error_callback
+        self.proc = None
+        self.idleId = None
+        self.bComplete = False
+
+    def start(self):
+        self.proc = subprocess.Popen(["/usr/bin/curl", self.url],
+                                     stdout=subprocess.PIPE,
+                                     stderr=subprocess.PIPE)
+        super().start()
+
+    def cancel(self):
+        assert self.proc is not None and not self.bComplete
+
+        while self.proc is None:
+            time.sleep(1.0)
+        if self.proc.poll() is None:
+            self.proc.terminate()
+            self.proc.wait()
+        self.join()
+        GLib.source_remove(self.idleId)
+
+    def run(self):
+        out, err = self.proc.communicate()
+        out = out.decode("utf-8")
+        err = err.decode("utf-8")
+        if self.proc.returncode == 0:
+            self.idleId = GLib.idle_add(self._idleCallback, self.ok_callback, out)
+        else:
+            self.idleId = GLib.idle_add(self._idleCallback, self.error_callback, self.proc.returncode, err)
+
+    def _idleCallback(self, func, *args):
+        func(*args)
+        self.bComplete = True
+        return False

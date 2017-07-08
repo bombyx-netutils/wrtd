@@ -45,7 +45,7 @@ class DbusMainObject(dbus.service.Object):
             if plugin.is_connected():
                 ret["wconn-plugin"]["is-connected"] = True
                 ret["wconn-plugin"]["ip"] = plugin.get_ip()
-                ret["wconn-plugin"]["is-ip-public"] = WrtUtil.isIpPublic(plugin.get_ip())
+                ret["wconn-plugin"]["is-ip-public"] = self.param.wanManager.wanConnIpIsPublic
             else:
                 ret["wconn-plugin"]["is-connected"] = False
 

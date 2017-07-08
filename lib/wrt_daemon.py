@@ -19,8 +19,8 @@ from wrt_manager_wan import WrtWanManager
 from wrt_manager_lan import WrtLanManager
 from wrt_manager_cascade import WrtCascadeManager
 from wrt_manager_sgw import WrtSgwManager
-from wrt_api_dbus import DbusMainObject
-from wrt_api_dbus import DbusIpForwardObject
+from wrt_dbus import DbusMainObject
+from wrt_dbus import DbusIpForwardObject
 
 
 class WrtDaemon:

@@ -31,7 +31,12 @@ class WrtSubCmdMain:
             print("    Plugin: " + info["wconn-plugin"]["name"])
             if info["wconn-plugin"]["is-connected"]:
                 print("    Status: Connected")
-                print("    IP:     " + info["wconn-plugin"]["ip"] + " " + ("(public)" if info["wconn-plugin"]["is-ip-public"] else "(behind NAT)"))
+                if info["wconn-plugin"]["is-ip-public"] is None:
+                    print("    IP:     " + info["wconn-plugin"]["ip"])
+                elif info["wconn-plugin"]["is-ip-public"]:
+                    print("    IP:     " + info["wconn-plugin"]["ip"] + " (public)")
+                else:
+                    print("    IP:     " + info["wconn-plugin"]["ip"] + " (behind NAT)")
             else:
                 print("    Status: Not connected")
         print("")
