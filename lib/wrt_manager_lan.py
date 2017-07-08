@@ -286,8 +286,8 @@ class _DefaultBridge:
         self.tmpDir = tmpDir
         self.varDir = varDir
         self.l2DnsPort = None
-        self.clientAppearFunc = None
-        self.clientDisappearFunc = None
+        self.clientAddOrChangeFunc = None
+        self.clientRemoveFunc = None
 
         self.brname = None
         self.brnetwork = None
@@ -304,7 +304,7 @@ class _DefaultBridge:
         self.pidFile = os.path.join(self.tmpDir, "dnsmasq.pid")
         self.dnsmasqProc = None
 
-    def init2(self, brname, prefix, l2DnsPort, clientAppearFunc, clientDisappearFunc):
+    def init2(self, brname, prefix, l2dns_port, client_add_or_change_func, client_remove_func):
         assert prefix[1] == "255.255.255.0"
 
         self.brname = brname
@@ -313,9 +313,9 @@ class _DefaultBridge:
         self.brip = ipaddress.IPv4Address(prefix[0]) + 1
         self.dhcpRange = (self.brip + 1, self.brip + 49)
 
-        self.l2DnsPort = l2DnsPort
-        self.clientAppearFunc = clientAppearFunc
-        self.clientDisappearFunc = clientDisappearFunc
+        self.l2DnsPort = l2dns_port
+        self.clientAddOrChangeFunc = client_add_or_change_func
+        self.clientRemoveFunc = client_remove_func
 
         # create bridge interface
         with pyroute2.IPRoute() as ip:
@@ -496,11 +496,11 @@ class _DefaultBridge:
                 data[jsonObj["ip"]] = dict()
                 if "hostname" in jsonObj:
                     data[jsonObj["ip"]]["hostname"] = jsonObj["hostname"]
-                self.clientAppearFunc(self.get_bridge_id(), data)
+                self.clientAddOrChangeFunc(self.get_bridge_id(), data)
             elif jsonObj["cmd"] == "remove":
                 # notify lan manager
                 data = [jsonObj["ip"]]
-                self.clientDisappearFunc(self.get_bridge_id(), data)
+                self.clientRemoveFunc(self.get_bridge_id(), data)
             else:
                 assert False
         except:
