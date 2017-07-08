@@ -173,8 +173,9 @@ class WrtWanManager:
 
     def _wconnIpCheckComplete(self, ip):
         self.wanConnIpIsPublic = (ip == self.wanConnPlugin.get_ip())
+        self.logger.error("Internet IP (%s) check complete, %s IP" % (self.wanConnPlugin.get_ip(), "Public" if self.wanConnIpIsPublic else "NATed"))
         self.wanConnIpChecker = None
 
     def _wconnIpCheckError(self, returncode, msg):
-        self.logger.error("Internet IP check failed, %s" % (msg))
+        self.logger.error("Internet IP (%s) check failed, %s" % (self.wanConnPlugin.get_ip(), msg))
         self.wanConnIpChecker = None
