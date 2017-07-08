@@ -11,7 +11,7 @@ import logging
 import ipaddress
 import pyroute2
 from gi.repository import Gio
-from wrtWrtUtil import WrtUtil
+from wrt_util import WrtUtil
 from wrt_common import WrtCommon
 
 
