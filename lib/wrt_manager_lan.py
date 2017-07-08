@@ -499,9 +499,9 @@ class _DefaultBridge:
                 for expiryTime, mac, ip, hostname, clientId in addList:
                     self.__dnsmasqLeaseChangedAddToIpDataDict(ipDataDict, ip, mac, hostname)
                     if hostname != "":
-                        self.pObj.logger.info("Client %s(IP:%s, MAC:%s) appeared." % (hostname, ip, mac))
+                        logging.info("Client %s(IP:%s, MAC:%s) appeared." % (hostname, ip, mac))
                     else:
-                        self.pObj.logger.info("Client %s(%s) appeared." % (ip, mac))
+                        logging.info("Client %s(%s) appeared." % (ip, mac))
                 for expiryTime, mac, ip, hostname, clientId in changeList:
                     self.__dnsmasqLeaseChangedAddToIpDataDict(ipDataDict, ip, mac, hostname)
                     # log is not needed for client change
@@ -512,13 +512,13 @@ class _DefaultBridge:
                 self.clientRemoveFunc(self.get_bridge_id(), ipList)
                 for expiryTime, mac, ip, hostname, clientId in removeList:
                     if hostname != "":
-                        self.pObj.logger.info("Client %s(IP:%s, MAC:%s) disappeared." % (hostname, ip, mac))
+                        logging.info("Client %s(IP:%s, MAC:%s) disappeared." % (hostname, ip, mac))
                     else:
-                        self.pObj.logger.info("Client %s(%s) disappeared." % (ip, mac))
+                        logging.info("Client %s(%s) disappeared." % (ip, mac))
 
             self.lastScanRecord = newLeaseList
         except Exception as e:
-            self.pObj.logger.error("Lease scan failed", exc_info=True)      # fixme
+            logging.error("Lease scan failed", exc_info=True)      # fixme
 
     def ___dnsmasqLeaseChangedFind(self, item, leaseList):
         for item2 in leaseList:
