@@ -269,21 +269,22 @@ class WrtUtil:
              ^            ^                 ^               ^         ^
              Expiry time  MAC address       IP address      hostname  Client-id
 
-           This function returns [(mac,ip,hostname), (mac,ip,hostname)]
+           This function returns [(expiry-time,mac,ip,hostname,client-id), (expiry-time,mac,ip,hostname,client-id)]
         """
 
-        pattern = "[0-9]+ +([0-9a-f:]+) +([0-9\.]+) +(\\S+) +\\S+"
+        pattern = "([0-9]+) +([0-9a-f:]+) +([0-9\.]+) +(\\S+) +(\\S+)"
         ret = []
         with open(filename, "r") as f:
             for line in f.read().split("\n"):
                 m = re.match(pattern, line)
                 if m is None:
                     continue
-                if m.group(3) == "*":
-                    item = (m.group(1), m.group(2), "")
-                else:
-                    item = (m.group(1), m.group(2), m.group(3))
-                ret.append(item)
+                expiryTime = m.group(1)
+                mac = m.group(2)
+                ip = m.group(3)
+                hostname = "" if m.group(4) == "*" else m.group(4)
+                clientId = "" if m.group(5) == "*" else m.group(5)
+                ret.append((expiryTime, mac, ip, hostname, clientId))
         return ret
 
 
