@@ -96,11 +96,11 @@ from wrt_common import Managers
 # }
 #
 ################################################################################
-# client2server: notification: router-wan-prefix-list-changed
+# client2server: notification: router-wan-prefix-list-change
 ################################################################################
 #
 # {
-#     "notification": "router-wan-prefix-list-changed",
+#     "notification": "router-wan-prefix-list-change",
 #     "data": {
 #         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
 #             "wan-prefix-list": ["192.168.0.0/255.255.255.0", "192.168.1.0/255.255.255.0"],
@@ -109,11 +109,11 @@ from wrt_common import Managers
 # }
 #
 ################################################################################
-# client2server: notification: router-lan-prefix-list-changed
+# client2server: notification: router-lan-prefix-list-change
 ################################################################################
 #
 # {
-#     "notification": "router-lan-prefix-list-changed",
+#     "notification": "router-lan-prefix-list-change",
 #     "data": {
 #         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
 #             "lan-prefix-list": ["192.168.0.0/255.255.255.0", "192.168.1.0/255.255.255.0"],
@@ -420,6 +420,11 @@ class WrtCascadeManager:
         if self.hasValidApiClient():
             self.apiClient.send_notification("router-add", data)
 
+        # notify other downstream
+        for sproc in self.getAllValidApiServerProcessors():
+            if sproc.get_peer_uuid() != peer_uuid:
+                sproc.send_notification("router-add", data)
+
     def on_cascade_downstream_router_remove(self, peer_uuid, data):
         for router_id in data:
             self.downstreamDict[peer_uuid].remove(router_id)
@@ -428,25 +433,50 @@ class WrtCascadeManager:
         if self.hasValidApiClient():
             self.apiClient.send_notification("router-remove", data)
 
-    def on_cascade_downstream_router_wan_prefix_list_changed(self, peer_uuid, data):
-        # notify upstream
-        if self.hasValidApiClient():
-            self.apiClient.send_notification("router-wan-prefix-list-changed", data)
+        # notify other downstream
+        for sproc in self.getAllValidApiServerProcessors():
+            if sproc.get_peer_uuid() != peer_uuid:
+                sproc.send_notification("router-remove", data)
 
-    def on_cascade_downstream_router_lan_prefix_list_changed(self, peer_uuid, data):
+    def on_cascade_downstream_router_wan_prefix_list_change(self, peer_uuid, data):
         # notify upstream
         if self.hasValidApiClient():
-            self.apiClient.send_notification("router-lan-prefix-list-changed", data)
+            self.apiClient.send_notification("router-wan-prefix-list-change", data)
+
+        # notify other downstream
+        for sproc in self.getAllValidApiServerProcessors():
+            if sproc.get_peer_uuid() != peer_uuid:
+                sproc.send_notification("router-wan-prefix-list-change", data)
+
+    def on_cascade_downstream_router_lan_prefix_list_change(self, peer_uuid, data):
+        # notify upstream
+        if self.hasValidApiClient():
+            self.apiClient.send_notification("router-lan-prefix-list-change", data)
+
+        # notify other downstream
+        for sproc in self.getAllValidApiServerProcessors():
+            if sproc.get_peer_uuid() != peer_uuid:
+                sproc.send_notification("router-lan-prefix-list-change", data)
 
     def on_cascade_downstream_router_client_add_or_change(self, peer_uuid, data):
         # notify upstream
         if self.hasValidApiClient():
             self.apiClient.send_notification("router-client-add-or-change", data)
 
+        # notify other downstream
+        for sproc in self.getAllValidApiServerProcessors():
+            if sproc.get_peer_uuid() != peer_uuid:
+                sproc.send_notification("router-client-add-or-change", data)
+
     def on_cascade_downstream_router_client_remove(self, peer_uuid, data):
         # notify upstream
         if self.hasValidApiClient():
             self.apiClient.send_notification("router-client-remove", data)
+
+        # notify other downstream
+        for sproc in self.getAllValidApiServerProcessors():
+            if sproc.get_peer_uuid() != peer_uuid:
+                sproc.send_notification("router-client-remove", data)
 
     def _wanPrefixListChange(self, prefixList):
         self.routerInfo[self.param.uuid]["wan-prefix-list"] = prefixList
@@ -455,7 +485,7 @@ class WrtCascadeManager:
         if self._apiClientCanNotify():
             data = dict()
             data[self.param.uuid] = prefixList
-            self.apiClient.send_notification("router-wan-prefix-list-changed", data)
+            self.apiClient.send_notification("router-wan-prefix-list-change", data)
 
         # notify downstream
         for sproc in self.getAllValidApiServerProcessors():
@@ -704,17 +734,17 @@ class _ApiServerProcessor(JsonApiEndPoint):
             del self.routerInfo[router_id]
         Managers.call("on_cascade_downstream_delete_router", self.peerUuid, data)
 
-    def on_notification_router_wan_prefix_list_changed(self, data):
+    def on_notification_router_wan_prefix_list_change(self, data):
         assert self.bRegistered
         for router_id, item in data.items():
             self.routerInfo[router_id]["wan-prefix-list"] = item["wan-prefix-list"]
-            Managers.call("on_cascade_downstream_router_wan_prefix_list_changed", self.peerUuid, data)
+            Managers.call("on_cascade_downstream_router_wan_prefix_list_change", self.peerUuid, data)
 
-    def on_notification_router_lan_prefix_list_changed(self, data):
+    def on_notification_router_lan_prefix_list_change(self, data):
         assert self.bRegistered
         for router_id, item in data.items():
             self.routerInfo[router_id]["lan-prefix-list"] = item["lan-prefix-list"]
-        Managers.call("on_cascade_downstream_router_lan_prefix_list_changed", self.peerUuid, data)
+        Managers.call("on_cascade_downstream_router_lan_prefix_list_change", self.peerUuid, data)
 
     def on_notification_router_client_add_or_change(self, data):
         assert self.bRegistered

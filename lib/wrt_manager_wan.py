@@ -153,14 +153,14 @@ class WrtWanManager:
 
     def on_cascade_downstream_router_add(self, peer_uuid, data):
         self.downstreamDict[peer_uuid] += data.keys()
-        self.on_cascade_downstream_router_wan_prefix_list_changed(peer_uuid, data)
+        self.on_cascade_downstream_router_wan_prefix_list_change(peer_uuid, data)
 
     def on_cascade_downstream_router_remove(self, peer_uuid, data):
         for router_id in data:
             self.param.prefixPool.removeExcludePrefixList("downstream-wan-%s" % (router_id))
             self.downstreamDict[peer_uuid].remove(router_id)
 
-    def on_cascade_downstream_router_wan_prefix_list_changed(self, peer_uuid, data):
+    def on_cascade_downstream_router_wan_prefix_list_change(self, peer_uuid, data):
         # check downstream wan-prefix and restart if neccessary
         show_router_id = None
         for router_id, item in data.items():
