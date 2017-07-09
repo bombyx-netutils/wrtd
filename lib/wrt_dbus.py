@@ -5,7 +5,6 @@ import json
 import dbus
 import dbus.service
 import socket
-from wrt_util import WrtUtil
 from wrt_common import WrtCommon
 
 
@@ -116,9 +115,11 @@ class DbusMainObject(dbus.service.Object):
                 raise Exception("No internet connection.")
             if not self.param.wanManager.wanConnPlugin.is_connected():
                 raise Exception("No internet connection.")
+            if self.param.wanManager.wanConnPlugin.wanConnIpIsPublic is None:
+                raise Exception("Internet connection IP address publicity checking is in progress.")
+            if not self.param.wanManager.wanConnPlugin.wanConnIpIsPublic:
+                raise Exception("Internet connection IP address is not public.")
             ip = self.param.wanManager.wanConnPlugin.get_ip()
-            if not WrtUtil.isIpPublic(ip):
-                raise Exception("Internet connection is behind NAT.")
             suggested_filename, content = pluginObj.generate_client_script(ip, os_type)
             return (suggested_filename, content, ["No domain name specified, using WAN IP address %s as cloud server address." % (ip)])
 

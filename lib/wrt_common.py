@@ -122,7 +122,7 @@ class Managers:
         if obj is None:
             return
 
-        if funcName.ends_with("_down"):
+        if funcName.endswith("_down"):
             upFuncName = funcName.replace("_down", "_up")
             if upFuncName not in Managers._callRecord[objName]:
                 return
