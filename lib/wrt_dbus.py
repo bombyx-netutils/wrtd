@@ -115,13 +115,14 @@ class DbusMainObject(dbus.service.Object):
                 raise Exception("No internet connection.")
             if not self.param.wanManager.wanConnPlugin.is_connected():
                 raise Exception("No internet connection.")
-            if self.param.wanManager.wanConnIpIsPublic is None:
-                raise Exception("Internet connection IP address publicity checking is in progress.")
-            if not self.param.wanManager.wanConnIpIsPublic:
-                raise Exception("Internet connection IP address is not public.")
             ip = self.param.wanManager.wanConnPlugin.get_ip()
+            msgList = ["No domain name specified, using WAN IP address %s as cloud server address." % (ip)]
+            if self.param.wanManager.wanConnIpIsPublic is None:
+                msgList.append("Internet connection IP address publicity checking is in progress.")
+            elif not self.param.wanManager.wanConnIpIsPublic:
+                msgList.append("Internet connection IP address is not public.")
             suggested_filename, content = pluginObj.generate_client_script(ip, os_type)
-            return (suggested_filename, content, ["No domain name specified, using WAN IP address %s as cloud server address." % (ip)])
+            return (suggested_filename, content, msgList)
 
 
 ################################################################################
