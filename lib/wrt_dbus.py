@@ -115,9 +115,9 @@ class DbusMainObject(dbus.service.Object):
                 raise Exception("No internet connection.")
             if not self.param.wanManager.wanConnPlugin.is_connected():
                 raise Exception("No internet connection.")
-            if self.param.wanManager.wanConnPlugin.wanConnIpIsPublic is None:
+            if self.param.wanManager.wanConnIpIsPublic is None:
                 raise Exception("Internet connection IP address publicity checking is in progress.")
-            if not self.param.wanManager.wanConnPlugin.wanConnIpIsPublic:
+            if not self.param.wanManager.wanConnIpIsPublic:
                 raise Exception("Internet connection IP address is not public.")
             ip = self.param.wanManager.wanConnPlugin.get_ip()
             suggested_filename, content = pluginObj.generate_client_script(ip, os_type)
