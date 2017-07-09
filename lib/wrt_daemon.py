@@ -14,6 +14,7 @@ from gi.repository import GObject
 from dbus.mainloop.glib import DBusGMainLoop
 from wrt_util import WrtUtil
 from wrt_common import PrefixPool
+from wrt_common import Managers
 from wrt_manager_traffic import WrtTrafficManager
 from wrt_manager_wan import WrtWanManager
 from wrt_manager_lan import WrtLanManager
@@ -74,6 +75,7 @@ class WrtDaemon:
                 f.write("")
 
             # business initialize
+            Managers.init(self.param)
             self.param.trafficManager = WrtTrafficManager(self.param)
             self.param.wanManager = WrtWanManager(self.param)
             self.param.lanManager = WrtLanManager(self.param)
