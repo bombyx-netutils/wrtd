@@ -9,6 +9,7 @@ import logging
 from gi.repository import Gio
 from wrt_util import JsonApiEndPoint
 from wrt_common import WrtCommon
+from wrt_common import Managers
 
 
 ################################################################################
@@ -527,7 +528,7 @@ class _ApiClient(JsonApiEndPoint):
             self.bConnected = True
         except Exception as e:
             logging.error("Failed to establish CASCADE-API connection", exc_info=True)   # fixme
-            WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_fail", e)
+            Managers.call("on_cascade_upstream_fail", e)
             self.close()
 
     def _on_register_return(self, data):
@@ -535,7 +536,7 @@ class _ApiClient(JsonApiEndPoint):
         self.routerInfo = data["router-list"]
         self.bRegistered = True
         logging.info("CASCADE-API connection established.")
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_up", data)
+        Managers.call("on_cascade_upstream_up", data)
 
     def _on_register_error(self, reason):
         raise Exception(reason)
@@ -543,51 +544,51 @@ class _ApiClient(JsonApiEndPoint):
     def on_error(self, excp):
         if not self.bRegistered:
             logging.error("Failed to establish CASCADE-API connection.", exc_info=True)      # fixme
-            WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_fail", excp)
+            Managers.call("on_cascade_upstream_fail", excp)
         else:
             logging.error("CASCADE-API connection disconnected with error.", exc_info=True)  # fixme
-            WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_error", excp)
+            Managers.call("on_cascade_upstream_error", excp)
 
     def on_close(self):
         if not self.bRegistered:
             pass
         else:
-            WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_down")
+            Managers.call("on_cascade_upstream_down")
 
     def on_notification_router_add(self, data):
         assert self.bRegistered
         self.routerInfo.update(data)
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_router_add", data)
+        Managers.call("on_cascade_upstream_router_add", data)
 
     def on_notification_router_remove(self, data):
         assert self.bRegistered
         for router_id in data:
             del self.routerInfo[router_id]
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_router_remove", data)
+        Managers.call("on_cascade_upstream_router_remove", data)
 
     def on_notification_router_cascade_vpn_change(self, data):
         assert self.bRegistered
         for router_id, item in data.items():
             self.routerInfo[router_id]["cascade-vpn"] = item["cascade-vpn"]
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_router_cascade_vpn_change", data)
+        Managers.call("on_cascade_upstream_router_cascade_vpn_change", data)
 
     def on_notification_router_wan_prefix_list_change(self, data):
         assert self.bRegistered
         for router_id, item in data.items():
             self.routerInfo[router_id]["wan-prefix-list"] = item["wan-prefix-list"]
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_router_wan_prefix_list_change", data)
+        Managers.call("on_cascade_upstream_router_wan_prefix_list_change", data)
 
     def on_notification_router_lan_prefix_list_change(self, data):
         assert self.bRegistered
         for router_id, item in data.items():
             self.routerInfo[router_id]["lan-prefix-list"] = item["lan-prefix-list"]
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_router_lan_prefix_list_change", data)
+        Managers.call("on_cascade_upstream_router_lan_prefix_list_change", data)
 
     def on_notification_router_client_add_or_change(self, data):
         assert self.bRegistered
         for router_id, item in data.items():
             self.routerInfo[router_id]["client-list"].update(item["client-list"])
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_router_client_add_or_change", data)
+        Managers.call("on_cascade_upstream_router_client_add_or_change", data)
 
     def on_notification_router_client_remove(self, data):
         assert self.bRegistered
@@ -596,7 +597,7 @@ class _ApiClient(JsonApiEndPoint):
             for ip in item["client-list"]:
                 if ip in o:
                     del o[ip]
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_upstream_router_client_remove", data)
+        Managers.call("on_cascade_upstream_router_client_remove", data)
 
 
 class _ApiServer:
@@ -662,7 +663,7 @@ class _ApiServerProcessor(JsonApiEndPoint):
 
     def on_close(self):
         if self.bRegistered:
-            WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_down", self.peerUuid)
+            Managers.call("on_cascade_downstream_down", self.peerUuid)
         logging.info("CASCADE-API client %s(UUID:%s) disconnected." % (self.get_peer_ip(), self.peerUuid))
 
     def on_command_register(self, data, return_callback, errror_callback):
@@ -690,36 +691,36 @@ class _ApiServerProcessor(JsonApiEndPoint):
         # registered
         self.bRegistered = True
         logging.info("CASCADE-API client %s(UUID:%s) registered." % (self.get_peer_ip(), self.peerUuid))
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_up", self.peerUuid, data)
+        Managers.call("on_cascade_downstream_up", self.peerUuid, data)
 
     def on_notification_router_add(self, data):
         assert self.bRegistered
         self.routerInfo.update(data)
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_router_add", self.peerUuid, data)
+        Managers.call("on_cascade_downstream_router_add", self.peerUuid, data)
 
     def on_notification_router_remove(self, data):
         assert self.bRegistered
         for router_id in data:
             del self.routerInfo[router_id]
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_delete_router", self.peerUuid, data)
+        Managers.call("on_cascade_downstream_delete_router", self.peerUuid, data)
 
     def on_notification_router_wan_prefix_list_changed(self, data):
         assert self.bRegistered
         for router_id, item in data.items():
             self.routerInfo[router_id]["wan-prefix-list"] = item["wan-prefix-list"]
-            WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_router_wan_prefix_list_changed", self.peerUuid, data)
+            Managers.call("on_cascade_downstream_router_wan_prefix_list_changed", self.peerUuid, data)
 
     def on_notification_router_lan_prefix_list_changed(self, data):
         assert self.bRegistered
         for router_id, item in data.items():
             self.routerInfo[router_id]["lan-prefix-list"] = item["lan-prefix-list"]
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_router_lan_prefix_list_changed", self.peerUuid, data)
+        Managers.call("on_cascade_downstream_router_lan_prefix_list_changed", self.peerUuid, data)
 
     def on_notification_router_client_add_or_change(self, data):
         assert self.bRegistered
         for router_id, item in data.items():
             self.routerInfo[router_id]["client-list"].update(item["client-list"])
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_router_client_add_or_change", self.peerUuid, data)
+        Managers.call("on_cascade_downstream_router_client_add_or_change", self.peerUuid, data)
 
     def on_notification_router_client_remove(self, data):
         assert self.bRegistered
@@ -728,4 +729,4 @@ class _ApiServerProcessor(JsonApiEndPoint):
             for ip in item["client-list"]:
                 if ip in o:
                     del o[ip]
-        WrtCommon.callManagers(self.pObj.param, "on_cascade_downstream_router_client_remove", self.peerUuid, data)
+        Managers.call("on_cascade_downstream_router_client_remove", self.peerUuid, data)

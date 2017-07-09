@@ -22,11 +22,6 @@ from gi.repository import GLib
 class WrtUtil:
 
     @staticmethod
-    def callFunc(obj, funcName, *args):
-        if hasattr(obj, funcName):
-            getattr(obj, funcName)(*args)
-
-    @staticmethod
     def prefixListConflict(prefixList1, prefixList2):
         for prefix1 in prefixList1:
             for prefix2 in prefixList2:

@@ -13,19 +13,6 @@ from wrt_util import WrtUtil
 class WrtCommon:
 
     @staticmethod
-    def callManagers(param, funcName, *args):
-        if param.trafficManager is not None:
-            WrtUtil.callFunc(param.trafficManager, funcName, *args)
-        if param.wanManager is not None:
-            WrtUtil.callFunc(param.wanManager, funcName, *args)
-        if param.lanManager is not None:
-            WrtUtil.callFunc(param.lanManager, funcName, *args)
-        if param.cascadeManager is not None:
-            WrtUtil.callFunc(param.cascadeManager, funcName, *args)
-        if param.sgwManager is not None:
-            WrtUtil.callFunc(param.sgwManager, funcName, *args)
-
-    @staticmethod
     def bridgeGetIp(bridge):
         return str(ipaddress.IPv4Address(bridge.get_prefix()[0]) + 1)
 
@@ -106,6 +93,47 @@ class WrtCommon:
                     obj.full_name = name
                 return obj
         return None
+
+
+class Managers:
+
+    _param = None
+    _callRecord = dict()
+
+    @staticmethod
+    def init(param):
+        Managers._param = param
+        Managers._callRecord["traffic"] = dict()
+        Managers._callRecord["wan"] = dict()
+        Managers._callRecord["lan"] = dict()
+        Managers._callRecord["cascade"] = dict()
+        Managers._callRecord["sgw"] = dict()
+
+    @staticmethod
+    def call(funcName, *args):
+        Managers._callFunc("traffic", Managers._param.trafficManager, funcName, *args)
+        Managers._callFunc("wan", Managers._param.wanManager, funcName, *args)
+        Managers._callFunc("lan", Managers._param.lanManager, funcName, *args)
+        Managers._callFunc("cascade", Managers._param.cascadeManager, funcName, *args)
+        Managers._callFunc("sgw", Managers._param.sgwManager, funcName, *args)
+
+    @staticmethod
+    def _callFunc(objName, obj, funcName, *args):
+        if obj is None:
+            return
+
+        if funcName.ends_with("_down"):
+            upFuncName = funcName.replace("_down", "_up")
+            if upFuncName not in Managers._callRecord[objName]:
+                return
+            if hasattr(obj, funcName):
+                getattr(obj, funcName)(*args)
+            del Managers._callRecord[objName][upFuncName]
+        else:
+            if hasattr(obj, funcName):
+                getattr(obj, funcName)(*args)
+            if funcName.endswith("_up"):
+                Managers._callRecord[objName][funcName] = True
 
 
 class DnsMasqHostFilesLock:

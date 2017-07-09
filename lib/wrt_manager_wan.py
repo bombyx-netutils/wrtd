@@ -9,6 +9,7 @@ import socket
 from wrt_util import WrtUtil
 from wrt_util import UrlOpenAsync
 from wrt_common import WrtCommon
+from wrt_common import Managers
 
 
 class WrtWanManager:
@@ -45,8 +46,8 @@ class WrtWanManager:
                 self.wanConnPlugin.init2(cfgObj,
                                          tdir,
                                          self.param.ownResolvConf,
-                                         lambda: WrtCommon.callManagers(self.param, "on_wconn_up"),
-                                         lambda: WrtCommon.callManagers(self.param, "on_wconn_down"))
+                                         lambda: Managers.call("on_wconn_up"),
+                                         lambda: Managers.call("on_wconn_down"))
                 self.wanConnPlugin.start()
                 self.logger.info("Internet connection activated, plugin: %s." % (cfgObj["plugin"]))
 
@@ -66,8 +67,8 @@ class WrtWanManager:
                 os.mkdir(tdir)
                 self.vpnPlugin.init2(cfgObj,
                                      tdir,
-                                     lambda: WrtCommon.callManagers(self.param, "on_wvpn_up"),
-                                     lambda: WrtCommon.callManagers(self.param, "on_wvpn_down"))
+                                     lambda: Managers.call("on_wvpn_up"),
+                                     lambda: Managers.call("on_wvpn_down"))
                 self.logger.info("CASCADE-VPN activated, plugin: %s." % (cfgObj["plugin"]))
             else:
                 self.logger.info("No CASCADE-VPN configured.")
