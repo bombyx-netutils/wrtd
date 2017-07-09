@@ -502,7 +502,7 @@ class UrlOpenAsync(threading.Thread):
 
     def run(self):
         out, err = self.proc.communicate()
-        out = out.decode("utf-8")
+        out = out.decode("utf-8").replace("\n", "")
         err = err.decode("utf-8")
         if self.proc.returncode == 0:
             self.idleId = GLib.idle_add(self._idleCallback, self.ok_callback, out)
