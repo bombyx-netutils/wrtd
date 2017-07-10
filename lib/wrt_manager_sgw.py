@@ -31,11 +31,25 @@ from wrt_common import WrtCommon
 # }
 #
 ################################################################################
-# Notify: host-add-or-change
+# Notify: host-add
 ################################################################################
 #
 # {
-#     "notify": "host-add-or-change",
+#     "notify": "host-add",
+#     "data": {
+#         "1.2.3.4": {
+#             "hostname": "abcd",
+#             "wakeup-mac": "01-02-03-04-05-06",
+#         },
+#     },
+# }
+#
+################################################################################
+# Notify: host-change
+################################################################################
+#
+# {
+#     "notify": "host-change",
 #     "data": {
 #         "1.2.3.4": {
 #             "hostname": "abcd",
@@ -90,10 +104,15 @@ class WrtSgwManager:
         # fixme
         pass
 
-    def on_client_add_or_change(self, source_id, ip_data_dict):
+    def on_client_add(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
         for sproc in self.getAllValidApiServerProcessors():
-            sproc.send_notification("host-add-or-change", ip_data_dict)
+            sproc.send_notification("host-add", ip_data_dict)
+
+    def on_client_change(self, source_id, ip_data_dict):
+        assert len(ip_data_dict) > 0
+        for sproc in self.getAllValidApiServerProcessors():
+            sproc.send_notification("host-change", ip_data_dict)
 
     def on_client_remove(self, source_id, ip_list):
         assert len(ip_list) > 0
@@ -112,7 +131,7 @@ class WrtSgwManager:
     def on_cascade_upstream_router_add(self, data):
         for router_id in data.keys():
             self.upstreamClientDict[router_id] = dict()
-        self.on_cascade_upstream_router_client_add_or_change(data)
+        self.on_cascade_upstream_router_client_add(data)
 
     def on_cascade_upstream_router_remove(self, data):
         notifyData = []
@@ -125,7 +144,7 @@ class WrtSgwManager:
         for sproc in self.getAllValidApiServerProcessors():
             sproc.send_notification("host-remove", notifyData)
 
-    def on_cascade_upstream_router_client_add_or_change(self, data):
+    def on_cascade_upstream_router_client_add(self, data):
         notifyData = dict()
 
         for router_id in data.keys():
@@ -138,7 +157,20 @@ class WrtSgwManager:
 
         if len(notifyData) > 0:
             for sproc in self.getAllValidApiServerProcessors():
-                sproc.send_notification("host-add-or-change", notifyData)
+                sproc.send_notification("host-add", notifyData)
+
+    def on_cascade_upstream_router_client_change(self, data):
+        notifyData = dict()
+
+        for router_id in data.keys():
+            for ip, data2 in data[router_id]["client-list"].items():
+                ip, data2 = _get_ip_data(ip, data2)
+                self.upstreamClientDict[router_id][ip] = data2
+                notifyData[ip] = data2
+
+        if len(notifyData) > 0:
+            for sproc in self.getAllValidApiServerProcessors():
+                sproc.send_notification("host-change", notifyData)
 
     def on_cascade_upstream_router_client_remove(self, data):
         notifyData = []
@@ -162,7 +194,7 @@ class WrtSgwManager:
     def on_cascade_downstream_router_add(self, peer_uuid, data):
         for router_id in data.keys():
             self.downstreamClientDict[peer_uuid][router_id] = dict()
-        self.on_cascade_downstream_router_client_add_or_change(peer_uuid, data)
+        self.on_cascade_downstream_router_client_add(peer_uuid, data)
 
     def on_cascade_downstream_router_remove(self, peer_uuid, data):
         notifyData = []
@@ -175,7 +207,7 @@ class WrtSgwManager:
         for sproc in self.getAllValidApiServerProcessors():
             sproc.send_notification("host-remove", notifyData)
 
-    def on_cascade_downstream_router_client_add_or_change(self, peer_uuid, data):
+    def on_cascade_downstream_router_client_add(self, peer_uuid, data):
         notifyData = dict()
 
         for router_id in data.keys():
@@ -188,7 +220,20 @@ class WrtSgwManager:
 
         if len(notifyData) > 0:
             for sproc in self.getAllValidApiServerProcessors():
-                sproc.send_notification("host-add-or-change", notifyData)
+                sproc.send_notification("host-add", notifyData)
+
+    def on_cascade_downstream_router_client_change(self, peer_uuid, data):
+        notifyData = dict()
+
+        for router_id in data.keys():
+            for ip, data2 in data[router_id]["client-list"].items():
+                ip, data2 = _get_ip_data(ip, data2)
+                self.downstreamClientDict[peer_uuid][router_id][ip] = data2
+                notifyData[ip] = data2
+
+        if len(notifyData) > 0:
+            for sproc in self.getAllValidApiServerProcessors():
+                sproc.send_notification("host-change", notifyData)
 
     def on_cascade_downstream_router_client_remove(self, peer_uuid, data):
         notifyData = []

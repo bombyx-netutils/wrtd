@@ -122,11 +122,30 @@ from wrt_common import Managers
 # }
 #
 ################################################################################
-# client2server: notification: router-client-add-or-change
+# client2server: notification: router-client-add
 ################################################################################
 #
 # {
-#     "notification": "router-client-add-or-change",
+#     "notification": "router-client-add",
+#     "data": {
+#         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
+#             "client-list": {
+#                 "1.2.3.4": {
+#                     "nat-ip": "2.3.4.5",
+#                     "hostname": "abcd",
+#                     "wakeup-mac": "01-02-03-04-05-06",
+#                 },
+#             },
+#         ],
+#     },
+# }
+#
+################################################################################
+# client2server: notification: router-client-change
+################################################################################
+#
+# {
+#     "notification": "router-client-change",
 #     "data": {
 #         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
 #             "client-list": {
@@ -200,10 +219,17 @@ from wrt_common import Managers
 #
 #
 ################################################################################
-# server2client: notification: router-client-add-or-change
+# server2client: notification: router-client-add
 ################################################################################
 #
-# same as client2server: notification: router-client-add-or-change
+# same as client2server: notification: router-client-add
+#
+#
+################################################################################
+# server2client: notification: router-client-change
+################################################################################
+#
+# same as client2server: notification: router-client-change
 #
 #
 ################################################################################
@@ -287,27 +313,11 @@ class WrtCascadeManager:
         for sproc in self.getAllValidApiServerProcessors():
             sproc.send_notification("router-cascade-vpn-change", data)
 
-    def on_client_add_or_change(self, source_id, ip_data_dict):
-        assert len(ip_data_dict) > 0
+    def on_client_add(self, source_id, ip_data_dict):
+        self._clientAddOrChange("add", source_id, ip_data_dict)
 
-        # process by myself
-        self.routerInfo[self.param.uuid]["client-list"].update(ip_data_dict)
-
-        # notify upstream
-        if self._apiClientCanNotify():
-            data = dict()
-            data[self.param.uuid] = dict()
-            data[self.param.uuid]["client-list"] = copy.deepcopy(ip_data_dict)
-            for ip, data2 in data[self.param.uuid]["client-list"].items():
-                data2["nat-ip"] = self.param.trafficManager.sourceIpDict[source_id][ip][1]
-            self.apiClient.send_notification("router-client-add-or-change", data)
-
-        # notify downstream
-        data = dict()
-        data[self.param.uuid] = dict()
-        data[self.param.uuid]["client-list"] = ip_data_dict
-        for sproc in self.getAllValidApiServerProcessors():
-            sproc.send_notification("router-client-add-or-change", data)
+    def on_client_change(self, source_id, ip_data_dict):
+        self._clientAddOrChange("change", source_id, ip_data_dict)
 
     def on_client_remove(self, source_id, ip_list):
         assert len(ip_list) > 0
@@ -342,6 +352,8 @@ class WrtCascadeManager:
         assert len(data) > 0
 
         # process by myself
+        for router_id in data.keys():
+            logging.info("Router %s(UUID:%s) appeared." % (router_id))
         if self.param.uuid in data.keys():
             os.kill(os.getpid(), signal.SIGHUP)
             raise Exception("router UUID duplicates, will restart")
@@ -364,6 +376,7 @@ class WrtCascadeManager:
         for router_id in data:
             self.param.prefixPool.removeExcludePrefixList("upstream-lan-%s" % (router_id))
             self.param.prefixPool.removeExcludePrefixList("upstream-wan-%s" % (router_id))
+            logging.info("Router %s(UUID:%s) disappeared." % (router_id))
 
         # notify downstream
         for sproc in self.getAllValidApiServerProcessors():
@@ -394,10 +407,15 @@ class WrtCascadeManager:
         for sproc in self.getAllValidApiServerProcessors():
             sproc.send_notification("lan-prefix-list-change", data)
 
-    def on_cascade_upstream_router_client_add_or_change(self, data):
+    def on_cascade_upstream_router_client_add(self, data):
         # notify downstream
         for sproc in self.getAllValidApiServerProcessors():
-            sproc.send_notification("router-client-add-or-change", data)
+            sproc.send_notification("router-client-add", data)
+
+    def on_cascade_upstream_router_client_change(self, data):
+        # notify downstream
+        for sproc in self.getAllValidApiServerProcessors():
+            sproc.send_notification("router-client-change", data)
 
     def on_cascade_upstream_router_client_remove(self, data):
         # notify downstream
@@ -458,15 +476,25 @@ class WrtCascadeManager:
             if sproc.get_peer_uuid() != peer_uuid:
                 sproc.send_notification("router-lan-prefix-list-change", data)
 
-    def on_cascade_downstream_router_client_add_or_change(self, peer_uuid, data):
+    def on_cascade_downstream_router_client_add(self, peer_uuid, data):
         # notify upstream
         if self.hasValidApiClient():
-            self.apiClient.send_notification("router-client-add-or-change", data)
+            self.apiClient.send_notification("router-client-add", data)
 
         # notify other downstream
         for sproc in self.getAllValidApiServerProcessors():
             if sproc.get_peer_uuid() != peer_uuid:
-                sproc.send_notification("router-client-add-or-change", data)
+                sproc.send_notification("router-client-add", data)
+
+    def on_cascade_downstream_router_client_change(self, peer_uuid, data):
+        # notify upstream
+        if self.hasValidApiClient():
+            self.apiClient.send_notification("router-client-change", data)
+
+        # notify other downstream
+        for sproc in self.getAllValidApiServerProcessors():
+            if sproc.get_peer_uuid() != peer_uuid:
+                sproc.send_notification("router-client-change", data)
 
     def on_cascade_downstream_router_client_remove(self, peer_uuid, data):
         # notify upstream
@@ -477,6 +505,28 @@ class WrtCascadeManager:
         for sproc in self.getAllValidApiServerProcessors():
             if sproc.get_peer_uuid() != peer_uuid:
                 sproc.send_notification("router-client-remove", data)
+
+    def _clientAddOrChange(self, type, source_id, ip_data_dict):
+        assert len(ip_data_dict) > 0
+
+        # process by myself
+        self.routerInfo[self.param.uuid]["client-list"].update(ip_data_dict)
+
+        # notify upstream
+        if self._apiClientCanNotify():
+            data = dict()
+            data[self.param.uuid] = dict()
+            data[self.param.uuid]["client-list"] = copy.deepcopy(ip_data_dict)
+            for ip, data2 in data[self.param.uuid]["client-list"].items():
+                data2["nat-ip"] = self.param.trafficManager.sourceIpDict[source_id][ip][1]
+            self.apiClient.send_notification("router-client-%s" % (type), data)
+
+        # notify downstream
+        data = dict()
+        data[self.param.uuid] = dict()
+        data[self.param.uuid]["client-list"] = ip_data_dict
+        for sproc in self.getAllValidApiServerProcessors():
+            sproc.send_notification("router-client-%s" % (type), data)
 
     def _wanPrefixListChange(self, prefixList):
         self.routerInfo[self.param.uuid]["wan-prefix-list"] = prefixList
@@ -614,11 +664,17 @@ class _ApiClient(JsonApiEndPoint):
             self.routerInfo[router_id]["lan-prefix-list"] = item["lan-prefix-list"]
         Managers.call("on_cascade_upstream_router_lan_prefix_list_change", data)
 
-    def on_notification_router_client_add_or_change(self, data):
+    def on_notification_router_client_add(self, data):
         assert self.bRegistered
         for router_id, item in data.items():
             self.routerInfo[router_id]["client-list"].update(item["client-list"])
-        Managers.call("on_cascade_upstream_router_client_add_or_change", data)
+        Managers.call("on_cascade_upstream_router_client_add", data)
+
+    def on_notification_router_client_change(self, data):
+        assert self.bRegistered
+        for router_id, item in data.items():
+            self.routerInfo[router_id]["client-list"].update(item["client-list"])
+        Managers.call("on_cascade_upstream_router_client_change", data)
 
     def on_notification_router_client_remove(self, data):
         assert self.bRegistered
@@ -746,11 +802,17 @@ class _ApiServerProcessor(JsonApiEndPoint):
             self.routerInfo[router_id]["lan-prefix-list"] = item["lan-prefix-list"]
         Managers.call("on_cascade_downstream_router_lan_prefix_list_change", self.peerUuid, data)
 
-    def on_notification_router_client_add_or_change(self, data):
+    def on_notification_router_client_add(self, data):
         assert self.bRegistered
         for router_id, item in data.items():
             self.routerInfo[router_id]["client-list"].update(item["client-list"])
-        Managers.call("on_cascade_downstream_router_client_add_or_change", self.peerUuid, data)
+        Managers.call("on_cascade_downstream_router_client_add", self.peerUuid, data)
+
+    def on_notification_router_client_change(self, data):
+        assert self.bRegistered
+        for router_id, item in data.items():
+            self.routerInfo[router_id]["client-list"].update(item["client-list"])
+        Managers.call("on_cascade_downstream_router_client_change", self.peerUuid, data)
 
     def on_notification_router_client_remove(self, data):
         assert self.bRegistered

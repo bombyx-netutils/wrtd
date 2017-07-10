@@ -288,7 +288,10 @@ class TemplateBridge:
     def on_source_remove(self, source_id):
         pass
 
-    def on_host_add_or_change(self, source_id, ip_data_dict):
+    def on_host_add(self, source_id, ip_data_dict):
+        assert False
+
+    def on_host_change(self, source_id, ip_data_dict):
         assert False
 
     def on_host_remove(self, source_id, ip_list):

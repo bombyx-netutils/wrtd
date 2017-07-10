@@ -35,7 +35,8 @@ class WrtLanManager:
             self.defaultBridge.init2("wrtd-br",
                                      self.param.prefixPool.usePrefix(),
                                      self.param.trafficManager.get_l2_nameserver_port(),
-                                     lambda source_id, ip_data_dict: Managers.call("on_client_add_or_change", source_id, ip_data_dict),
+                                     lambda source_id, ip_data_dict: Managers.call("on_client_add", source_id, ip_data_dict),
+                                     lambda source_id, ip_data_dict: Managers.call("on_client_change", source_id, ip_data_dict),
                                      lambda source_id, ip_list: Managers.call("on_client_remove", source_id, ip_list))
             logging.info("Default bridge started.")
 
@@ -64,7 +65,8 @@ class WrtLanManager:
                             vardir,
                             self.param.prefixPool.usePrefix(),
                             self.param.trafficManager.get_l2_nameserver_port(),
-                            lambda source_id, ip_data_dict: Managers.call("on_client_add_or_change", source_id, ip_data_dict),
+                            lambda source_id, ip_data_dict: Managers.call("on_client_add", source_id, ip_data_dict),
+                            lambda source_id, ip_data_dict: Managers.call("on_client_change", source_id, ip_data_dict),
                             lambda source_id, ip_list: Managers.call("on_client_remove", source_id, ip_list),
                             lambda x: self._apiFirewallAllowFunc(p.full_name, x))
                     p.start()
@@ -88,12 +90,19 @@ class WrtLanManager:
         self._dispose()
         logging.info("Terminated.")
 
-    def on_client_add_or_change(self, source_id, ip_data_dict):
+    def on_client_add(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             if source_id == bridge.get_bridge_id():
                 continue
-            bridge.on_host_add_or_change(source_id, ip_data_dict)
+            bridge.on_host_add(source_id, ip_data_dict)
+
+    def on_client_change(self, source_id, ip_data_dict):
+        assert len(ip_data_dict) > 0
+        for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
+            if source_id == bridge.get_bridge_id():
+                continue
+            bridge.on_host_change(source_id, ip_data_dict)
 
     def on_client_remove(self, source_id, ip_list):
         assert len(ip_list) > 0
@@ -117,7 +126,10 @@ class WrtLanManager:
     def on_cascade_upstream_router_remove(self, data):
         self._upstreamVpnHostRefresh()
 
-    def on_cascade_upstream_router_client_add_or_change(self, data):
+    def on_cascade_upstream_router_client_add(self, data):
+        self._upstreamVpnHostRefresh()
+
+    def on_cascade_upstream_router_client_change(self, data):
         self._upstreamVpnHostRefresh()
 
     def on_cascade_upstream_router_client_remove(self, data):
@@ -144,7 +156,11 @@ class WrtLanManager:
             for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
                 bridge.on_source_remove("downstream-" + router_id)
 
-    def on_cascade_downstream_router_client_add_or_change(self, peer_uuid, data):
+    def on_cascade_downstream_router_client_add(self, peer_uuid, data):
+        for router_id in data.keys():
+            self._downstreamVpnHostRefreshForRouter(peer_uuid, router_id)
+
+    def on_cascade_downstream_router_client_change(self, peer_uuid, data):
         for router_id in data.keys():
             self._downstreamVpnHostRefreshForRouter(peer_uuid, router_id)
 
@@ -287,7 +303,8 @@ class _DefaultBridge:
         self.tmpDir = tmpDir
         self.varDir = varDir
         self.l2DnsPort = None
-        self.clientAddOrChangeFunc = None
+        self.clientAddFunc = None
+        self.clientChangeFunc = None
         self.clientRemoveFunc = None
 
         self.brname = None
@@ -303,7 +320,7 @@ class _DefaultBridge:
         self.leaseMonitor = None
         self.lastScanRecord = None
 
-    def init2(self, brname, prefix, l2dns_port, client_add_or_change_func, client_remove_func):
+    def init2(self, brname, prefix, l2dns_port, client_add_func, client_change_func, client_remove_func):
         assert prefix[1] == "255.255.255.0"
 
         self.brname = brname
@@ -313,7 +330,8 @@ class _DefaultBridge:
         self.dhcpRange = (self.brip + 1, self.brip + 49)
 
         self.l2DnsPort = l2dns_port
-        self.clientAddOrChangeFunc = client_add_or_change_func
+        self.clientAddFunc = client_add_func
+        self.clientChangeFunc = client_change_func
         self.clientRemoveFunc = client_remove_func
 
         # create bridge interface
@@ -362,7 +380,7 @@ class _DefaultBridge:
     def on_source_remove(self, source_id):
         os.unlink(os.path.join(self.hostsDir, source_id))
 
-    def on_host_add_or_change(self, source_id, ip_data_dict):
+    def on_host_add(self, source_id, ip_data_dict):
         fn = os.path.join(self.hostsDir, source_id)
         itemDict = WrtUtil.dnsmasqHostFileToOrderedDict(fn)
         bChanged = False
@@ -384,6 +402,9 @@ class _DefaultBridge:
         if bChanged:
             WrtUtil.dictToDnsmasqHostFile(itemDict, fn)
             self.dnsmasqProc.send_signal(signal.SIGHUP)
+
+    def on_host_change(self, source_id, ip_data_dict):
+        self.on_host_add(source_id, ip_data_dict)
 
     def on_host_remove(self, source_id, ip_list):
         fn = os.path.join(self.hostsDir, source_id)
@@ -495,7 +516,7 @@ class _DefaultBridge:
                 if self.___dnsmasqLeaseChangedFind(item, newLeaseList) is None:
                     removeList.append(item)
 
-            if len(addList) > 0 or len(changeList) > 0:
+            if len(addList) > 0:
                 ipDataDict = dict()
                 for expiryTime, mac, ip, hostname, clientId in addList:
                     self.__dnsmasqLeaseChangedAddToIpDataDict(ipDataDict, ip, mac, hostname)
@@ -506,7 +527,14 @@ class _DefaultBridge:
                 for expiryTime, mac, ip, hostname, clientId in changeList:
                     self.__dnsmasqLeaseChangedAddToIpDataDict(ipDataDict, ip, mac, hostname)
                     # log is not needed for client change
-                self.clientAddOrChangeFunc(self.get_bridge_id(), ipDataDict)
+                self.clientAddFunc(self.get_bridge_id(), ipDataDict)
+
+            if len(changeList) > 0:
+                ipDataDict = dict()
+                for expiryTime, mac, ip, hostname, clientId in changeList:
+                    self.__dnsmasqLeaseChangedAddToIpDataDict(ipDataDict, ip, mac, hostname)
+                    # log is not needed for client change
+                self.clientChangeFunc(self.get_bridge_id(), ipDataDict)
 
             if len(removeList) > 0:
                 ipList = [x[2] for x in removeList]

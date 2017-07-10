@@ -51,7 +51,7 @@ class WrtTrafficManager:
         # WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ip protocol icmp accept' % (intf))
         # WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s drop' % (intf))
 
-    def on_client_add_or_change(self, source_id, ip_data_dict):
+    def on_client_add(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
 
         if source_id not in self.sourceIpDict:
@@ -72,6 +72,9 @@ class WrtTrafficManager:
             if self.freeIpSet is not None:
                 self.sourceIpDict[source_id][ip] = (self.sourceIpDict[source_id][ip][0], self.freeIpSet.pop())
                 self._natCreate(source_id, ip)
+
+    def on_client_change(self, source_id, ip_data_dict):
+        self.on_client_add(source_id, ip_data_dict)
 
     def on_client_remove(self, source_id, ip_list):
         assert len(ip_list) > 0
@@ -122,7 +125,7 @@ class WrtTrafficManager:
     def on_cascade_downstream_router_add(self, peer_uuid, data):
         for router_id in data.keys():
             self.downstreamDict[peer_uuid][router_id] = set()
-        self.on_cascade_downstream_router_client_add_or_change(peer_uuid, data)
+        self.on_cascade_downstream_router_client_add(peer_uuid, data)
 
     def on_cascade_downstream_delete_router(self, peer_uuid, data):
         for router_id in data:
@@ -130,12 +133,19 @@ class WrtTrafficManager:
             self.on_client_remove("downstream-%s" % (router_id), list(ip_set))
         del self.downstreamDict[peer_uuid][router_id]
 
-    def on_cascade_downstream_router_client_add_or_change(self, peer_uuid, data):
+    def on_cascade_downstream_router_client_add(self, peer_uuid, data):
         for router_id, info in data.items():
             if info.get("client-list", dict()) == dict():
                 continue
             self.downstreamDict[peer_uuid][router_id] |= set(info["client-list"].keys())
-            self.on_client_add_or_change("downstream-%s" % (router_id), info["client-list"])
+            self.on_client_add("downstream-%s" % (router_id), info["client-list"])
+
+    def on_cascade_downstream_router_client_change(self, peer_uuid, data):
+        for router_id, info in data.items():
+            if info.get("client-list", dict()) == dict():
+                continue
+            self.downstreamDict[peer_uuid][router_id] |= set(info["client-list"].keys())
+            self.on_client_change("downstream-%s" % (router_id), info["client-list"])
 
     def on_cascade_downstream_router_client_remove(self, peer_uuid, data):
         for router_id, info in data.items():
