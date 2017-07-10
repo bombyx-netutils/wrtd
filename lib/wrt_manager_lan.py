@@ -111,62 +111,62 @@ class WrtLanManager:
                 continue
             bridge.on_host_remove(source_id, ip_list)
 
-    def on_cascade_upstream_up(self, data):
+    def on_cascade_upstream_up(self, api_client, data):
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             bridge.on_source_add("upstream-vpn")
-        self._upstreamVpnHostRefresh()
+        self._upstreamVpnHostRefresh(api_client)
 
-    def on_cascade_upstream_down(self):
+    def on_cascade_upstream_down(self, api_client):
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             bridge.on_source_remove("upstream-vpn")
 
-    def on_cascade_upstream_router_add(self, data):
-        self._upstreamVpnHostRefresh()
+    def on_cascade_upstream_router_add(self, api_client, data):
+        self._upstreamVpnHostRefresh(api_client)
 
-    def on_cascade_upstream_router_remove(self, data):
-        self._upstreamVpnHostRefresh()
+    def on_cascade_upstream_router_remove(self, api_client, data):
+        self._upstreamVpnHostRefresh(api_client)
 
-    def on_cascade_upstream_router_client_add(self, data):
-        self._upstreamVpnHostRefresh()
+    def on_cascade_upstream_router_client_add(self, api_client, data):
+        self._upstreamVpnHostRefresh(api_client)
 
-    def on_cascade_upstream_router_client_change(self, data):
-        self._upstreamVpnHostRefresh()
+    def on_cascade_upstream_router_client_change(self, api_client, data):
+        self._upstreamVpnHostRefresh(api_client)
 
-    def on_cascade_upstream_router_client_remove(self, data):
-        self._upstreamVpnHostRefresh()
+    def on_cascade_upstream_router_client_remove(self, api_client, data):
+        self._upstreamVpnHostRefresh(api_client)
 
-    def on_cascade_downstream_up(self, peer_uuid, data):
-        self.downstreamDict[peer_uuid] = []
-        self.on_cascade_downstream_router_add(peer_uuid, data["router-list"])
+    def on_cascade_downstream_up(self, sproc, data):
+        self.downstreamDict[sproc.get_peer_uuid()] = []
+        self.on_cascade_downstream_router_add(sproc, data["router-list"])
 
-    def on_cascade_downstream_down(self, peer_uuid):
-        if len(self.downstreamDict[peer_uuid]) > 0:
-            self.on_cascade_downstream_router_remove(peer_uuid, self.downstreamDict[peer_uuid])
-        del self.downstreamDict[peer_uuid]
+    def on_cascade_downstream_down(self, sproc):
+        if len(self.downstreamDict[sproc.get_peer_uuid()]) > 0:
+            self.on_cascade_downstream_router_remove(sproc, self.downstreamDict[sproc.get_peer_uuid()])
+        del self.downstreamDict[sproc.get_peer_uuid()]
 
-    def on_cascade_downstream_router_add(self, peer_uuid, data):
+    def on_cascade_downstream_router_add(self, sproc, data):
         for router_id in data.keys():
-            self.downstreamDict[peer_uuid].append(router_id)
+            self.downstreamDict[sproc.get_peer_uuid()].append(router_id)
             for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
                 bridge.on_source_add("downstream-" + router_id)
-            self._downstreamVpnHostRefreshForRouter(peer_uuid, router_id)
+            self._downstreamVpnHostRefreshForRouter(sproc, router_id)
 
-    def on_cascade_downstream_router_remove(self, peer_uuid, data):
+    def on_cascade_downstream_router_remove(self, sproc, data):
         for router_id in data:
             for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
                 bridge.on_source_remove("downstream-" + router_id)
 
-    def on_cascade_downstream_router_client_add(self, peer_uuid, data):
+    def on_cascade_downstream_router_client_add(self, sproc, data):
         for router_id in data.keys():
-            self._downstreamVpnHostRefreshForRouter(peer_uuid, router_id)
+            self._downstreamVpnHostRefreshForRouter(sproc, router_id)
 
-    def on_cascade_downstream_router_client_change(self, peer_uuid, data):
+    def on_cascade_downstream_router_client_change(self, sproc, data):
         for router_id in data.keys():
-            self._downstreamVpnHostRefreshForRouter(peer_uuid, router_id)
+            self._downstreamVpnHostRefreshForRouter(sproc, router_id)
 
-    def on_cascade_downstream_router_client_remove(self, peer_uuid, data):
+    def on_cascade_downstream_router_client_remove(self, sproc, data):
         for router_id in data.keys():
-            self._downstreamVpnHostRefreshForRouter(peer_uuid, router_id)
+            self._downstreamVpnHostRefreshForRouter(sproc, router_id)
 
     def _apiFirewallAllowFunc(self, owner, rule):
         class _Stub:
@@ -175,18 +175,18 @@ class WrtLanManager:
         data.firewall_allow = [rule]
         self.param.trafficManager.set_data(owner, data)
 
-    def _upstreamVpnHostRefresh(self):
+    def _upstreamVpnHostRefresh(self, api_client):
         # we need to differentiate upstream router and other client, so we do refresh instead of add/change/remove
         ipDataDict = dict()
 
         # add upstream routers into ipDataDict
         upstreamRouterLocalIpList = []
         if self.param.cascadeManager.hasValidApiClient():
-            curUpstreamId = self.param.cascadeManager.apiClient.get_peer_uuid()
-            curUpstreamIp = self.param.cascadeManager.apiClient.get_peer_ip()
+            curUpstreamId = api_client.get_peer_uuid()
+            curUpstreamIp = api_client.get_peer_ip()
             curUpstreamLocalIp = self.param.wanManager.vpnPlugin.get_local_ip()
             while True:
-                data = self.param.cascadeManager.apiClient.get_upstream_router_info()[curUpstreamId]
+                data = api_client.get_upstream_router_info()[curUpstreamId]
 
                 ipDataDict[curUpstreamIp] = dict()
                 if "hostname" in data:
@@ -200,7 +200,7 @@ class WrtLanManager:
                 curUpstreamLocalIp = data["cascade-vpn"]["local-ip"]
 
         # add all clients into ipDataDict
-        for router in self.param.cascadeManager.apiClient.get_upstream_router_info().values():
+        for router in api_client.get_upstream_router_info().values():
             if "client-list" in router:
                 for ip, data in router["client-list"].items():
                     if ip in upstreamRouterLocalIpList:
@@ -215,23 +215,12 @@ class WrtLanManager:
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             bridge.on_host_refresh("upstream-vpn", ipDataDict)
 
-    def _downstreamVpnHostRefreshForRouter(self, peer_uuid, router_id):
+    def _downstreamVpnHostRefreshForRouter(self, sproc, router_id):
         # we don't want to record "nat-ip" information, so we do refresh instead of add/change/remove
         ipDataDict = dict()
 
-        # get router data
-        routerData = None
-        for sproc in self.param.cascadeManager.getAllValidApiServerProcessors():
-            if sproc.get_peer_uuid() == peer_uuid:
-                for id2, data2 in sproc.get_downstream_router_info().items():
-                    if id2 == router_id:
-                        routerData = data2
-                        break
-                if routerData is not None:
-                    break
-        assert routerData is not None
-
         # add all clients into ipDataDict
+        routerData = sproc.get_downstream_router_info().items()[router_id]
         for ip, data in routerData["client-list"].items():
             if "nat-ip" in data:
                 ip = data["nat-ip"]

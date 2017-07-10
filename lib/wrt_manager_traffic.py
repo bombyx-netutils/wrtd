@@ -88,7 +88,7 @@ class WrtTrafficManager:
         if len(self.sourceIpDict[source_id]) == 0:
             del self.sourceIpDict[source_id]
 
-    def on_cascade_upstream_up(self, data):
+    def on_cascade_upstream_up(self, api_client, data):
         # create self.freeIpSet
         self.freeIpSet = set()
         ip1 = ipaddress.IPv4Address(data["subhost-start"])
@@ -106,51 +106,51 @@ class WrtTrafficManager:
                 ipDict[ip] = (ipDict[ip][0], self.freeIpSet.pop())
                 self._natCreate(source_id, ip)
 
-    def on_cascade_upstream_down(self):
+    def on_cascade_upstream_down(self, api_client):
         for source_id, ipDict in self.sourceIpDict.items():
             for ip in ipDict.keys():
                 ipDict[ip] = (ipDict[ip][0], None)
         self.freeIpSet = None
         # nftables rules and sub-interfaces would be auto-deleted when vpn-interface is removed
 
-    def on_cascade_downstream_up(self, peer_uuid, data):
-        self.downstreamDict[peer_uuid] = dict()
-        self.on_cascade_downstream_router_add(peer_uuid, data["router-list"])
+    def on_cascade_downstream_up(self, sproc, data):
+        self.downstreamDict[sproc.get_peer_uuid()] = dict()
+        self.on_cascade_downstream_router_add(sproc, data["router-list"])
 
-    def on_cascade_downstream_down(self, peer_uuid):
-        for router_id, ip_set in self.downstreamDict[peer_uuid].items():
+    def on_cascade_downstream_down(self, sproc):
+        for router_id, ip_set in self.downstreamDict[sproc.get_peer_uuid()].items():
             self.on_client_remove("downstream-%s" % (router_id), list(ip_set))
-        del self.downstreamDict[peer_uuid]
+        del self.downstreamDict[sproc.get_peer_uuid()]
 
-    def on_cascade_downstream_router_add(self, peer_uuid, data):
+    def on_cascade_downstream_router_add(self, sproc, data):
         for router_id in data.keys():
-            self.downstreamDict[peer_uuid][router_id] = set()
-        self.on_cascade_downstream_router_client_add(peer_uuid, data)
+            self.downstreamDict[sproc.get_peer_uuid()][router_id] = set()
+        self.on_cascade_downstream_router_client_add(sproc, data)
 
-    def on_cascade_downstream_delete_router(self, peer_uuid, data):
+    def on_cascade_downstream_delete_router(self, sproc, data):
         for router_id in data:
-            ip_set = self.downstreamDict[peer_uuid][router_id]
+            ip_set = self.downstreamDict[sproc.get_peer_uuid()][router_id]
             self.on_client_remove("downstream-%s" % (router_id), list(ip_set))
-        del self.downstreamDict[peer_uuid][router_id]
+        del self.downstreamDict[sproc.get_peer_uuid()][router_id]
 
-    def on_cascade_downstream_router_client_add(self, peer_uuid, data):
+    def on_cascade_downstream_router_client_add(self, sproc, data):
         for router_id, info in data.items():
             if info.get("client-list", dict()) == dict():
                 continue
-            self.downstreamDict[peer_uuid][router_id] |= set(info["client-list"].keys())
+            self.downstreamDict[sproc.get_peer_uuid()][router_id] |= set(info["client-list"].keys())
             self.on_client_add("downstream-%s" % (router_id), info["client-list"])
 
-    def on_cascade_downstream_router_client_change(self, peer_uuid, data):
+    def on_cascade_downstream_router_client_change(self, sproc, data):
         for router_id, info in data.items():
             if info.get("client-list", dict()) == dict():
                 continue
-            self.downstreamDict[peer_uuid][router_id] |= set(info["client-list"].keys())
+            self.downstreamDict[sproc.get_peer_uuid()][router_id] |= set(info["client-list"].keys())
             self.on_client_change("downstream-%s" % (router_id), info["client-list"])
 
-    def on_cascade_downstream_router_client_remove(self, peer_uuid, data):
+    def on_cascade_downstream_router_client_remove(self, sproc, data):
         for router_id, info in data.items():
             self.on_client_remove("downstream-%s" % (router_id), info["client-list"])
-            self.downstreamDict[peer_uuid][router_id] -= set(info["client-list"])
+            self.downstreamDict[sproc.get_peer_uuid()][router_id] -= set(info["client-list"])
 
     def _natCreate(self, source_id, ip):
         oriIp, natIp = self.sourceIpDict[source_id][ip]

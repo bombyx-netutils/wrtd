@@ -137,30 +137,30 @@ class WrtWanManager:
     def on_wvpn_down(self):
         self.param.prefixPool.removeExcludePrefixList("vpn")
 
-    def on_cascade_upstream_fail(self, excp):
+    def on_cascade_upstream_fail(self, api_client, excp):
         self.vpnPlugin.disconnect()
 
-    def on_cascade_upstream_down(self):
+    def on_cascade_upstream_down(self, api_client):
         self.vpnPlugin.disconnect()
 
-    def on_cascade_downstream_up(self, peer_uuid, data):
-        self.downstreamDict[peer_uuid] = []
-        self.on_cascade_downstream_router_add(peer_uuid, data["router-list"])
+    def on_cascade_downstream_up(self, sproc, data):
+        self.downstreamDict[sproc.get_peer_uuid()] = []
+        self.on_cascade_downstream_router_add(sproc, data["router-list"])
 
-    def on_cascade_downstream_down(self, peer_uuid):
-        self.on_cascade_downstream_router_remove(peer_uuid, self.downstreamDict[peer_uuid])
-        del self.downstreamDict[peer_uuid]
+    def on_cascade_downstream_down(self, sproc):
+        self.on_cascade_downstream_router_remove(sproc, self.downstreamDict[sproc.get_peer_uuid()])
+        del self.downstreamDict[sproc.get_peer_uuid()]
 
-    def on_cascade_downstream_router_add(self, peer_uuid, data):
-        self.downstreamDict[peer_uuid] += data.keys()
-        self.on_cascade_downstream_router_wan_prefix_list_change(peer_uuid, data)
+    def on_cascade_downstream_router_add(self, sproc, data):
+        self.downstreamDict[sproc.get_peer_uuid()] += data.keys()
+        self.on_cascade_downstream_router_wan_prefix_list_change(sproc, data)
 
-    def on_cascade_downstream_router_remove(self, peer_uuid, data):
+    def on_cascade_downstream_router_remove(self, sproc, data):
         for router_id in data:
             self.param.prefixPool.removeExcludePrefixList("downstream-wan-%s" % (router_id))
-            self.downstreamDict[peer_uuid].remove(router_id)
+            self.downstreamDict[sproc.get_peer_uuid()].remove(router_id)
 
-    def on_cascade_downstream_router_wan_prefix_list_change(self, peer_uuid, data):
+    def on_cascade_downstream_router_wan_prefix_list_change(self, sproc, data):
         # check downstream wan-prefix and restart if neccessary
         show_router_id = None
         for router_id, item in data.items():

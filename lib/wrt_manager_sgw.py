@@ -106,34 +106,34 @@ class WrtSgwManager:
 
     def on_client_add(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
-        for sproc in self.getAllValidApiServerProcessors():
-            sproc.send_notification("host-add", ip_data_dict)
+        for obj in self.getAllValidApiServerProcessors():
+            obj.send_notification("host-add", ip_data_dict)
 
     def on_client_change(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
-        for sproc in self.getAllValidApiServerProcessors():
-            sproc.send_notification("host-change", ip_data_dict)
+        for obj in self.getAllValidApiServerProcessors():
+            obj.send_notification("host-change", ip_data_dict)
 
     def on_client_remove(self, source_id, ip_list):
         assert len(ip_list) > 0
-        for sproc in self.getAllValidApiServerProcessors():
-            sproc.send_notification("host-remove", ip_list)
+        for obj in self.getAllValidApiServerProcessors():
+            obj.send_notification("host-remove", ip_list)
 
-    def on_cascade_upstream_up(self, data):
+    def on_cascade_upstream_up(self, api_client, data):
         self.upstreamClientDict = dict()
-        self.on_cascade_upstream_router_add(data["router-list"])
+        self.on_cascade_upstream_router_add(api_client, data["router-list"])
 
-    def on_cascade_upstream_down(self):
+    def on_cascade_upstream_down(self, api_client):
         router_id_list = list(self.upstreamClientDict.keys())
-        self.on_cascade_upstream_router_remove(router_id_list)
+        self.on_cascade_upstream_router_remove(api_client, router_id_list)
         self.upstreamClientDict = None
 
-    def on_cascade_upstream_router_add(self, data):
+    def on_cascade_upstream_router_add(self, api_client, data):
         for router_id in data.keys():
             self.upstreamClientDict[router_id] = dict()
-        self.on_cascade_upstream_router_client_add(data)
+        self.on_cascade_upstream_router_client_add(api_client, data)
 
-    def on_cascade_upstream_router_remove(self, data):
+    def on_cascade_upstream_router_remove(self, api_client, data):
         notifyData = []
 
         for router_id in data:
@@ -141,10 +141,10 @@ class WrtSgwManager:
                 notifyData.append(ip)
             del self.upstreamClientDict[router_id]
 
-        for sproc in self.getAllValidApiServerProcessors():
-            sproc.send_notification("host-remove", notifyData)
+        for obj in self.getAllValidApiServerProcessors():
+            obj.send_notification("host-remove", notifyData)
 
-    def on_cascade_upstream_router_client_add(self, data):
+    def on_cascade_upstream_router_client_add(self, api_client, data):
         notifyData = dict()
 
         for router_id in data.keys():
@@ -156,10 +156,10 @@ class WrtSgwManager:
                 notifyData[ip] = data2
 
         if len(notifyData) > 0:
-            for sproc in self.getAllValidApiServerProcessors():
-                sproc.send_notification("host-add", notifyData)
+            for obj in self.getAllValidApiServerProcessors():
+                obj.send_notification("host-add", notifyData)
 
-    def on_cascade_upstream_router_client_change(self, data):
+    def on_cascade_upstream_router_client_change(self, api_client, data):
         notifyData = dict()
 
         for router_id in data.keys():
@@ -169,10 +169,10 @@ class WrtSgwManager:
                 notifyData[ip] = data2
 
         if len(notifyData) > 0:
-            for sproc in self.getAllValidApiServerProcessors():
-                sproc.send_notification("host-change", notifyData)
+            for obj in self.getAllValidApiServerProcessors():
+                obj.send_notification("host-change", notifyData)
 
-    def on_cascade_upstream_router_client_remove(self, data):
+    def on_cascade_upstream_router_client_remove(self, api_client, data):
         notifyData = []
 
         for router_id in data:
@@ -180,34 +180,34 @@ class WrtSgwManager:
                 del self.upstreamClientDict[router_id][ip]
                 notifyData.append(ip)
 
-        for sproc in self.getAllValidApiServerProcessors():
-            sproc.send_notification("host-remove", notifyData)
+        for obj in self.getAllValidApiServerProcessors():
+            obj.send_notification("host-remove", notifyData)
 
-    def on_cascade_downstream_up(self, peer_uuid, data):
-        self.downstreamClientDict[peer_uuid] = dict()
-        self.on_cascade_downstream_router_add(peer_uuid, data["router-list"])
+    def on_cascade_downstream_up(self, sproc, data):
+        self.downstreamClientDict[sproc.get_peer_uuid()] = dict()
+        self.on_cascade_downstream_router_add(sproc, data["router-list"])
 
-    def on_cascade_downstream_down(self, peer_uuid):
-        self.on_cascade_downstream_router_remove(peer_uuid, self.downstreamClientDict[peer_uuid])
-        del self.downstreamClientDict[peer_uuid]
+    def on_cascade_downstream_down(self, sproc):
+        self.on_cascade_downstream_router_remove(sproc, self.downstreamClientDict[sproc.get_peer_uuid()])
+        del self.downstreamClientDict[sproc.get_peer_uuid()]
 
-    def on_cascade_downstream_router_add(self, peer_uuid, data):
+    def on_cascade_downstream_router_add(self, sproc, data):
         for router_id in data.keys():
-            self.downstreamClientDict[peer_uuid][router_id] = dict()
-        self.on_cascade_downstream_router_client_add(peer_uuid, data)
+            self.downstreamClientDict[sproc.get_peer_uuid()][router_id] = dict()
+        self.on_cascade_downstream_router_client_add(sproc, data)
 
-    def on_cascade_downstream_router_remove(self, peer_uuid, data):
+    def on_cascade_downstream_router_remove(self, sproc, data):
         notifyData = []
 
         for router_id in data:
             for ip in data[router_id]["client-list"]:
-                del self.downstreamClientDict[peer_uuid][router_id][ip]
+                del self.downstreamClientDict[sproc.get_peer_uuid()][router_id][ip]
                 notifyData.append(ip)
 
-        for sproc in self.getAllValidApiServerProcessors():
-            sproc.send_notification("host-remove", notifyData)
+        for obj in self.getAllValidApiServerProcessors():
+            obj.send_notification("host-remove", notifyData)
 
-    def on_cascade_downstream_router_client_add(self, peer_uuid, data):
+    def on_cascade_downstream_router_client_add(self, sproc, data):
         notifyData = dict()
 
         for router_id in data.keys():
@@ -215,36 +215,36 @@ class WrtSgwManager:
                 continue            # used when called by on_cascade_downstream_router_add()
             for ip, data2 in data[router_id]["client-list"].items():
                 ip, data2 = _get_ip_data(ip, data2)
-                self.downstreamClientDict[peer_uuid][router_id][ip] = data2
+                self.downstreamClientDict[sproc.get_peer_uuid()][router_id][ip] = data2
                 notifyData[ip] = data2
 
         if len(notifyData) > 0:
-            for sproc in self.getAllValidApiServerProcessors():
-                sproc.send_notification("host-add", notifyData)
+            for obj in self.getAllValidApiServerProcessors():
+                obj.send_notification("host-add", notifyData)
 
-    def on_cascade_downstream_router_client_change(self, peer_uuid, data):
+    def on_cascade_downstream_router_client_change(self, sproc, data):
         notifyData = dict()
 
         for router_id in data.keys():
             for ip, data2 in data[router_id]["client-list"].items():
                 ip, data2 = _get_ip_data(ip, data2)
-                self.downstreamClientDict[peer_uuid][router_id][ip] = data2
+                self.downstreamClientDict[sproc.get_peer_uuid()][router_id][ip] = data2
                 notifyData[ip] = data2
 
         if len(notifyData) > 0:
-            for sproc in self.getAllValidApiServerProcessors():
-                sproc.send_notification("host-change", notifyData)
+            for obj in self.getAllValidApiServerProcessors():
+                obj.send_notification("host-change", notifyData)
 
-    def on_cascade_downstream_router_client_remove(self, peer_uuid, data):
+    def on_cascade_downstream_router_client_remove(self, sproc, data):
         notifyData = []
 
         for router_id in data:
             for ip in data[router_id]["client-list"]:
-                del self.downstreamClientDict[peer_uuid][router_id][ip]
+                del self.downstreamClientDict[sproc.get_peer_uuid()][router_id][ip]
                 notifyData.append(ip)
 
-        for sproc in self.getAllValidApiServerProcessors():
-            sproc.send_notification("host-remove", notifyData)
+        for obj in self.getAllValidApiServerProcessors():
+            obj.send_notification("host-remove", notifyData)
 
     def getAllValidApiServerProcessors(self):
         ret = []
