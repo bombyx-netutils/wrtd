@@ -352,8 +352,6 @@ class WrtCascadeManager:
         assert len(data) > 0
 
         # process by myself
-        for router_id in data.keys():
-            logging.info("Router %s(UUID:%s) appeared." % (router_id))
         if self.param.uuid in data.keys():
             os.kill(os.getpid(), signal.SIGHUP)
             raise Exception("router UUID duplicates, will restart")
@@ -376,7 +374,6 @@ class WrtCascadeManager:
         for router_id in data:
             self.param.prefixPool.removeExcludePrefixList("upstream-lan-%s" % (router_id))
             self.param.prefixPool.removeExcludePrefixList("upstream-wan-%s" % (router_id))
-            logging.info("Router %s(UUID:%s) disappeared." % (router_id))
 
         # notify downstream
         for sproc in self.getAllValidApiServerProcessors():
@@ -637,12 +634,22 @@ class _ApiClient(JsonApiEndPoint):
 
     def on_notification_router_add(self, data):
         assert self.bRegistered
+
         self.routerInfo.update(data)
+        for router_id, data2 in data.items():
+            if "hostname" in data2:
+                logging.info("Router %s(UUID:%s) appeared." % (data2["hostname"], router_id))
+            else:
+                logging.info("Router %s appeared." % (router_id))
         Managers.call("on_cascade_upstream_router_add", data)
 
     def on_notification_router_remove(self, data):
         assert self.bRegistered
         for router_id in data:
+            if "hostname" in self.routerInfo[router_id]:
+                logging.info("Router %s(UUID:%s) disappeared." % (self.routerInfo[router_id]["hostname"], router_id))
+            else:
+                logging.info("Router %s disappeared." % (router_id))
             del self.routerInfo[router_id]
         Managers.call("on_cascade_upstream_router_remove", data)
 
