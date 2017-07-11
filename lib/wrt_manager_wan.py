@@ -32,8 +32,6 @@ class WrtWanManager:
 
         self.vpnPlugin = None
 
-        self.downstreamDict = dict()
-
         try:
             cfgfile = os.path.join(self.param.etcDir, "wan-connection.json")
             if os.path.exists(cfgfile):
@@ -144,21 +142,18 @@ class WrtWanManager:
         self.vpnPlugin.disconnect()
 
     def on_cascade_downstream_up(self, sproc, data):
-        self.downstreamDict[sproc.get_peer_uuid()] = []
         self.on_cascade_downstream_router_add(sproc, data["router-list"])
 
     def on_cascade_downstream_down(self, sproc):
-        self.on_cascade_downstream_router_remove(sproc, self.downstreamDict[sproc.get_peer_uuid()])
-        del self.downstreamDict[sproc.get_peer_uuid()]
+        router_id_list = list(sproc.get_router_info().keys())
+        self.on_cascade_downstream_router_remove(sproc, router_id_list)
 
     def on_cascade_downstream_router_add(self, sproc, data):
-        self.downstreamDict[sproc.get_peer_uuid()] += data.keys()
         self.on_cascade_downstream_router_wan_prefix_list_change(sproc, data)
 
     def on_cascade_downstream_router_remove(self, sproc, data):
         for router_id in data:
             self.param.prefixPool.removeExcludePrefixList("downstream-wan-%s" % (router_id))
-            self.downstreamDict[sproc.get_peer_uuid()].remove(router_id)
 
     def on_cascade_downstream_router_wan_prefix_list_change(self, sproc, data):
         # check downstream wan-prefix and restart if neccessary

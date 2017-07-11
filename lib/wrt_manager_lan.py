@@ -23,7 +23,6 @@ class WrtLanManager:
         self.defaultBridge = None
         self.lifPluginList = []
         self.vpnsPluginList = []
-        self.downstreamDict = dict()
 
         try:
             # create default bridge
@@ -136,17 +135,14 @@ class WrtLanManager:
         self._upstreamVpnHostRefresh(api_client)
 
     def on_cascade_downstream_up(self, sproc, data):
-        self.downstreamDict[sproc.get_peer_uuid()] = []
         self.on_cascade_downstream_router_add(sproc, data["router-list"])
 
     def on_cascade_downstream_down(self, sproc):
-        if len(self.downstreamDict[sproc.get_peer_uuid()]) > 0:
-            self.on_cascade_downstream_router_remove(sproc, self.downstreamDict[sproc.get_peer_uuid()])
-        del self.downstreamDict[sproc.get_peer_uuid()]
+        if len(sproc.get_router_info()) > 0:
+            self.on_cascade_downstream_router_remove(sproc, list(sproc.get_router_info().keys()))
 
     def on_cascade_downstream_router_add(self, sproc, data):
         for router_id in data.keys():
-            self.downstreamDict[sproc.get_peer_uuid()].append(router_id)
             for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
                 bridge.on_source_add("downstream-" + router_id)
             self._downstreamVpnHostRefreshForRouter(sproc, router_id)
@@ -186,7 +182,7 @@ class WrtLanManager:
             curUpstreamIp = api_client.get_peer_ip()
             curUpstreamLocalIp = self.param.wanManager.vpnPlugin.get_local_ip()
             while True:
-                data = api_client.get_upstream_router_info()[curUpstreamId]
+                data = api_client.get_router_info()[curUpstreamId]
 
                 ipDataDict[curUpstreamIp] = dict()
                 if "hostname" in data:
@@ -200,7 +196,7 @@ class WrtLanManager:
                 curUpstreamLocalIp = data["cascade-vpn"]["local-ip"]
 
         # add all clients into ipDataDict
-        for router in api_client.get_upstream_router_info().values():
+        for router in api_client.get_router_info().values():
             if "client-list" in router:
                 for ip, data in router["client-list"].items():
                     if ip in upstreamRouterLocalIpList:
@@ -220,7 +216,7 @@ class WrtLanManager:
         ipDataDict = dict()
 
         # add all clients into ipDataDict
-        routerData = sproc.get_downstream_router_info().items()[router_id]
+        routerData = sproc.get_router_info().items()[router_id]
         for ip, data in routerData["client-list"].items():
             if "nat-ip" in data:
                 ip = data["nat-ip"]

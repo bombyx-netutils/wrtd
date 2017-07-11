@@ -82,9 +82,9 @@ class DbusMainObject(dbus.service.Object):
             ret["cascade"]["router-list"].update(self.param.cascadeManager.routerInfo)
             if self.param.cascadeManager.hasValidApiClient():
                 ret["cascade"]["router-list"][self.param.uuid]["parent"] = self.param.cascadeManager.apiClient.get_peer_uuid()
-                ret["cascade"]["router-list"].update(self.param.cascadeManager.apiClient.get_upstream_router_info())
+                ret["cascade"]["router-list"].update(self.param.cascadeManager.apiClient.get_router_info())
             for sproc in self.param.cascadeManager.getAllValidApiServerProcessors():
-                ret["cascade"]["router-list"].update(sproc.get_downstream_router_info())
+                ret["cascade"]["router-list"].update(sproc.get_router_info())
                 ret["cascade"]["router-list"][sproc.get_peer_uuid()]["parent"] = self.param.uuid
 
         return json.dumps(ret)
