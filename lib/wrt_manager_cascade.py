@@ -833,7 +833,7 @@ class _Helper:
                     if "hostname" in o[ip]:
                         logging.info("Client %s(IP:%s) disappeared." % (o[ip]["hostname"], sip))
                     else:
-                        logging.info("Client %s(%s) disappeared." % (sip))
+                        logging.info("Client %s disappeared." % (sip))
             if "hostname" in data2:
                 logging.info("Router %s(UUID:%s) disappeared." % (data2["hostname"], router_id))
             else:
@@ -864,4 +864,4 @@ class _Helper:
                 if "hostname" in o[ip]:
                     logging.info("Client %s(IP:%s) disappeared." % (o[ip]["hostname"], sip))
                 else:
-                    logging.info("Client %s(%s) disappeared." % (sip))
+                    logging.info("Client %s disappeared." % (sip))
