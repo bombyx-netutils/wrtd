@@ -349,9 +349,6 @@ class WrtCascadeManager:
         assert len(data) > 0
 
         # process by myself
-        if self.param.uuid in data.keys():
-            os.kill(os.getpid(), signal.SIGHUP)
-            raise Exception("router UUID duplicates, will restart")
         ret = False
         for router_id, item in data.items():
             ret |= self.param.prefixPool.setExcludePrefixList("upstream-wan-%s" % (router_id), item.get("wan-prefix-list", []))
@@ -727,10 +724,30 @@ class _ApiServerProcessor(JsonApiEndPoint):
             _Helper.logRouterRemoveAll(self.routerInfo)
         logging.info("CASCADE-API client %s(UUID:%s) disconnected." % (self.get_peer_ip(), self.peerUuid))
 
-    def on_command_register(self, data, return_callback, errror_callback):
+    def on_command_register(self, data, return_callback, error_callback):
         # receive data
-        self.peerUuid = data["my-id"]
-        self.routerInfo = data["router-list"]
+        peerUuid = data["my-id"]
+        routerInfo = data["router-list"]
+
+        # check data
+        def _errfunc(uuid):
+            logging.error("CASCADE-API client %s rejected, UUID %s duplicate." % (self.get_peer_ip(), uuid))
+            error_callback("UUID %s duplicate" % (uuid))
+        if self.param.uuid in routerInfo:
+            _errfunc(self.param.uuid)
+            return
+        if self.pObj.hasValidApiClient():
+            ret = set(self.pObj.apiClient.get_router_info()) & set(routerInfo.keys())
+            ret = list(ret)
+            if len(ret) > 0:
+                _errfunc(ret[0])
+                return
+        for sproc in self.pObj.getAllValidApiServerProcessors():
+            ret = set(sproc.get_router_info()) & set(routerInfo.keys())
+            ret = list(ret)
+            if len(ret) > 0:
+                _errfunc(ret[0])
+                return
 
         # send data
         data2 = dict()
@@ -744,14 +761,15 @@ class _ApiServerProcessor(JsonApiEndPoint):
                 data2["router-list"][self.pObj.param.uuid]["parent"] = self.pObj.apiClient.peerUuid
                 data2["router-list"].update(self.pObj.apiClient.routerInfo)
             for sproc in self.pObj.getAllValidApiServerProcessors():
-                if sproc != self:
-                    data2["router-list"].update(sproc.routerInfo)
-                    data2["router-list"][sproc.peerUuid]["parent"] = self.pObj.param.uuid
+                data2["router-list"].update(sproc.routerInfo)
+                data2["router-list"][sproc.peerUuid]["parent"] = self.pObj.param.uuid
         return_callback(data2)
 
         # registered
+        self.peerUuid = peerUuid
+        self.routerInfo = routerInfo
         self.bRegistered = True
-        logging.info("CASCADE-API client %s(UUID:%s) registered." % (self.get_peer_ip(), self.peerUuid))
+        logging.info("CASCADE-API client %s registered." % (self.get_peer_ip()))
         _Helper.logRouterAdd(self.routerInfo)
         Managers.call("on_cascade_downstream_up", self, data)
 
