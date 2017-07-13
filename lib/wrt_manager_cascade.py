@@ -2,6 +2,8 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
+import re
+
 import copy
 import socket
 import signal
@@ -257,9 +259,12 @@ class WrtCascadeManager:
         self.routerInfo[self.param.uuid]["lan-prefix-list"] = []
         self.routerInfo[self.param.uuid]["client-list"] = dict()
 
-        # client & servers
+        # client
         self.apiClient = None
+
+        # servers
         self.apiServerList = []
+        self.banUuidList = []
 
         # start CASCADE-API server for all the bridges
         for plugin in self.param.lanManager.vpnsPluginList:
@@ -339,6 +344,7 @@ class WrtCascadeManager:
             sproc.send_notification("router-client-remove", data)
 
     def on_cascade_upstream_up(self, api_client, data):
+        self.banUuidList = []
         self.on_cascade_upstream_router_add(api_client, data["router-list"])
 
     def on_cascade_upstream_down(self, api_client):
@@ -567,7 +573,7 @@ class _ApiClient(JsonApiEndPoint):
             if True:
                 data["router-list"].update(self.pObj.routerInfo)
                 for sproc in self.pObj.getAllValidApiServerProcessors():
-                    data["router-list"].update(sproc.routerInfo)
+                    data["router-list"].update(sproc.get_router_info())
                     data["router-list"][sproc.peerUuid]["parent"] = self.pObj.param.uuid
             super().exec_command("register", data, self._on_register_return, self._on_register_error)
 
@@ -586,6 +592,17 @@ class _ApiClient(JsonApiEndPoint):
         Managers.call("on_cascade_upstream_up", self, data)
 
     def _on_register_error(self, reason):
+        m = re.match("UUID (.*) duplicate", reason)
+        if m is not None:
+            if m.group(1) == self.param.uuid:
+                WrtCommon.generateAndSaveUuid(self.pObj.param)
+                os.kill(os.getpid(), signal.SIGHUP)
+            else:
+                for sproc in self.pObj.getAllValidApiServerProcessors():
+                    if m.group(1) in sproc.get_router_info():
+                        self.pObj.banUuidList.append(m.group(1))
+                        sproc.close()
+                        break
         raise Exception(reason)
 
     def on_error(self, excp):
@@ -605,6 +622,18 @@ class _ApiClient(JsonApiEndPoint):
 
     def on_notification_router_add(self, data):
         assert self.bRegistered
+
+        ret = _Helper.upstreamRouterIdDuplicityCheck(self.pObj.param, data)
+        if ret is not None:
+            uuid, sproc = ret
+            if sproc is None:
+                WrtCommon.generateAndSaveUuid(self.pObj.param)
+                os.kill(os.getpid(), signal.SIGHUP)
+            else:
+                self.pObj.banUuidList.append(uuid)
+                sproc.close()
+            raise Exception("UUID %s duplicate" % (uuid))
+
         self.routerInfo.update(data)
         _Helper.logRouterAdd(data)
         Managers.call("on_cascade_upstream_router_add", self, data)
@@ -661,7 +690,7 @@ class _ApiServer:
 
     def __init__(self, pObj, bridge):
         self.pObj = pObj
-        self.freeSubhostIpRangeList = bridge.get_subhost_ip_range()
+        self.freeSubhostIpRangeList = list(bridge.get_subhost_ip_range())
 
         self.serverListener = Gio.SocketListener.new()
         addr = Gio.InetSocketAddress.new_from_string(WrtCommon.bridgeGetIp(bridge), self.pObj.param.cascadeApiPort)
@@ -677,12 +706,7 @@ class _ApiServer:
 
     def _on_accept(self, source_object, res):
         conn, dummy = source_object.accept_finish(res)
-        if self.freeSubhostIpRangeList == []:
-            conn.close()
-            logging.info("CASCADE-API client %s rejected, no subhost ip range available." % (conn.get_remote_address().get_address().to_string()))
-            return
-
-        sproc = _ApiServerProcessor(self.pObj, self, conn, self.freeSubhostIpRangeList.pop(0))
+        sproc = _ApiServerProcessor(self.pObj, self, conn)
         self.sprocList.append(sproc)
         logging.info("CASCADE-API client %s accepted." % (conn.get_remote_address().get_address().to_string()))
         self.serverListener.accept_async(None, self._on_accept)
@@ -690,15 +714,15 @@ class _ApiServer:
 
 class _ApiServerProcessor(JsonApiEndPoint):
 
-    def __init__(self, pObj, serverObj, conn, subhostIpRange):
+    def __init__(self, pObj, serverObj, conn):
         super().__init__()
         self.pObj = pObj
         self.serverObj = serverObj
         self.conn = conn
-        self.subhostIpRange = subhostIpRange
-        self.bRegistered = False
         self.peerUuid = None
         self.routerInfo = dict()
+        self.subhostIpRange = None
+        self.bRegistered = False
         super().set_iostream_and_start(self.conn)
 
     def get_peer_uuid(self):
@@ -710,19 +734,19 @@ class _ApiServerProcessor(JsonApiEndPoint):
     def get_router_info(self):
         return self.routerInfo
 
-    def close(self):
-        pass            # fixme
-
     def on_error(self, e):
         logging.error("debugXXXXXXXXXXXX", exc_info=True)            # fixme
-        self.serverObj.sprocList.remove(self)
-        self.serverObj.freeSubhostIpRangeList.append(self.subhostIpRange)
 
     def on_close(self):
         if self.bRegistered:
             Managers.call("on_cascade_downstream_down", self)
             _Helper.logRouterRemoveAll(self.routerInfo)
+        if self.subhostIpRange is not None:
+            self.serverObj.freeSubhostIpRangeList.append(self.subhostIpRange)
+        self.routerInfo = None
+        self.peerUuid = None
         logging.info("CASCADE-API client %s(UUID:%s) disconnected." % (self.get_peer_ip(), self.peerUuid))
+        self.serverObj.sprocList.remove(self)
 
     def on_command_register(self, data, return_callback, error_callback):
         # receive data
@@ -730,26 +754,25 @@ class _ApiServerProcessor(JsonApiEndPoint):
         routerInfo = data["router-list"]
 
         # check data
-        def _errfunc(uuid):
-            logging.error("CASCADE-API client %s rejected, UUID %s duplicate." % (self.get_peer_ip(), uuid))
-            error_callback("UUID %s duplicate" % (uuid))
-        if self.param.uuid in routerInfo:
-            _errfunc(self.param.uuid)
+        if True:
+            uuid = _Helper.downStreamRouterIdDuplicityCheck(self.pObj.param, routerInfo)
+            if uuid is not None:
+                logging.error("CASCADE-API client %s rejected, UUID %s duplicate." % (self.get_peer_ip(), uuid))
+                error_callback("UUID %s duplicate" % (uuid))
+                # no need to actively close connection, client would close it
+                return
+        if len(self.serverObj.freeSubhostIpRangeList) == 0:
+            logging.error("CASCADE-API client %s rejected, no subhost IP range available." % (self.get_peer_ip()))
+            error_callback("no subhost IP range available")
+            # no need to actively close connection, client would close it
             return
-        if self.pObj.hasValidApiClient():
-            ret = set(self.pObj.apiClient.get_router_info()) & set(routerInfo.keys())
-            ret = list(ret)
-            if len(ret) > 0:
-                _errfunc(ret[0])
-                return
-        for sproc in self.pObj.getAllValidApiServerProcessors():
-            ret = set(sproc.get_router_info()) & set(routerInfo.keys())
-            ret = list(ret)
-            if len(ret) > 0:
-                _errfunc(ret[0])
-                return
 
-        # send data
+        # save data
+        self.peerUuid = peerUuid
+        self.routerInfo = routerInfo
+        self.subhostIpRange = self.serverObj.freeSubhostIpRangeList.pop(0)
+
+        # send reply
         data2 = dict()
         data2["my-id"] = self.pObj.param.uuid
         data2["subhost-start"] = self.subhostIpRange[0]
@@ -766,8 +789,6 @@ class _ApiServerProcessor(JsonApiEndPoint):
         return_callback(data2)
 
         # registered
-        self.peerUuid = peerUuid
-        self.routerInfo = routerInfo
         self.bRegistered = True
         logging.info("CASCADE-API client %s registered." % (self.get_peer_ip()))
         _Helper.logRouterAdd(self.routerInfo)
@@ -775,6 +796,11 @@ class _ApiServerProcessor(JsonApiEndPoint):
 
     def on_notification_router_add(self, data):
         assert self.bRegistered
+
+        uuid = _Helper.downStreamRouterIdDuplicityCheck(self.pObj.param, data)
+        if uuid is not None:
+            raise Exception("UUID %s duplicate" % (uuid))
+
         self.routerInfo.update(data)
         _Helper.logRouterAdd(data)
         Managers.call("on_cascade_downstream_router_add", self, data)
@@ -822,6 +848,31 @@ class _ApiServerProcessor(JsonApiEndPoint):
 
 
 class _Helper:
+
+    def upstreamRouterIdDuplicityCheck(param, routerInfo):
+        if param.uuid in routerInfo:
+            return (param.uuid, None)
+        for sproc in param.cascadeManager.getAllValidApiServerProcessors():
+            ret = set(sproc.get_router_info()) & set(routerInfo.keys())
+            ret = list(ret)
+            if len(ret) > 0:
+                return (ret[0], sproc)
+        return None
+
+    def downStreamRouterIdDuplicityCheck(param, routerInfo):
+        if param.uuid in routerInfo:
+            return param.uuid
+        if param.cascadeManager.hasValidApiClient():
+            ret = set(param.cascadeManager.apiClient.get_router_info()) & set(routerInfo.keys())
+            ret = list(ret)
+            if len(ret) > 0:
+                return ret[0]
+        for sproc in param.cascadeManager.getAllValidApiServerProcessors():
+            ret = set(sproc.get_router_info()) & set(routerInfo.keys())
+            ret = list(ret)
+            if len(ret) > 0:
+                return ret[0]
+        return None
 
     def logRouterAdd(data):
         for router_id, item in data.items():

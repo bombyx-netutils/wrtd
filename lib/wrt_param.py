@@ -14,7 +14,9 @@ class WrtParam:
         self.logDir = "/var/log/wrtd"
         self.tmpDir = "/tmp/wrtd"
         self.varDir = "/var/wrtd"
+
         self.ownResolvConf = os.path.join(self.tmpDir, "resolv.conf")
+        self.dataFile = os.path.join(self.varDir, "global.json")
 
         self.daemon = None
 

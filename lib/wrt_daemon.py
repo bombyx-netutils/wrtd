@@ -4,7 +4,6 @@
 import os
 import sys
 import json
-import uuid
 import signal
 import shutil
 import logging
@@ -13,6 +12,7 @@ from gi.repository import GLib
 from gi.repository import GObject
 from dbus.mainloop.glib import DBusGMainLoop
 from wrt_util import WrtUtil
+from wrt_common import WrtCommon
 from wrt_common import PrefixPool
 from wrt_common import Managers
 from wrt_manager_traffic import WrtTrafficManager
@@ -29,7 +29,6 @@ class WrtDaemon:
     def __init__(self, param):
         self.param = param
         self.cfgFile = os.path.join(self.param.etcDir, "global.json")
-        self.dataFile = os.path.join(self.param.varDir, "global.json")
         self.bRestart = False
         self.interfaceDict = dict()
         self.interfaceTimer = None
@@ -47,7 +46,7 @@ class WrtDaemon:
             self._loadCfg()
 
             # load UUID
-            if self._loadUuid():
+            if WrtCommon.loadUuid(self.param):
                 logging.info("UUID generated: \"%s\"." % (self.param.uuid))
             else:
                 logging.info("UUID loaded: \"%s\"." % (self.param.uuid))
@@ -142,21 +141,6 @@ class WrtDaemon:
             with open(self.cfgFile, "r") as f:
                 cfgObj = json.load(f)
             self.param.dnsName = cfgObj["dns-name"]
-
-    def _loadUuid(self):
-        if os.path.exists(self.dataFile):
-            cfgObj = None
-            with open(self.dataFile, "r") as f:
-                cfgObj = json.load(f)
-            self.param.uuid = cfgObj["uuid"]
-            return False
-        else:
-            self.param.uuid = str(uuid.uuid4())
-            cfgObj = dict()
-            cfgObj["uuid"] = self.param.uuid
-            with open(self.dataFile, "w") as f:
-                json.dump(cfgObj, f)
-            return True
 
     def _interfaceTimerCallback(self):
         intfList = netifaces.interfaces()

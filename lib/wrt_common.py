@@ -2,6 +2,7 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
+import uuid
 import glob
 import fcntl
 import json
@@ -11,6 +12,26 @@ from wrt_util import WrtUtil
 
 
 class WrtCommon:
+
+    @staticmethod
+    def loadUuid(param):
+        if os.path.exists(param.dataFile):
+            cfgObj = None
+            with open(param.dataFile, "r") as f:
+                cfgObj = json.load(f)
+            param.uuid = cfgObj["uuid"]
+            return False
+        else:
+            param.uuid = WrtCommon.generateAndSaveUuid(param)
+            return True
+
+    @staticmethod
+    def generateAndSaveUuid(param):
+        cfgObj = dict()
+        cfgObj["uuid"] = str(uuid.uuid4())
+        with open(param.dataFile, "w") as f:
+            json.dump(cfgObj, f)
+        return cfgObj["uuid"]
 
     @staticmethod
     def bridgeGetIp(bridge):
