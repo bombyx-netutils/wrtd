@@ -593,15 +593,10 @@ class _ApiClient(JsonApiEndPoint):
     def _on_register_error(self, reason):
         m = re.match("UUID (.*) duplicate", reason)
         if m is not None:
-            if m.group(1) == self.param.uuid:
-                WrtCommon.generateAndSaveUuid(self.pObj.param)
-                os.kill(os.getpid(), signal.SIGHUP)
-            else:
-                for sproc in self.pObj.getAllValidApiServerProcessors():
-                    if m.group(1) in sproc.get_router_info():
-                        self.pObj.banUuidList.append(m.group(1))
-                        sproc.close()
-                        break
+            for sproc in self.pObj.getAllValidApiServerProcessors():
+                if m.group(1) in sproc.get_router_info():
+                    self.pObj.banUuidList.append(m.group(1))
+                    sproc.close()
         raise Exception(reason)
 
     def on_error(self, excp):
@@ -625,10 +620,7 @@ class _ApiClient(JsonApiEndPoint):
         ret = _Helper.upstreamRouterIdDuplicityCheck(self.pObj.param, data)
         if ret is not None:
             uuid, sproc = ret
-            if sproc is None:
-                WrtCommon.generateAndSaveUuid(self.pObj.param)
-                os.kill(os.getpid(), signal.SIGHUP)
-            else:
+            if sproc is not None:
                 self.pObj.banUuidList.append(uuid)
                 sproc.close()
             raise Exception("UUID %s duplicate" % (uuid))
