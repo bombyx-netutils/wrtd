@@ -107,8 +107,7 @@ class WrtWanManager:
                 self.logger.warn("Invalid DNS name %s." % (self.param.dnsName))
 
         # start checking if ip is public
-        self.wconnIpChecker = UrlOpenAsync("https://ipinfo.io/ip", self._wconnIpCheckComplete, self._wconnIpCheckError)
-        self.wconnIpChecker.start()
+        self._wconnIpCheckStart()
 
         # start vpn plugin
         if self.vpnPlugin is not None:
@@ -167,6 +166,11 @@ class WrtWanManager:
             os.kill(os.getpid(), signal.SIGHUP)
             self.logger.error("Prefix duplicates with downstream router %s, autofix it and restart." % (show_router_id))
 
+    def _wconnIpCheckStart(self):
+        assert self.wconnIpChecker is None
+        self.wconnIpChecker = UrlOpenAsync("https://ipinfo.io/ip", self._wconnIpCheckComplete, self._wconnIpCheckError)
+        self.wconnIpChecker.start()
+
     def _wconnIpCheckComplete(self, ip):
         self.wanConnIpIsPublic = (ip == self.wanConnPlugin.get_ip())
         self.logger.error("Internet IP (%s) check complete, %s IP" % (self.wanConnPlugin.get_ip(), "Public" if self.wanConnIpIsPublic else "NATed"))
@@ -175,3 +179,4 @@ class WrtWanManager:
     def _wconnIpCheckError(self, returncode, msg):
         self.logger.error("Internet IP (%s) check failed, %s" % (self.wanConnPlugin.get_ip(), msg))
         self.wanConnIpChecker = None
+        self._wconnIpCheckStart()       # restart check
