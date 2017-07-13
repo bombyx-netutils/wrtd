@@ -216,8 +216,7 @@ class WrtLanManager:
         ipDataDict = dict()
 
         # add all clients into ipDataDict
-        routerData = sproc.get_router_info().items()[router_id]
-        for ip, data in routerData["client-list"].items():
+        for ip, data in sproc.get_router_info()[router_id]["client-list"].items():
             if "nat-ip" in data:
                 ip = data["nat-ip"]
                 data = data.copy()
