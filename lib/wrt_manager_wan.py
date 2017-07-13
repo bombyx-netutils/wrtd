@@ -117,9 +117,9 @@ class WrtWanManager:
         self.wanConnIpIsPublic = None
         if self.vpnPlugin is not None:
             self.vpnPlugin.stop()
-        if self.wconnIpChecker is not None:
-            self.wconnIpChecker.cancel()
-            self.wconnIpChecker = None
+        if self.wanConnIpChecker is not None:
+            self.wanConnIpChecker.cancel()
+            self.wanConnIpChecker = None
         self.param.prefixPool.removeExcludePrefixList("wan")
 
     def on_wvpn_up(self):
@@ -167,9 +167,9 @@ class WrtWanManager:
             self.logger.error("Prefix duplicates with downstream router %s, autofix it and restart." % (show_router_id))
 
     def _wconnIpCheckStart(self):
-        assert self.wconnIpChecker is None
-        self.wconnIpChecker = UrlOpenAsync("https://ipinfo.io/ip", self._wconnIpCheckComplete, self._wconnIpCheckError)
-        self.wconnIpChecker.start()
+        assert self.wanConnIpChecker is None
+        self.wanConnIpChecker = UrlOpenAsync("https://ipinfo.io/ip", self._wconnIpCheckComplete, self._wconnIpCheckError)
+        self.wanConnIpChecker.start()
 
     def _wconnIpCheckComplete(self, ip):
         self.wanConnIpIsPublic = (ip == self.wanConnPlugin.get_ip())
