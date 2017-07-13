@@ -3,7 +3,6 @@
 
 import os
 import re
-
 import copy
 import socket
 import signal
@@ -909,8 +908,7 @@ class _Helper:
                 logging.info("Router %s disappeared." % (router_id))
 
     def logRouterRemoveAll(router_info):
-        data = list(router_info.keys())
-        _Helper.logRouterRemove(data, router_info)
+        _Helper.logRouterRemove(list(router_info.keys()), router_info)
 
     def logRouterClientAdd(data):
         for router_id, item in data.items():
