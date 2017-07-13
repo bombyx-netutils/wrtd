@@ -131,8 +131,8 @@ class WrtTrafficManager:
 
     def on_cascade_downstream_router_client_add(self, sproc, data):
         for router_id, info in data.items():
-            if "client-list" not in info:
-                continue
+            if "client-list" not in info or len(info["client-list"]) == 0:
+                continue        # may be called in on_cascade_downstream_router_add
             self.on_client_add("downstream-%s" % (router_id), info["client-list"])
 
     def on_cascade_downstream_router_client_change(self, sproc, data):
