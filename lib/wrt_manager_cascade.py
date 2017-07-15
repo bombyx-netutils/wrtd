@@ -327,6 +327,9 @@ class WrtCascadeManager:
         for ip in ip_list:
             if ip in self.routerInfo[self.param.uuid]["client-list"]:
                 del self.routerInfo[self.param.uuid]["client-list"][ip]
+        for sproc in self.getAllValidApiServerProcessors():
+            if sproc.get_peer_ip() in ip_list:
+                sproc.close()
 
         # notify upstream
         if self._apiClientCanNotify():
@@ -736,7 +739,7 @@ class _ApiServerProcessor(JsonApiEndPoint):
             self.serverObj.freeSubhostIpRangeList.append(self.subhostIpRange)
         self.routerInfo = None
         self.peerUuid = None
-        logging.info("CASCADE-API client %s(UUID:%s) disconnected." % (self.get_peer_ip(), self.peerUuid))
+        logging.info("CASCADE-API client %s disconnected." % (self.get_peer_ip()))
         self.serverObj.sprocList.remove(self)
 
     def on_command_register(self, data, return_callback, error_callback):

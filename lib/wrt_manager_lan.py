@@ -411,7 +411,7 @@ class _DefaultBridge:
         itemDict2 = dict()
         for ip, data in ip_data_dict.items():
             if "hostname" in data:
-                itemDict[ip] = data["hostname"]
+                itemDict2[ip] = data["hostname"]
 
         if itemDict != itemDict2:
             WrtUtil.dictToDnsmasqHostFile(itemDict2, fn)
