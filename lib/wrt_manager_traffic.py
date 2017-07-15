@@ -21,6 +21,7 @@ class WrtTrafficManager:
 
         self.sourceIpDict = dict()      # dict<source-id, dict<ip, (original-ip, nat-ip)>>
         self.freeIpSet = None
+        self.routesDict = dict()        # dict<gateway-ip, prefix-list>
 
         self.dnsPort = None
         self.dnsmasqProc = None
@@ -112,6 +113,17 @@ class WrtTrafficManager:
         self.freeIpSet = None
         # nftables rules and sub-interfaces would be auto-deleted when vpn-interface is removed
 
+    def on_cascade_upstream_router_add(self, api_client, data):
+
+
+    def on_cascade_upstream_router_lan_prefix_list_change(self, api_client, data):
+
+        for router_id in data:
+            if "lan-prefix-list" in data[router_id]:
+                self._updateRoutes(data[route_id]["lan-prefix-list"], sproc.get_peer_ip())
+
+
+
     def on_cascade_downstream_up(self, sproc, data):
         self.on_cascade_downstream_router_add(sproc, data["router-list"])
 
@@ -122,12 +134,18 @@ class WrtTrafficManager:
                 self.on_client_remove("downstream-%s" % (router_id), ip_list)
 
     def on_cascade_downstream_router_add(self, sproc, data):
+        self.on_cascade_downstream_router_lan_prefix_list_change(sproc, data)
         self.on_cascade_downstream_router_client_add(sproc, data)
 
-    def on_cascade_downstream_delete_router(self, sproc, data):
+    def on_cascade_downstream_router_remove(self, sproc, data):
         for router_id in data:
             ip_list = sproc.get_router_info()[router_id]
             self.on_client_remove("downstream-%s" % (router_id), ip_list)
+
+    def on_cascade_downstream_router_lan_prefix_list_change(self, sproc, data):
+        for router_id in data:
+            if "lan-prefix-list" in data[router_id]:
+                self._updateRoutes(data[route_id]["lan-prefix-list"], sproc.get_peer_ip())
 
     def on_cascade_downstream_router_client_add(self, sproc, data):
         for router_id, info in data.items():
@@ -207,3 +225,19 @@ class WrtTrafficManager:
             self.dnsmasqProc = None
         WrtUtil.forceDelete(self.pidFile)
         WrtUtil.forceDelete(self.cfgFile)
+
+    def _updateRoutes(self, prefix_list, gateway_ip)
+        with pyroute2.IPRoute() as ipp:
+            # remove routes
+            tlist = list(self.routesDict[gateway_ip])
+            for prefix in tlist:
+                if prefix not in prefix_list:
+                    dstStr = prefix[0] + "/" + prefix[1]
+                    ipp.route("del", dst=dstStr)
+                    self.routesDict[gateway_ip].remove(prefix)
+            # add routes
+            for prefix in prefix_list:
+                if prefix not in self.routesDict[gateway_ip]:
+                    dstStr = prefix[0] + "/" + prefix[1]
+                    ipp.route("add", dst=dstStr, gateway=gateway_ip)
+                    self.routesDict[gateway_ip].append(prefix)

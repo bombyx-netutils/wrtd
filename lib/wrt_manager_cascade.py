@@ -801,7 +801,7 @@ class _ApiServerProcessor(JsonApiEndPoint):
 
     def on_notification_router_remove(self, data):
         assert self.bRegistered
-        Managers.call("on_cascade_downstream_delete_router", self, data)
+        Managers.call("on_cascade_downstream_router_remove", self, data)
         _Helper.logRouterRemove(data, self.routerInfo)
         for router_id in data:
             del self.routerInfo[router_id]
@@ -810,7 +810,7 @@ class _ApiServerProcessor(JsonApiEndPoint):
         assert self.bRegistered
         for router_id, item in data.items():
             self.routerInfo[router_id]["wan-prefix-list"] = item["wan-prefix-list"]
-            Managers.call("on_cascade_downstream_router_wan_prefix_list_change", self, data)
+        Managers.call("on_cascade_downstream_router_wan_prefix_list_change", self, data)
 
     def on_notification_router_lan_prefix_list_change(self, data):
         assert self.bRegistered
