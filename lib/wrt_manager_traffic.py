@@ -19,9 +19,9 @@ class WrtTrafficManager:
 
         self.ownerDict = dict()
 
-        self.sourceIpDict = dict()      # dict<source-id, dict<ip, (original-ip, nat-ip)>>
+        self.sourceIpDict = dict()              # dict<source-id, dict<ip, (original-ip, nat-ip)>>
         self.freeIpSet = None
-        self.routesDict = dict()        # dict<gateway-ip, prefix-list>
+        self.downstreamRoutesDict = dict()      # dict<gateway-ip, prefix-list>
 
         self.dnsPort = None
         self.dnsmasqProc = None
@@ -125,6 +125,7 @@ class WrtTrafficManager:
 
 
     def on_cascade_downstream_up(self, sproc, data):
+        self.downstreamRoutesDict[sproc.get_peer_ip()] = []
         self.on_cascade_downstream_router_add(sproc, data["router-list"])
 
     def on_cascade_downstream_down(self, sproc):
@@ -132,6 +133,9 @@ class WrtTrafficManager:
             if "client-list" in data:
                 ip_list = list(data["client-list"].keys())
                 self.on_client_remove("downstream-%s" % (router_id), ip_list)
+        for peer_ip in list(self.downstreamRoutesDict.keys()):
+            self._updateRoutes([], peer_ip)
+            del self.downstreamRoutesDict[peer_ip]
 
     def on_cascade_downstream_router_add(self, sproc, data):
         self.on_cascade_downstream_router_lan_prefix_list_change(sproc, data)
@@ -141,6 +145,7 @@ class WrtTrafficManager:
         for router_id in data:
             ip_list = sproc.get_router_info()[router_id]
             self.on_client_remove("downstream-%s" % (router_id), ip_list)
+        self._updateRoutes([], sproc.get_peer_ip())
 
     def on_cascade_downstream_router_lan_prefix_list_change(self, sproc, data):
         for router_id in data:
