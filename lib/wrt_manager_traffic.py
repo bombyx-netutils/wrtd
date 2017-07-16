@@ -132,7 +132,7 @@ class WrtTrafficManager:
             if "lan-prefix-list" not in data[router_id]:
                 continue                # called by on_cascade_upstream_router_add()
             logging.info("debug1 " + str(data[router_id]["lan-prefix-list"]))
-            if router_id == api_client.get_peer_id():
+            if router_id == api_client.get_peer_uuid():
                 tlist = list(data[router_id]["lan-prefix-list"])
                 for prefix in self.param.wanManager.vpnPlugin.get_prefix_list():
                     tlist.remove(prefix[0] + "/" + prefix[1])
