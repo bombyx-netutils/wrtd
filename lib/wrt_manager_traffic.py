@@ -253,7 +253,7 @@ class WrtTrafficManager:
 
     def _updateRoutes(self, gateway_ip, router_id, prefix_list):
         if router_id not in self.routesDict[gateway_ip]:
-            self.routesDict[gateway_ip][router_id] = dict()
+            self.routesDict[gateway_ip][router_id] = []
         with pyroute2.IPRoute() as ipp:
             # remove routes
             tlist = list(self.routesDict[gateway_ip][router_id])
