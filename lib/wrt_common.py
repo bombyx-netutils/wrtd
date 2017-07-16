@@ -295,6 +295,7 @@ class TemplateBridge:
         assert False
 
     def get_prefix(self):
+        # returns (ip, mask)
         assert False
 
     def get_bridge_id(self):
@@ -354,6 +355,7 @@ class PluginTemplateWanConnection:
         assert False
 
     def get_prefix_list(self):
+        # returns [(ip, mask), (ip,mask ), ...]
         assert False
 
     def interface_appear(self, ifname):
@@ -405,6 +407,7 @@ class PluginTemplateCascadeVpn:
         assert False
 
     def get_prefix_list(self):
+        # returns [(ip, mask), (ip,mask ), ...]
         assert False
 
 

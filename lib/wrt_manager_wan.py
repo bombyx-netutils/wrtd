@@ -140,32 +140,6 @@ class WrtWanManager:
     def on_cascade_upstream_down(self, api_client):
         self.vpnPlugin.disconnect()
 
-    def on_cascade_downstream_up(self, sproc, data):
-        self.on_cascade_downstream_router_add(sproc, data["router-list"])
-
-    def on_cascade_downstream_down(self, sproc):
-        router_id_list = list(sproc.get_router_info().keys())
-        self.on_cascade_downstream_router_remove(sproc, router_id_list)
-
-    def on_cascade_downstream_router_add(self, sproc, data):
-        self.on_cascade_downstream_router_wan_prefix_list_change(sproc, data)
-
-    def on_cascade_downstream_router_remove(self, sproc, data):
-        for router_id in data:
-            self.param.prefixPool.removeExcludePrefixList("downstream-wan-%s" % (router_id))
-
-    def on_cascade_downstream_router_wan_prefix_list_change(self, sproc, data):
-        # check downstream wan-prefix and restart if neccessary
-        show_router_id = None
-        for router_id, item in data.items():
-            if "wan-prefix-list" not in item:
-                continue        # used when called by on_cascade_downstream_router_add()
-            if self.param.prefixPool.setExcludePrefixList("downstream-wan-%s" % (router_id), item["wan-prefix-list"]):
-                show_router_id = router_id
-        if show_router_id is not None:
-            os.kill(os.getpid(), signal.SIGHUP)
-            self.logger.error("Prefix duplicates with downstream router %s, autofix it and restart." % (show_router_id))
-
     def _wconnIpCheckStart(self):
         assert self.wanConnIpChecker is None
         self.wanConnIpChecker = UrlOpenAsync("https://ipinfo.io/ip", self._wconnIpCheckComplete, self._wconnIpCheckError)

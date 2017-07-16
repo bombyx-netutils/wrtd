@@ -363,8 +363,10 @@ class WrtCascadeManager:
         # process by myself
         ret = False
         for router_id, item in data.items():
-            ret |= self.param.prefixPool.setExcludePrefixList("upstream-wan-%s" % (router_id), item.get("wan-prefix-list", []))
-            ret |= self.param.prefixPool.setExcludePrefixList("upstream-lan-%s" % (router_id), item.get("lan-prefix-list", []))
+            tlist = _Helper.protocolPrefixListToPrefixList(item.get("wan-prefix-list", []))
+            ret |= self.param.prefixPool.setExcludePrefixList("upstream-wan-%s" % (router_id), tlist)
+            tlist = _Helper.protocolPrefixListToPrefixList(item.get("lan-prefix-list", []))
+            ret |= self.param.prefixPool.setExcludePrefixList("upstream-lan-%s" % (router_id), tlist)
         if ret:
             os.kill(os.getpid(), signal.SIGHUP)
             raise Exception("prefix duplicates with upstream router %s, autofix it and restart" % (router_id))
@@ -388,7 +390,8 @@ class WrtCascadeManager:
     def on_cascade_upstream_router_wan_prefix_list_change(self, api_client, data):
         ret = False
         for router_id, item in data.items():
-            ret |= self.param.prefixPool.setExcludePrefixList("upstream-wan-%s" % (router_id), item["wan-prefix-list"])
+            tlist = _Helper.protocolPrefixListToPrefixList(item["wan-prefix-list"])
+            ret |= self.param.prefixPool.setExcludePrefixList("upstream-wan-%s" % (router_id), tlist)
         if ret:
             os.kill(os.getpid(), signal.SIGHUP)
             raise Exception("prefix duplicates with upstream router %s, autofix it and restart" % (router_id))
@@ -401,7 +404,8 @@ class WrtCascadeManager:
         # process by myself
         ret = False
         for router_id, item in data.items():
-            ret |= self.param.prefixPool.setExcludePrefixList("upstream-lan-%s" % (router_id), item["lan-prefix-list"])
+            tlist = _Helper.protocolPrefixListToPrefixList(item["lan-prefix-list"])
+            ret |= self.param.prefixPool.setExcludePrefixList("upstream-lan-%s" % (router_id), tlist)
         if ret:
             os.kill(os.getpid(), signal.SIGHUP)
             raise Exception("prefix duplicates with upstream router %s, autofix it and restart" % (router_id))
@@ -433,6 +437,9 @@ class WrtCascadeManager:
         self.on_cascade_downstream_router_remove(sproc, list(sproc.get_router_info().keys()))
 
     def on_cascade_downstream_router_add(self, sproc, data):
+        # process by myself
+        self._downstreamWanPrefixListCheck(data)
+
         # notify upstream and other downstream
         if self.hasValidApiClient():
             self.apiClient.send_notification("router-add", data)
@@ -440,6 +447,10 @@ class WrtCascadeManager:
             obj.send_notification("router-add", data)
 
     def on_cascade_downstream_router_remove(self, sproc, data):
+        # process by myself
+        for router_id in data:
+            self.param.prefixPool.removeExcludePrefixList("downstream-wan-%s" % (router_id))
+
         # notify upstream and other downstream
         if self.hasValidApiClient():
             self.apiClient.send_notification("router-remove", data)
@@ -447,6 +458,9 @@ class WrtCascadeManager:
             obj.send_notification("router-remove", data)
 
     def on_cascade_downstream_router_wan_prefix_list_change(self, sproc, data):
+        # process by myself
+        self._downstreamWanPrefixListCheck(data)
+
         # notify upstream and other downstream
         if self.hasValidApiClient():
             self.apiClient.send_notification("router-wan-prefix-list-change", data)
@@ -504,19 +518,32 @@ class WrtCascadeManager:
             sproc.send_notification("router-client-%s" % (type), data)
 
     def _wanPrefixListChange(self, prefixList):
+        prefixList = _Helper.prefixListToProtocolPrefixList(prefixList)
+
+        # process by myself
         self.routerInfo[self.param.uuid]["wan-prefix-list"] = prefixList
 
-        # notify upstream
+        # notify upstream & downstream
+        data = dict()
+        data[self.param.uuid] = dict()
+        data[self.param.uuid]["wan-prefix-list"] = prefixList
         if self._apiClientCanNotify():
-            data = dict()
-            data[self.param.uuid] = prefixList
             self.apiClient.send_notification("router-wan-prefix-list-change", data)
-
-        # notify downstream
         for sproc in self.getAllValidApiServerProcessors():
-            data = dict()
-            data[self.param.uuid] = prefixList
             sproc.send_notification("router-wan-prefix-list-change", data)
+
+    def _downstreamWanPrefixListCheck(self, data):
+        # check downstream wan-prefix and restart if neccessary
+        show_router_id = None
+        for router_id, item in data.items():
+            if "wan-prefix-list" not in item:
+                continue        # used when called by on_cascade_downstream_router_add()
+            tlist = _Helper.protocolPrefixListToPrefixList(item["wan-prefix-list"])
+            if self.param.prefixPool.setExcludePrefixList("downstream-wan-%s" % (router_id), tlist):
+                show_router_id = router_id
+        if show_router_id is not None:
+            os.kill(os.getpid(), signal.SIGHUP)
+            raise Exception("prefix duplicates with downstream router %s, autofix it and restart" % (show_router_id))
 
     def hasValidApiClient(self):
         return self.apiClient is not None and self.apiClient.bRegistered
@@ -846,6 +873,19 @@ class _ApiServerProcessor(JsonApiEndPoint):
 
 
 class _Helper:
+
+    def prefixListToProtocolPrefixList(prefixList):
+        ret = []
+        for prefix in prefixList:
+            ret.append(prefix[0] + "/" + prefix[1])
+        return ret
+
+    def protocolPrefixListToPrefixList(protocolPrefixList):
+        ret = []
+        for prefix in protocolPrefixList:
+            tlist = prefix.split("/")
+            ret.append((tlist[0], tlist[1]))
+        return ret
 
     def upstreamRouterIdDuplicityCheck(param, routerInfo):
         if param.uuid in routerInfo:
