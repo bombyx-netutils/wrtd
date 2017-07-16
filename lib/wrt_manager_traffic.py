@@ -152,7 +152,9 @@ class WrtTrafficManager:
         #         self.on_client_remove("downstream-%s" % (router_id), ip_list)
 
     def on_cascade_downstream_down(self, sproc):
+        logging.info("debugabc")
         for router_id in sproc.get_router_info():
+            logging.info("debugabc " + router_id)
             self._removeRoutes(sproc.get_peer_ip(), router_id)
         del self.routesDict[sproc.get_peer_ip()]
 
@@ -270,6 +272,7 @@ class WrtTrafficManager:
                     logging.info("debug13 " + str(prefix))
 
     def _removeRoutes(self, gateway_ip, router_id):
+        logging.info("debug16 " + gateway_ip + " " + router_id)
         if router_id in self.routesDict[gateway_ip]:
             with pyroute2.IPRoute() as ipp:
                 for prefix in self.routesDict[gateway_ip][router_id]:
