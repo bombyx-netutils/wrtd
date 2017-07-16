@@ -255,7 +255,11 @@ class WrtCascadeManager:
             self.routerInfo[self.param.uuid]["cascade-vpn"] = dict()
         if self.param.wanManager.wanConnPlugin is not None:
             self.routerInfo[self.param.uuid]["wan-prefix-list"] = []
-        self.routerInfo[self.param.uuid]["lan-prefix-list"] = []
+        if True:
+            self.routerInfo[self.param.uuid]["lan-prefix-list"] = []
+            for bridge in [self.param.lanManager.defaultBridge] + [x.get_bridge() for x in self.param.lanManager.vpnsPluginList]:
+                prefix = bridge.get_prefix()
+                self.routerInfo[self.param.uuid]["lan-prefix-list"].append(prefix[0] + "/" + prefix[1])
         self.routerInfo[self.param.uuid]["client-list"] = dict()
 
         # client

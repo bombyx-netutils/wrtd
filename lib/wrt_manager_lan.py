@@ -72,10 +72,8 @@ class WrtLanManager:
                     self.vpnsPluginList.append(p)
                     logging.info("VPN server plugin \"%s\" activated." % (p.full_name))
 
-            # get all bridges
-            all_bridges = [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]
-
             # send other-bridge-create event
+            all_bridges = [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]
             for bridge in all_bridges:
                 for other_bridge in all_bridges:
                     if bridge == other_bridge:
