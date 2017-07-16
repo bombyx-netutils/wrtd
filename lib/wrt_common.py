@@ -144,22 +144,17 @@ class Managers:
         if obj is None:
             return
 
-        import logging
         if funcName.endswith("_down"):
-            logging.info("debugxyz " + objName + " " + funcName)
             upFuncName = re.sub("_down$", "_up", funcName)
             if upFuncName not in Managers._callRecord[objName]:
                 return
-            logging.info("debugxyyyyyyy " + objName + " " + funcName)
             if hasattr(obj, funcName):
-                logging.info("debugxyzzzzz " + objName + " " + funcName)
                 getattr(obj, funcName)(*args)
             del Managers._callRecord[objName][upFuncName]
         else:
             if hasattr(obj, funcName):
                 getattr(obj, funcName)(*args)
             if funcName.endswith("_up"):
-                logging.info("debugxxxxxxxxxxxx " + objName + " " + funcName)
                 Managers._callRecord[objName][funcName] = True
 
 
