@@ -259,13 +259,13 @@ class WrtTrafficManager:
             tlist = list(self.routesDict[gateway_ip][router_id])
             for prefix in tlist:
                 if prefix not in prefix_list:
-                    ipp.route("del", dst=prefix)
+                    ipp.route("del", dst=self._prefixConvert(prefix))
                     self.routesDict[gateway_ip][router_id].remove(prefix)
                     logging.info("debug12 " + str(prefix))
             # add routes
             for prefix in prefix_list:
                 if prefix not in self.routesDict[gateway_ip][router_id]:
-                    ipp.route("add", dst=prefix, gateway=gateway_ip)
+                    ipp.route("add", dst=self._prefixConvert(prefix), gateway=gateway_ip)
                     self.routesDict[gateway_ip][router_id].append(prefix)
                     logging.info("debug13 " + str(prefix))
 
@@ -274,5 +274,9 @@ class WrtTrafficManager:
             with pyroute2.IPRoute() as ipp:
                 for prefix in self.routesDict[gateway_ip][router_id]:
                     logging.info("debug14 " + str(prefix))
-                    ipp.route("del", dst=prefix)
+                    ipp.route("del", dst=self._prefixConvert(prefix))
                 del self.routesDict[gateway_ip][router_id]
+
+    def __prefixConvert(self, prefix):
+        tl = prefix.split("/")
+        return tl[0] + "/" + str(WrtUtil.ipMaskToLen(tl[1]))
