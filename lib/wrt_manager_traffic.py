@@ -142,6 +142,7 @@ class WrtTrafficManager:
             self._updateRoutes(api_client.get_peer_ip(), router_id, tlist)
 
     def on_cascade_downstream_up(self, sproc, data):
+        logging.info("debugabc")
         self.routesDict[sproc.get_peer_ip()] = dict()
         self.on_cascade_downstream_router_add(sproc, data["router-list"])
 
@@ -152,9 +153,9 @@ class WrtTrafficManager:
         #         self.on_client_remove("downstream-%s" % (router_id), ip_list)
 
     def on_cascade_downstream_down(self, sproc):
-        logging.info("debugabc")
+        logging.info("debugabc2")
         for router_id in sproc.get_router_info():
-            logging.info("debugabc " + router_id)
+            logging.info("debugabc3 " + router_id)
             self._removeRoutes(sproc.get_peer_ip(), router_id)
         del self.routesDict[sproc.get_peer_ip()]
 
