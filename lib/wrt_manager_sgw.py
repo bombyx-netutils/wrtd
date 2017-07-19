@@ -304,8 +304,5 @@ class _ApiServerProcessor(JsonApiEndPoint):
 
 def _get_ip_data(ip, data):
     data = data.copy()
-    if "nat-ip" in data:
-        ip = data["nat-ip"]
-        del data["nat-ip"]
     data["through-vpn"] = True
     return (ip, data)

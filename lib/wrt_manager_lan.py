@@ -140,10 +140,12 @@ class WrtLanManager:
             self.on_cascade_downstream_router_remove(sproc, list(sproc.get_router_info().keys()))
 
     def on_cascade_downstream_router_add(self, sproc, data):
-        for router_id in data.keys():
+        for router_id, router_info in data.items():
+            if "client-list" not in router_info:
+                continue
             for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
                 bridge.on_source_add("downstream-" + router_id)
-            self._downstreamVpnHostRefreshForRouter(sproc, router_id)
+                bridge.on_host_add("downstream-" + router_id, router_info["client-list"])
 
     def on_cascade_downstream_router_remove(self, sproc, data):
         for router_id in data:
@@ -151,16 +153,19 @@ class WrtLanManager:
                 bridge.on_source_remove("downstream-" + router_id)
 
     def on_cascade_downstream_router_client_add(self, sproc, data):
-        for router_id in data.keys():
-            self._downstreamVpnHostRefreshForRouter(sproc, router_id)
+        for router_id, router_info in data.items():
+            for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
+                bridge.on_host_add("downstream-" + router_id, router_info["client-list"])
 
     def on_cascade_downstream_router_client_change(self, sproc, data):
-        for router_id in data.keys():
-            self._downstreamVpnHostRefreshForRouter(sproc, router_id)
+        for router_id, router_info in data.items():
+            for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
+                bridge.on_host_change("downstream-" + router_id, router_info["client-list"])
 
     def on_cascade_downstream_router_client_remove(self, sproc, data):
-        for router_id in data.keys():
-            self._downstreamVpnHostRefreshForRouter(sproc, router_id)
+        for router_id, router_info in data.items():
+            for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
+                bridge.on_host_remove("downstream-" + router_id, router_info["client-list"])
 
     def _apiFirewallAllowFunc(self, owner, rule):
         class _Stub:
@@ -199,31 +204,11 @@ class WrtLanManager:
                 for ip, data in router["client-list"].items():
                     if ip in upstreamRouterLocalIpList:
                         continue
-                    if "nat-ip" in data:
-                        ip = data["nat-ip"]
-                        data = data.copy()
-                        del data["nat-ip"]
                     ipDataDict[ip] = data
 
         # refresh to all bridges
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             bridge.on_host_refresh("upstream-vpn", ipDataDict)
-
-    def _downstreamVpnHostRefreshForRouter(self, sproc, router_id):
-        # we don't want to record "nat-ip" information, so we do refresh instead of add/change/remove
-        ipDataDict = dict()
-
-        # add all clients into ipDataDict
-        for ip, data in sproc.get_router_info()[router_id]["client-list"].items():
-            if "nat-ip" in data:
-                ip = data["nat-ip"]
-                data = data.copy()
-                del data["nat-ip"]
-            ipDataDict[ip] = data
-
-        # refresh to all bridges
-        for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-            bridge.on_host_refresh("downstream-" + router_id, ipDataDict)
 
     def _getInstanceAndInfoFromEtcDir(self, pluginPrefix, cfgfilePrefix, name):
         # Returns (instanceName, cfgobj, tmpdir, vardir)

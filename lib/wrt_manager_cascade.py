@@ -3,7 +3,6 @@
 
 import os
 import re
-import copy
 import socket
 import signal
 import logging
@@ -132,7 +131,6 @@ from wrt_common import Managers
 #         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
 #             "client-list": {
 #                 "1.2.3.4": {
-#                     "nat-ip": "2.3.4.5",
 #                     "hostname": "abcd",
 #                     "wakeup-mac": "01-02-03-04-05-06",
 #                 },
@@ -151,7 +149,6 @@ from wrt_common import Managers
 #         "c5facfa6-d8c3-4bce-ac13-6abab49c86fc" : {
 #             "client-list": {
 #                 "1.2.3.4": {
-#                     "nat-ip": "2.3.4.5",
 #                     "hostname": "abcd",
 #                     "wakeup-mac": "01-02-03-04-05-06",
 #                 },
@@ -505,9 +502,7 @@ class WrtCascadeManager:
         if self._apiClientCanNotify():
             data = dict()
             data[self.param.uuid] = dict()
-            data[self.param.uuid]["client-list"] = copy.deepcopy(ip_data_dict)
-            for ip, data2 in data[self.param.uuid]["client-list"].items():
-                data2["nat-ip"] = self.param.trafficManager.sourceIpDict[source_id][ip][1]
+            data[self.param.uuid]["client-list"] = ip_data_dict
             self.apiClient.send_notification("router-client-%s" % (type), data)
 
         # notify downstream
@@ -920,8 +915,6 @@ class _Helper:
                 logging.info("Router %s appeared." % (router_id))
             if "client-list" in item:
                 for ip, data2 in item["client-list"].items():
-                    if "nat-ip" in data2:
-                        ip = data2["nat-ip"]
                     if "hostname" in data2:
                         logging.info("Client %s(IP:%s) appeared." % (data2["hostname"], ip))
                     else:
@@ -933,14 +926,10 @@ class _Helper:
             if "client-list" in data2:
                 o = data2["client-list"]
                 for ip in o.keys():
-                    if "nat-ip" in o[ip]:
-                        sip = o[ip]["nat-ip"]
-                    else:
-                        sip = ip
                     if "hostname" in o[ip]:
-                        logging.info("Client %s(IP:%s) disappeared." % (o[ip]["hostname"], sip))
+                        logging.info("Client %s(IP:%s) disappeared." % (o[ip]["hostname"], ip))
                     else:
-                        logging.info("Client %s disappeared." % (sip))
+                        logging.info("Client %s disappeared." % (ip))
             if "hostname" in data2:
                 logging.info("Router %s(UUID:%s) disappeared." % (data2["hostname"], router_id))
             else:
@@ -952,8 +941,6 @@ class _Helper:
     def logRouterClientAdd(data):
         for router_id, item in data.items():
             for ip, data2 in item["client-list"].items():
-                if "nat-ip" in data2:
-                    ip = data2["nat-ip"]
                 if "hostname" in data2:
                     logging.info("Client %s(IP:%s) appeared." % (data2["hostname"], ip))
                 else:
@@ -963,11 +950,7 @@ class _Helper:
         for router_id, item in data.items():
             o = router_info[router_id]["client-list"]
             for ip in item["client-list"]:
-                if "nat-ip" in o[ip]:
-                    sip = o[ip]["nat-ip"]
-                else:
-                    sip = ip
                 if "hostname" in o[ip]:
-                    logging.info("Client %s(IP:%s) disappeared." % (o[ip]["hostname"], sip))
+                    logging.info("Client %s(IP:%s) disappeared." % (o[ip]["hostname"], ip))
                 else:
-                    logging.info("Client %s disappeared." % (sip))
+                    logging.info("Client %s disappeared." % (ip))

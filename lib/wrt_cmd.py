@@ -88,8 +88,6 @@ class WrtSubCmdMain:
                     print("        No client.")
                 else:
                     for clientIp, clientData in routerData["client-list"].items():
-                        if "nat-ip" in clientData:
-                            clientIp = clientData["nat-ip"]
                         if "hostname" in clientData:
                             clientName = "%s(%s)" % (clientData["hostname"], clientIp)
                         else:

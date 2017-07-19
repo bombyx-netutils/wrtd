@@ -443,9 +443,6 @@ class TemplatePluginVpnServer:
     def init2(self, instanceName, cfg, tmpDir, varDir, bridgePrefix, l2DnsPort, clientAddOrChangeCallback, clientRemoveCallback, firewallAllowFunc):
         assert False
 
-    def set_other_bridge_list(self, bridge_list):
-        assert False
-
     def start(self):
         assert False
 
