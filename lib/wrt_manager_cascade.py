@@ -784,7 +784,7 @@ class _ApiServerProcessor(JsonApiEndPoint):
         # save data
         if "my-id" in data:
             self.peerUuid = data["my-id"]
-            self.routerInfo = data["router-info"]
+            self.routerInfo = data["router-list"]
 
         # send reply
         data2 = dict()
