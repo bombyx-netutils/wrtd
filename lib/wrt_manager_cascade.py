@@ -552,11 +552,11 @@ class WrtCascadeManager:
                     ret.append(sproc2)
         return ret
 
-    def getAllRotuerApiServerProcessors(self):
+    def getAllRouterApiServerProcessors(self):
         ret = []
         for obj in self.apiServerList:
             for sproc in obj.sprocList:
-                if sproc.bRegistered and sproc2.get_peer_uuid() is not None:
+                if sproc.bRegistered and sproc.get_peer_uuid() is not None:
                     ret.append(sproc)
         return ret
 
@@ -606,9 +606,9 @@ class _ApiClient(JsonApiEndPoint):
             data["router-list"] = dict()
             if True:
                 data["router-list"].update(self.pObj.routerInfo)
-                for sproc in self.pObj.getAllValidApiServerProcessors():
+                for sproc in self.pObj.getAllRouterApiServerProcessors():
                     data["router-list"].update(sproc.get_router_info())
-                    data["router-list"][sproc.peerUuid]["parent"] = self.pObj.param.uuid
+                    data["router-list"][sproc.get_peer_uuid()]["parent"] = self.pObj.param.uuid
             super().exec_command("register", data, self._on_register_return, self._on_register_error)
 
             self.bConnected = True
@@ -628,7 +628,7 @@ class _ApiClient(JsonApiEndPoint):
     def _on_register_error(self, reason):
         m = re.match("UUID (.*) duplicate", reason)
         if m is not None:
-            for sproc in self.pObj.getAllValidApiServerProcessors():
+            for sproc in self.pObj.getAllRouterApiServerProcessors():
                 if m.group(1) in sproc.get_router_info():
                     self.pObj.banUuidList.append(m.group(1))
                     sproc.close()
@@ -745,7 +745,7 @@ class _ApiServerProcessor(JsonApiEndPoint):
         self.serverObj = serverObj
         self.conn = conn
         self.peerUuid = None
-        self.routerInfo = dict()
+        self.routerInfo = None
         self.bRegistered = False
         super().set_iostream_and_start(self.conn)
 
@@ -764,20 +764,17 @@ class _ApiServerProcessor(JsonApiEndPoint):
     def on_close(self):
         if self.bRegistered:
             Managers.call("on_cascade_downstream_down", self)
-            _Helper.logRouterRemoveAll(self.routerInfo)
+            if self.peerUuid is not None:
+                _Helper.logRouterRemoveAll(self.routerInfo)
         self.routerInfo = None
         self.peerUuid = None
         logging.info("CASCADE-API client %s disconnected." % (self.get_peer_ip()))
         self.serverObj.sprocList.remove(self)
 
     def on_command_register(self, data, return_callback, error_callback):
-        # receive data
-        peerUuid = data["my-id"]
-        routerInfo = data["router-list"]
-
         # check data
-        if True:
-            uuid = _Helper.downStreamRouterIdDuplicityCheck(self.pObj.param, routerInfo)
+        if "my-id" in data:
+            uuid = _Helper.downStreamRouterIdDuplicityCheck(self.pObj.param, data["router-list"])
             if uuid is not None:
                 logging.error("CASCADE-API client %s rejected, UUID %s duplicate." % (self.get_peer_ip(), uuid))
                 error_callback("UUID %s duplicate" % (uuid))
@@ -785,8 +782,9 @@ class _ApiServerProcessor(JsonApiEndPoint):
                 return
 
         # save data
-        self.peerUuid = peerUuid
-        self.routerInfo = routerInfo
+        if "my-id" in data:
+            self.peerUuid = data["my-id"]
+            self.routerInfo = data["router-info"]
 
         # send reply
         data2 = dict()
@@ -797,7 +795,7 @@ class _ApiServerProcessor(JsonApiEndPoint):
             if self.pObj.hasValidApiClient():
                 data2["router-list"][self.pObj.param.uuid]["parent"] = self.pObj.apiClient.peerUuid
                 data2["router-list"].update(self.pObj.apiClient.routerInfo)
-            for sproc in self.pObj.getAllValidApiServerProcessors():
+            for sproc in self.pObj.getAllRouterApiServerProcessors():
                 data2["router-list"].update(sproc.routerInfo)
                 data2["router-list"][sproc.peerUuid]["parent"] = self.pObj.param.uuid
         return_callback(data2)
@@ -805,11 +803,12 @@ class _ApiServerProcessor(JsonApiEndPoint):
         # registered
         self.bRegistered = True
         logging.info("CASCADE-API client %s registered." % (self.get_peer_ip()))
-        _Helper.logRouterAdd(self.routerInfo)
+        if self.peerUuid is not None:
+            _Helper.logRouterAdd(self.routerInfo)
         Managers.call("on_cascade_downstream_up", self, data)
 
     def on_notification_router_add(self, data):
-        assert self.bRegistered
+        assert self.bRegistered and self.peerUuid is not None
 
         uuid = _Helper.downStreamRouterIdDuplicityCheck(self.pObj.param, data)
         if uuid is not None:
@@ -820,40 +819,46 @@ class _ApiServerProcessor(JsonApiEndPoint):
         Managers.call("on_cascade_downstream_router_add", self, data)
 
     def on_notification_router_remove(self, data):
-        assert self.bRegistered
+        assert self.bRegistered and self.peerUuid is not None
+
         Managers.call("on_cascade_downstream_router_remove", self, data)
         _Helper.logRouterRemove(data, self.routerInfo)
         for router_id in data:
             del self.routerInfo[router_id]
 
     def on_notification_router_wan_prefix_list_change(self, data):
-        assert self.bRegistered
+        assert self.bRegistered and self.peerUuid is not None
+
         for router_id, item in data.items():
             self.routerInfo[router_id]["wan-prefix-list"] = item["wan-prefix-list"]
         Managers.call("on_cascade_downstream_router_wan_prefix_list_change", self, data)
 
     def on_notification_router_lan_prefix_list_change(self, data):
-        assert self.bRegistered
+        assert self.bRegistered and self.peerUuid is not None
+
         for router_id, item in data.items():
             self.routerInfo[router_id]["lan-prefix-list"] = item["lan-prefix-list"]
         Managers.call("on_cascade_downstream_router_lan_prefix_list_change", self, data)
 
     def on_notification_router_client_add(self, data):
-        assert self.bRegistered
+        assert self.bRegistered and self.peerUuid is not None
+
         for router_id, item in data.items():
             self.routerInfo[router_id]["client-list"].update(item["client-list"])
         _Helper.logRouterClientAdd(data)
         Managers.call("on_cascade_downstream_router_client_add", self, data)
 
     def on_notification_router_client_change(self, data):
-        assert self.bRegistered
+        assert self.bRegistered and self.peerUuid is not None
+
         for router_id, item in data.items():
             self.routerInfo[router_id]["client-list"].update(item["client-list"])
         # no log needed for client change
         Managers.call("on_cascade_downstream_router_client_change", self, data)
 
     def on_notification_router_client_remove(self, data):
-        assert self.bRegistered
+        assert self.bRegistered and self.peerUuid is not None
+
         Managers.call("on_cascade_downstream_router_client_remove", self, data)
         _Helper.logRouterClientRemove(data, self.routerInfo)
         for router_id, item in data.items():
@@ -879,8 +884,8 @@ class _Helper:
     def upstreamRouterIdDuplicityCheck(param, routerInfo):
         if param.uuid in routerInfo:
             return (param.uuid, None)
-        for sproc in param.cascadeManager.getAllValidApiServerProcessors():
-            ret = set(sproc.get_router_info()) & set(routerInfo.keys())
+        for sproc in param.cascadeManager.getAllRouterApiServerProcessors():
+            ret = set(sproc.get_router_info().keys()) & set(routerInfo.keys())
             ret = list(ret)
             if len(ret) > 0:
                 return (ret[0], sproc)
@@ -894,8 +899,8 @@ class _Helper:
             ret = list(ret)
             if len(ret) > 0:
                 return ret[0]
-        for sproc in param.cascadeManager.getAllValidApiServerProcessors():
-            ret = set(sproc.get_router_info()) & set(routerInfo.keys())
+        for sproc in param.cascadeManager.getAllRouterApiServerProcessors():
+            ret = set(sproc.get_router_info().keys()) & set(routerInfo.keys())
             ret = list(ret)
             if len(ret) > 0:
                 return ret[0]
