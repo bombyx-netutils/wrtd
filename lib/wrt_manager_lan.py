@@ -277,7 +277,6 @@ class _DefaultBridge:
         self.brname = None
         self.brnetwork = None
         self.dhcpRange = None
-        self.subhostIpRange = None
 
         self.myhostnameFile = os.path.join(self.tmpDir, "dnsmasq.myhostname")
         self.hostsDir = os.path.join(self.tmpDir, "hosts.d")
@@ -331,14 +330,6 @@ class _DefaultBridge:
 
     def get_prefix(self):
         return (str(self.brnetwork.network_address), str(self.brnetwork.netmask))
-
-    def get_subhost_ip_range(self):
-        subhostIpRange = []
-        i = 51
-        while i + 49 < 255:
-            subhostIpRange.append((str(self.brip + i), str(self.brip + i + 49)))
-            i += 50
-        return subhostIpRange
 
     def on_source_add(self, source_id):
         with open(os.path.join(self.hostsDir, source_id), "w") as f:

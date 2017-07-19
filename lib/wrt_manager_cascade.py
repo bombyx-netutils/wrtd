@@ -41,8 +41,6 @@ from wrt_common import Managers
 # {
 #     "return": {
 #         "my-id": "c5facfa6-d8c3-4bce-ac13-6abab49c86fc",
-#         "subhost-start": "192.168.1.100",
-#         "subhost-end": "192.168.1.200",
 #         "router-list": {
 #             "c5facfa6-d8c3-4bce-ac13-6abab49c86fc": {
 #                 "parent": "c6f7cdad-d2ce-3478-cabc-a3b5445bdfee",
@@ -710,7 +708,6 @@ class _ApiServer:
 
     def __init__(self, pObj, bridge):
         self.pObj = pObj
-        self.freeSubhostIpRangeList = list(bridge.get_subhost_ip_range())
 
         self.serverListener = Gio.SocketListener.new()
         addr = Gio.InetSocketAddress.new_from_string(WrtCommon.bridgeGetIp(bridge), self.pObj.param.cascadeApiPort)
@@ -741,7 +738,6 @@ class _ApiServerProcessor(JsonApiEndPoint):
         self.conn = conn
         self.peerUuid = None
         self.routerInfo = dict()
-        self.subhostIpRange = None
         self.bRegistered = False
         super().set_iostream_and_start(self.conn)
 
@@ -761,8 +757,6 @@ class _ApiServerProcessor(JsonApiEndPoint):
         if self.bRegistered:
             Managers.call("on_cascade_downstream_down", self)
             _Helper.logRouterRemoveAll(self.routerInfo)
-        if self.subhostIpRange is not None:
-            self.serverObj.freeSubhostIpRangeList.append(self.subhostIpRange)
         self.routerInfo = None
         self.peerUuid = None
         logging.info("CASCADE-API client %s disconnected." % (self.get_peer_ip()))
@@ -781,22 +775,14 @@ class _ApiServerProcessor(JsonApiEndPoint):
                 error_callback("UUID %s duplicate" % (uuid))
                 # no need to actively close connection, client would close it
                 return
-        if len(self.serverObj.freeSubhostIpRangeList) == 0:
-            logging.error("CASCADE-API client %s rejected, no subhost IP range available." % (self.get_peer_ip()))
-            error_callback("no subhost IP range available")
-            # no need to actively close connection, client would close it
-            return
 
         # save data
         self.peerUuid = peerUuid
         self.routerInfo = routerInfo
-        self.subhostIpRange = self.serverObj.freeSubhostIpRangeList.pop(0)
 
         # send reply
         data2 = dict()
         data2["my-id"] = self.pObj.param.uuid
-        data2["subhost-start"] = self.subhostIpRange[0]
-        data2["subhost-end"] = self.subhostIpRange[1]
         data2["router-list"] = dict()
         if True:
             data2["router-list"].update(self.pObj.routerInfo)

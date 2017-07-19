@@ -301,10 +301,6 @@ class TemplateBridge:
     def get_bridge_id(self):
         assert False
 
-    def get_subhost_ip_range(self):
-        # return list(start_ip, end_ip)
-        assert False
-
     def on_source_add(self, source_id):
         pass
 
