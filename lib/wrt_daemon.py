@@ -19,7 +19,6 @@ from wrt_manager_traffic import WrtTrafficManager
 from wrt_manager_wan import WrtWanManager
 from wrt_manager_lan import WrtLanManager
 from wrt_manager_cascade import WrtCascadeManager
-from wrt_manager_sgw import WrtSgwManager
 from wrt_dbus import DbusMainObject
 from wrt_dbus import DbusIpForwardObject
 
@@ -79,7 +78,6 @@ class WrtDaemon:
             self.param.wanManager = WrtWanManager(self.param)
             self.param.lanManager = WrtLanManager(self.param)
             self.param.cascadeManager = WrtCascadeManager(self.param)
-            self.param.sgwManager = WrtSgwManager(self.param)
             self.interfaceTimer = GObject.timeout_add_seconds(10, self._interfaceTimerCallback)
 
             # start DBUS API server
@@ -95,9 +93,6 @@ class WrtDaemon:
             self.param.mainloop.run()
             logging.info("Mainloop exits.")
         finally:
-            if self.param.sgwManager is not None:
-                self.param.sgwManager.dispose()
-                self.param.sgwManager = None
             if self.interfaceTimer is not None:
                 GLib.source_remove(self.interfaceTimer)
                 self.interfaceTimer = None

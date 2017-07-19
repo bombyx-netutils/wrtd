@@ -29,7 +29,6 @@ class WrtParam:
         self.dbusMainObject = None
         self.dbusIpForwardObject = None
 
-        self.sgwApiPort = 2220
         self.cascadeApiPort = 2221
 
         self.pidFile = os.path.join(self.runDir, "wrtd.pid")
@@ -40,4 +39,3 @@ class WrtParam:
         self.wanManager = None
         self.lanManager = None
         self.cascadeManager = None
-        self.sgwManager = None

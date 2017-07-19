@@ -129,7 +129,6 @@ class Managers:
         Managers._callRecord["wan"] = dict()
         Managers._callRecord["lan"] = dict()
         Managers._callRecord["cascade"] = dict()
-        Managers._callRecord["sgw"] = dict()
 
     @staticmethod
     def call(funcName, *args):
@@ -137,7 +136,6 @@ class Managers:
         Managers._callFunc("wan", Managers._param.wanManager, funcName, *args)
         Managers._callFunc("lan", Managers._param.lanManager, funcName, *args)
         Managers._callFunc("cascade", Managers._param.cascadeManager, funcName, *args)
-        Managers._callFunc("sgw", Managers._param.sgwManager, funcName, *args)
 
     @staticmethod
     def _callFunc(objName, obj, funcName, *args):

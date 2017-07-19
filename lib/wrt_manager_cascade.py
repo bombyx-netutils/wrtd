@@ -552,6 +552,14 @@ class WrtCascadeManager:
                     ret.append(sproc2)
         return ret
 
+    def getAllRotuerApiServerProcessors(self):
+        ret = []
+        for obj in self.apiServerList:
+            for sproc in obj.sprocList:
+                if sproc.bRegistered and sproc2.get_peer_uuid() is not None:
+                    ret.append(sproc)
+        return ret
+
     def _apiClientCanNotify(self):
         return self.apiClient is not None and self.apiClient.bConnected
 

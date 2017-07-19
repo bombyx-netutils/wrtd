@@ -136,8 +136,7 @@ class WrtLanManager:
         self.on_cascade_downstream_router_add(sproc, data["router-list"])
 
     def on_cascade_downstream_down(self, sproc):
-        if len(sproc.get_router_info()) > 0:
-            self.on_cascade_downstream_router_remove(sproc, list(sproc.get_router_info().keys()))
+        self.on_cascade_downstream_router_remove(sproc, list(sproc.get_router_info().keys()))
 
     def on_cascade_downstream_router_add(self, sproc, data):
         for router_id, router_info in data.items():
