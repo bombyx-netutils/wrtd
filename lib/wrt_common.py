@@ -90,6 +90,17 @@ class WrtCommon:
         return ret
 
     @staticmethod
+    def getTrafficPluginList(param):
+        return WrtCommon._getPluginList(param, "traffic")
+
+    @staticmethod
+    def getTrafficPlugin(param, name):
+        ret = WrtCommon._getPlugin(param, "traffic", name, "")
+        if ret is None:
+            raise Exception("traffic plugin %s does not exists" % (name))
+        return ret
+
+    @staticmethod
     def _getPluginList(param, prefix):
         ret = []
         for fn in glob.glob(os.path.join(param.libDir, "plugins", prefix + "_*")):
@@ -452,6 +463,20 @@ class TemplatePluginVpnServer:
 
     def generate_client_script(self, wan_ip, os_type):
         # returns (suggested-script-filename, script-content)
+        assert False
+
+
+# plugin module name: plugins.traffic_*
+# config file: ${ETC}/traffic-(PLUGIN_NAME)-(INSTANCE_NAME).json
+class TemplatePluginTraffic:
+
+    def init2(self, cfg, tmpDir, varDir, setTrafficManagementDataCallback):
+        assert False
+
+    def start(self):
+        assert False
+
+    def stop(self):
         assert False
 
 

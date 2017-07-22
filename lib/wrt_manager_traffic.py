@@ -2,10 +2,12 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
+import json
 import logging
 import subprocess
 import pyroute2
 from wrt_util import WrtUtil
+from wrt_common import WrtCommon
 
 
 class WrtTrafficManager:
@@ -15,6 +17,7 @@ class WrtTrafficManager:
         self.cfgFile = os.path.join(self.param.tmpDir, "l2-dnsmasq.conf")
         self.pidFile = os.path.join(self.param.tmpDir, "l2-dnsmasq.pid")
 
+        self.pluginList = []
         self.ownerDict = dict()
         self.routesDict = dict()      # dict<gateway-ip, dict<router-id, list<prefix>>>
 
@@ -23,12 +26,36 @@ class WrtTrafficManager:
         try:
             self._runDnsmasq()
             logging.info("Level 2 nameserver started.")
-        except BaseException:
-            self._stopDnsmasq()
+
+            # start all traffic plugins
+            for name in WrtCommon.getTrafficPluginList(self.param):
+                fn = os.path.join(self.param.etcDir, "traffic-%s.json" % (name))
+                if not os.path.exists(fn):
+                    continue
+
+                tmpdir = os.path.join(self.param.tmpDir, name)
+                os.mkdir(tmpdir)
+
+                vardir = os.path.join(self.param.varDir, name)
+                WrtUtil.ensureDir(vardir)
+
+                if os.path.getsize(fn) > 0:
+                    with open(fn, "r") as f:
+                        cfgObj = json.load(f)
+                else:
+                    cfgObj = dict()
+
+                p = WrtCommon.getTrafficPlugin(self.param, name)
+                p.init2(cfgObj, tmpdir, vardir)
+                p.start()
+                self.pluginList.append(p)
+                logging.info("Traffic plugin \"%s\" activated." % (p.full_name))
+        except:
+            self.dispose()
             raise
 
     def dispose(self):
-        self._stopDnsmasq()
+        self._dispose()
         logging.info("Terminated.")
 
     def get_l2_nameserver_port(self):
@@ -94,6 +121,14 @@ class WrtTrafficManager:
         for router_id in data:
             if "lan-prefix-list" in data[router_id]:
                 self._updateRoutes(sproc.get_peer_ip(), router_id, data[router_id]["lan-prefix-list"])
+
+    def _dispose(self):
+        for p in self.pluginList:
+            p.stop()
+            logging.info("Traffic plugin \"%s\" deactivated." % (p.full_name))
+        self.pluginList = []
+
+        self._stopDnsmasq()
 
     def _runDnsmasq(self):
         self.dnsPort = WrtUtil.getFreeSocketPort("tcp")
