@@ -66,25 +66,20 @@ class WrtTrafficManager:
         for router_id in data:
             if "lan-prefix-list" not in data[router_id]:
                 continue                # called by on_cascade_upstream_router_add()
-            logging.info("debug1 " + str(data[router_id]["lan-prefix-list"]))
             if router_id == api_client.get_peer_uuid():
                 tlist = list(data[router_id]["lan-prefix-list"])
                 for prefix in self.param.wanManager.vpnPlugin.get_prefix_list():
                     tlist.remove(prefix[0] + "/" + prefix[1])
             else:
                 tlist = data[router_id]["lan-prefix-list"]
-            logging.info("debug2 " + str(data[router_id]["lan-prefix-list"]))
             self._updateRoutes(api_client.get_peer_ip(), router_id, tlist)
 
     def on_cascade_downstream_up(self, sproc, data):
-        logging.info("debugabc")
         self.routesDict[sproc.get_peer_ip()] = dict()
         self.on_cascade_downstream_router_add(sproc, data["router-list"])
 
     def on_cascade_downstream_down(self, sproc):
-        logging.info("debugabc2")
         for router_id in sproc.get_router_info():
-            logging.info("debugabc3 " + router_id)
             self._removeRoutes(sproc.get_peer_ip(), router_id)
         del self.routesDict[sproc.get_peer_ip()]
 
@@ -98,7 +93,6 @@ class WrtTrafficManager:
     def on_cascade_downstream_router_lan_prefix_list_change(self, sproc, data):
         for router_id in data:
             if "lan-prefix-list" in data[router_id]:
-                logging.info("debug0 " + str(data[router_id]["lan-prefix-list"]))
                 self._updateRoutes(sproc.get_peer_ip(), router_id, data[router_id]["lan-prefix-list"])
 
     def _runDnsmasq(self):
@@ -146,20 +140,16 @@ class WrtTrafficManager:
                 if prefix not in prefix_list:
                     ipp.route("del", dst=self.__prefixConvert(prefix))
                     self.routesDict[gateway_ip][router_id].remove(prefix)
-                    logging.info("debug12 " + str(prefix))
             # add routes
             for prefix in prefix_list:
                 if prefix not in self.routesDict[gateway_ip][router_id]:
                     ipp.route("add", dst=self.__prefixConvert(prefix), gateway=gateway_ip)
                     self.routesDict[gateway_ip][router_id].append(prefix)
-                    logging.info("debug13 " + str(prefix))
 
     def _removeRoutes(self, gateway_ip, router_id):
-        logging.info("debug16 " + gateway_ip + " " + router_id)
         if router_id in self.routesDict[gateway_ip]:
             with pyroute2.IPRoute() as ipp:
                 for prefix in self.routesDict[gateway_ip][router_id]:
-                    logging.info("debug14 " + str(prefix))
                     ipp.route("del", dst=self.__prefixConvert(prefix))
                 del self.routesDict[gateway_ip][router_id]
 

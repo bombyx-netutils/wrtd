@@ -434,7 +434,7 @@ class TemplatePluginLanInterface:
 # allow multiple plugins be loaded, and one plugin can have multiple instances
 class TemplatePluginVpnServer:
 
-    def init2(self, instanceName, cfg, tmpDir, varDir, bridgePrefix, l2DnsPort, clientAddOrChangeCallback, clientRemoveCallback, firewallAllowFunc):
+    def init2(self, instanceName, cfg, tmpDir, varDir, bridgePrefix, l2DnsPort, clientAddCallback, clientChangeCallback, clientRemoveCallback):
         assert False
 
     def start(self):
@@ -445,6 +445,9 @@ class TemplatePluginVpnServer:
 
     def get_bridge(self):
         # must be called after start()
+        assert False
+
+    def get_traffic_management_firewall_allow_list(self):
         assert False
 
     def generate_client_script(self, wan_ip, os_type):
@@ -475,7 +478,7 @@ class TemplateTrafficManagementData:
         assert False
 
     @property
-    def firewall_allow(self):
+    def firewall_allow_list(self):
         # list<rule>, optional
         assert False
 

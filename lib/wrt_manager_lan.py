@@ -66,11 +66,16 @@ class WrtLanManager:
                             self.param.trafficManager.get_l2_nameserver_port(),
                             lambda source_id, ip_data_dict: Managers.call("on_client_add", source_id, ip_data_dict),
                             lambda source_id, ip_data_dict: Managers.call("on_client_change", source_id, ip_data_dict),
-                            lambda source_id, ip_list: Managers.call("on_client_remove", source_id, ip_list),
-                            lambda x: self._apiFirewallAllowFunc(p.full_name, x))
+                            lambda source_id, ip_list: Managers.call("on_client_remove", source_id, ip_list))
                     p.start()
                     self.vpnsPluginList.append(p)
                     logging.info("VPN server plugin \"%s\" activated." % (p.full_name))
+
+                    class _Stub:
+                        pass
+                    data = _Stub()
+                    data.firewall_allow_list = p.get_traffic_management_firewall_allow_list()
+                    self.param.trafficManager.set_data(p.full_name, data)
 
             # send other-bridge-create event
             all_bridges = [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]
@@ -165,13 +170,6 @@ class WrtLanManager:
         for router_id, router_info in data.items():
             for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
                 bridge.on_host_remove("downstream-" + router_id, router_info["client-list"])
-
-    def _apiFirewallAllowFunc(self, owner, rule):
-        class _Stub:
-            pass
-        data = _Stub
-        data.firewall_allow = [rule]
-        self.param.trafficManager.set_data(owner, data)
 
     def _upstreamVpnHostRefresh(self, api_client):
         # we need to differentiate upstream router and other client, so we do refresh instead of add/change/remove
