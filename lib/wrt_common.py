@@ -470,7 +470,7 @@ class TemplatePluginVpnServer:
 # config file: ${ETC}/traffic-(PLUGIN_NAME)-(INSTANCE_NAME).json
 class TemplatePluginTraffic:
 
-    def init2(self, cfg, tmpDir, varDir, setTrafficManagementDataCallback):
+    def init2(self, cfg, tmpDir, varDir, facilityChangeCallback):
         assert False
 
     def start(self):
@@ -478,6 +478,57 @@ class TemplatePluginTraffic:
 
     def stop(self):
         assert False
+
+
+class TemplateFacilityNameserver:
+
+    @property
+    def target(self):
+        """[(hostname,port)]"""
+        assert False
+
+    @property
+    def domain_list(self):
+        assert False
+
+
+class FacilityGateway:
+
+    @property
+    def target(self):
+        """(next-hop,interface), invalid if both is None"""
+        assert False
+
+    @property
+    def network_list(self):
+        assert False
+
+
+class FacilityHttpProxy:
+
+    """HTTP/HTTPS/FTP proxy"""
+
+    @property
+    def target(self):
+        """{"http":(hostname, port),"https":(hostname,port),"ftp":(hostname,port)}"""
+        assert False
+
+    @property
+    def domain_list(self):
+        assert False
+
+
+class FacilitySocks4Proxy:
+
+    @property
+    def target(self):
+        """[(hostname,port)]"""
+        assert False
+
+    @property
+    def domain_list(self):
+        assert False
+
 
 
 class TemplateTrafficManagementData:
