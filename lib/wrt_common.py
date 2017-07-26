@@ -458,7 +458,7 @@ class TemplatePluginVpnServer:
         # must be called after start()
         assert False
 
-    def get_traffic_management_firewall_allow_list(self):
+    def get_wan_service(self):
         assert False
 
     def generate_client_script(self, wan_ip, os_type):
@@ -470,7 +470,7 @@ class TemplatePluginVpnServer:
 # config file: ${ETC}/traffic-(PLUGIN_NAME)-(INSTANCE_NAME).json
 class TemplatePluginTraffic:
 
-    def init2(self, cfg, tmpDir, varDir, setTrafficManagementDataCallback, deleteTrafficManagerDataCallback):
+    def init2(self, cfg, tmpDir, varDir, facilityChangeCallback):
         assert False
 
     def start(self):
@@ -484,34 +484,73 @@ class TemplatePluginTraffic:
         assert False
 
 
-class TemplateTrafficManagementData:
+class TemplateFacilityNameserver:
 
     @property
-    def domain_ip_dict(self):
-        # dict<domain-name, ip-address>, optional
+    def facility_type(self):
+        return "nameserver"
+
+    @property
+    def target(self):
+        """[(hostname,port)]"""
         assert False
 
     @property
-    def domain_nameserver_dict(self):
-        # dict<domain-name, nameserver-list>, optional
+    def domain_list(self):
+        assert False
+
+
+class TemplateFacilityGateway:
+
+    @property
+    def facility_type(self):
+        return "gateway"
+
+    @property
+    def target(self):
+        """(next-hop,interface), invalid if both is None"""
         assert False
 
     @property
-    def web_transparent_proxy_dict(self):
-        # dict<url-source, url-target>, optional
+    def network_list(self):
+        assert False
+
+
+class TemplateFacilityHttpProxy:
+
+    """HTTP/HTTPS/FTP proxy"""
+
+    @property
+    def facility_type(self):
+        return "http-proxy"
+
+    @property
+    def target(self):
+        """{"http":(hostname, port),"https":(hostname,port),"ftp":(hostname,port)}"""
         assert False
 
     @property
-    def route_dict(self):
-        # dict<prefix, (nexthop, interface)>, optional
+    def domain_list(self):
         assert False
+
+
+class TemplateLanService:
+
+    @property
+    def protocol(self):
+        assert False
+
+    @property
+    def port(self):
+        assert False
+
+    @property
+    def txt_dict(self):
+        assert False
+
+
+class TemplateWanService:
 
     @property
     def firewall_allow_list(self):
-        # list<rule>, optional
-        assert False
-
-    @property
-    def firewall_port_mapping_dict(self):
-        # dict<port, (ip, port)>, optional
         assert False
