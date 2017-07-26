@@ -470,13 +470,17 @@ class TemplatePluginVpnServer:
 # config file: ${ETC}/traffic-(PLUGIN_NAME)-(INSTANCE_NAME).json
 class TemplatePluginTraffic:
 
-    def init2(self, cfg, tmpDir, varDir, setTrafficManagementDataCallback):
+    def init2(self, cfg, tmpDir, varDir, setTrafficManagementDataCallback, deleteTrafficManagerDataCallback):
         assert False
 
     def start(self):
         assert False
 
     def stop(self):
+        assert False
+
+    def get_priority(self):
+        # returns priority, range [0,100]
         assert False
 
 
