@@ -21,6 +21,7 @@ class WrtLanManager:
     def __init__(self, param):
         self.param = param
         self.defaultBridge = None
+        self.lanServDict = dict()
         self.lifPluginList = []
         self.vpnsPluginList = []
 
@@ -91,6 +92,18 @@ class WrtLanManager:
     def dispose(self):
         self._dispose()
         logging.info("Terminated.")
+
+    def add_lan_service(self, service):
+        id = 0
+        for i in self.lanServDict.keys():
+            id = max(id, i + 1)
+        assert id not in self.lanServDict.keys()
+
+        self.lanServDict[i] = service
+        return id
+
+    def remove_lan_service(self, service_id):
+        del self.lanServDict[service_id]
 
     def on_client_add(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
