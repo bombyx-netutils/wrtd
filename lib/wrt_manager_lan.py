@@ -21,7 +21,7 @@ class WrtLanManager:
     def __init__(self, param):
         self.param = param
         self.defaultBridge = None
-        self.lanServDict = dict()
+        self.lanServDict = dict()           # dict<name,json-object>
         self.lifPluginList = []
         self.vpnsPluginList = []
 
@@ -72,11 +72,8 @@ class WrtLanManager:
                     self.vpnsPluginList.append(p)
                     logging.info("VPN server plugin \"%s\" activated." % (p.full_name))
 
-                    class _Stub:
-                        pass
-                    data = _Stub()
-                    data.firewall_allow_list = p.get_traffic_management_firewall_allow_list()
-                    self.param.trafficManager.set_data(p.full_name, data)
+                    if p.get_wan_service() is not None:
+                        self.param.trafficManager.add_wan_service(p.full_name, p.get_wan_service())
 
             # send other-bridge-create event
             all_bridges = [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]
@@ -94,13 +91,13 @@ class WrtLanManager:
         logging.info("Terminated.")
 
     def add_lan_service(self, service):
-        id = 0
+        service_id = 0
         for i in self.lanServDict.keys():
-            id = max(id, i + 1)
-        assert id not in self.lanServDict.keys()
+            service_id = max(service_id, i + 1)
+        assert service_id not in self.lanServDict.keys()
 
-        self.lanServDict[i] = service
-        return id
+        self.lanServDict[service_id] = service
+        return service_id
 
     def remove_lan_service(self, service_id):
         del self.lanServDict[service_id]

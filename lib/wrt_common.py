@@ -484,7 +484,12 @@ class TemplatePluginTraffic:
         assert False
 
 
+# template for json object
 class TemplateFacilityNameserver:
+
+    @property
+    def facility_name(self):
+        assert False
 
     @property
     def facility_type(self):
@@ -500,7 +505,12 @@ class TemplateFacilityNameserver:
         assert False
 
 
+# template for json object
 class TemplateFacilityGateway:
+
+    @property
+    def facility_name(self):
+        assert False
 
     @property
     def facility_type(self):
@@ -516,9 +526,14 @@ class TemplateFacilityGateway:
         assert False
 
 
+# template for json object
 class TemplateFacilityHttpProxy:
 
     """HTTP/HTTPS/FTP proxy"""
+
+    @property
+    def facility_name(self):
+        assert False
 
     @property
     def facility_type(self):
@@ -534,6 +549,7 @@ class TemplateFacilityHttpProxy:
         assert False
 
 
+# template for json object
 class TemplateLanService:
 
     @property
@@ -549,6 +565,7 @@ class TemplateLanService:
         assert False
 
 
+# template for json object
 class TemplateWanService:
 
     @property

@@ -18,13 +18,20 @@ from wrt_common import WrtCommon
 # Object path           /
 #
 # Methods:
-# info:json                                                GetRouterInfo()
-# (suggested_filename:str,content:str,warn_msg:str-list)   GenerateClientScript(lif_plugin_id:str, os_type:str)
-#
+#   info:json                                                GetRouterInfo()
+#   (suggested_filename:str,content:str,warn_msg:str-list)   GenerateClientScript(lif_plugin_id:str, os_type:str)
+#   void                                                     AddWanService(name:str, service:json-str)
+#   void                                                     RemoveWanService(name:str)
+#   void                                                     AddTrafficFacilityGroup(name:str, priority:int, tfac_group:json-str)
+#   void                                                     ChangeTrafficFacilityGroup(name:str, tfac_group:json-str)
+#   void                                                     RemoveTrafficFacilityGroup(name:str)
+
 class DbusMainObject(dbus.service.Object):
 
     def __init__(self, param):
         self.param = param
+        self.wanServOwnerDict = dict()          # dict<wan-service-name,owner>
+        self.tfacGroupOwnerDict = dict()        # dict<tfac-group-name,owner>
 
         # register dbus object path
         bus_name = dbus.service.BusName('org.fpemud.WRT', bus=dbus.SystemBus())
@@ -32,6 +39,28 @@ class DbusMainObject(dbus.service.Object):
 
     def release(self):
         self.remove_from_connection()
+
+    def onNameOwnerChanged(self, name, old, new):
+        # focus on name deletion, filter other circumstance
+        if not name.startswith(":") or new != "":
+            return
+        assert name == old
+
+        # remove wan services
+        snamelist = []
+        for sname, owner in self.wanServOwnerDict.items():
+            if owner == name:
+                snamelist.append(sname)
+        for sname in snamelist:
+            self.param.trafficManager.remove_wan_service(sname)
+
+        # remove traffic facility groups
+        snamelist = []
+        for sname, owner in self.wanServOwnerDict.items():
+            if owner == name:
+                snamelist.append(sname)
+        for sname in snamelist:
+            self.param.trafficManager.remove_tfac_group(sname)
 
     @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='s')
     def GetRouterInfo(self):
@@ -123,6 +152,34 @@ class DbusMainObject(dbus.service.Object):
                 msgList.append("Internet connection IP address is not public.")
             suggested_filename, content = pluginObj.generate_client_script(ip, os_type)
             return (suggested_filename, content, msgList)
+
+    @dbus.service.method('org.fpemud.WRT', sender_keyword='sender', in_signature='ss')
+    def AddWanService(self, name, service, sender=None):
+        if self.param.trafficManager.has_wan_service(name):
+            raise Exception("WAN service \"%s\" already exists." % (name))
+        self.param.trafficManager.add_wan_service(name, json.loads(service))
+        self.wanServOwnerDict[name] = sender
+
+    @dbus.service.method('org.fpemud.WRT', in_signature='s')
+    def RemoveWanService(self, name):
+        self.param.trafficManager.remove_wan_service(name)
+        del self.wanServOwnerDict[name]
+
+    @dbus.service.method('org.fpemud.WRT', sender_keyword='sender', in_signature='sis')
+    def AddTrafficFacilityGroup(self, name, priority, tfac_group, sender=None):
+        if self.param.trafficManager.has_tfac_group(name):
+            raise Exception("Traffic facility grouop \"%s\" already exists." % (name))
+        self.param.trafficManager.add_tfac_group(name, priority, json.loads(tfac_group))
+        self.tfacGroupOwnerDict[name] = sender
+
+    @dbus.service.method('org.fpemud.WRT', in_signature='ss')
+    def ChangeTrafficFacilityGroup(self, name, tfac_group):
+        self.param.trafficManager.change_tfac_group(name, json.loads(tfac_group))
+
+    @dbus.service.method('org.fpemud.WRT', in_signature='s')
+    def RemoveTrafficFacilityGroup(self, name):
+        self.param.trafficManager.remove_tfac_group(name)
+        del self.tfacGroupOwnerDict[name]
 
 
 ################################################################################

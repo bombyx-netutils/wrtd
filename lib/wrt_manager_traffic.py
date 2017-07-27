@@ -18,8 +18,9 @@ class WrtTrafficManager:
         self.pidFile = os.path.join(self.param.tmpDir, "l2-dnsmasq.pid")
 
         self.pluginList = []
-        self.ownerDict = dict()
-        self.routesDict = dict()      # dict<gateway-ip, dict<router-id, list<prefix>>>
+        self.wanServDict = dict()           # dict<name,json-object>
+        self.tfacGroupDict = dict()         # dict<name,_TrafficFacilityGroup>
+        self.routesDict = dict()            # dict<gateway-ip, dict<router-id, list<prefix>>>
 
         self.dnsPort = None
         self.dnsmasqProc = None
@@ -50,7 +51,7 @@ class WrtTrafficManager:
                 p.start()
                 self.pluginList.append(p)
                 logging.info("Traffic plugin \"%s\" activated." % (p.full_name))
-        except:
+        except BaseException:
             self.dispose()
             raise
 
@@ -61,11 +62,30 @@ class WrtTrafficManager:
     def get_l2_nameserver_port(self):
         return self.dnsPort
 
-    def set_data(self, owner, data):
-        self.ownerDict[owner] = data
+    def has_wan_service(self, name):
+        return name in self.wanServDict
 
-    def delete_data(self, owner):
-        del self.ownerDict[owner]
+    def add_wan_service(self, name, service):
+        assert name not in self.wanServDict
+        self.wanServDict[name] = service
+
+    def remove_wan_service(self, name):
+        del self.wanServDict[name]
+
+    def has_tfac_group(self, name):
+        return name in self.tfacGroupDict
+
+    def add_tfac_group(self, name, priority, tfac_group):
+        assert name not in self.tfacGroupDict
+        self.tfacGroupDict[name] = _TrafficFacilityGroup()
+        self.tfacGroupDict[name].priority = priority
+        self.tfacGroupDict[name].facilityList = tfac_group
+
+    def change_tfac_group(self, name, tfac_group):
+        self.tfacGroupDict[name].facilityList = tfac_group
+
+    def remove_tfac_group(self, name):
+        del self.tfacGroupDict[name]
 
     def on_wconn_up(self):
         WrtUtil.shell('/sbin/nft add rule wrtd natpost oifname %s masquerade' % (self.param.wanManager.wanConnPlugin.get_interface()))
@@ -191,3 +211,10 @@ class WrtTrafficManager:
     def __prefixConvert(self, prefix):
         tl = prefix.split("/")
         return tl[0] + "/" + str(WrtUtil.ipMaskToLen(tl[1]))
+
+
+class _TrafficFacilityGroup:
+
+    def __init__(self):
+        self.priority = None
+        self.facilityList = []
