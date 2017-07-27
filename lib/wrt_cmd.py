@@ -41,6 +41,23 @@ class WrtSubCmdMain:
                 print("    Status: Not connected")
         print("")
 
+        if len(info["wan-service"]) > 0:
+            print("WAN Services:")
+            for item in info["wan-service"]:
+                print("    " + item)
+            print("")
+
+        if len(info["lan-service"]) > 0:
+            print("LAN Services:")
+            for item in info["lan-service"]:
+                print("    localhost: " + item)
+            print("")
+
+        if len(info["tfac-group"]) > 0:
+            print("Traffic Facility Groups:")
+            for name, item in info["tfac-group"].items():
+                print("    %s: %d, %s" % (name, item["priority"], ",".join(item["facilities"])))
+
         while True:
             myData = info["cascade"]["router-list"][info["cascade"]["my-id"]]
             if "parent" not in myData:
