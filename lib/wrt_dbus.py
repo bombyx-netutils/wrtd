@@ -116,6 +116,21 @@ class DbusMainObject(dbus.service.Object):
                 ret["cascade"]["router-list"].update(sproc.get_router_info())
                 ret["cascade"]["router-list"][sproc.get_peer_uuid()]["parent"] = self.param.uuid
 
+        ret["wan-service"] = []
+        if True:
+            ret["wan-service"] = list(self.param.trafficManager.wanServDict.keys())
+
+        ret["lan-service"] = []
+        if True:
+            ret["lan-service"] = list(self.param.lanManager.lanServDict.keys())
+
+        ret["tfac-group"] = dict()
+        if True:
+            for name, group in self.param.trafficManager.tfacGroupDict.items():
+                ret["tfac-group"][name] = dict()
+                ret["tfac-group"][name]["priority"] = group.priority
+                ret["tfac-group"][name]["facilities"] = [tfac["facility_name"] for tfac in group.facility_list]
+
         return json.dumps(ret)
 
     @dbus.service.method('org.fpemud.WRT', in_signature='ss', out_signature='ssas')

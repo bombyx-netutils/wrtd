@@ -79,10 +79,10 @@ class WrtTrafficManager:
         assert name not in self.tfacGroupDict
         self.tfacGroupDict[name] = _TrafficFacilityGroup()
         self.tfacGroupDict[name].priority = priority
-        self.tfacGroupDict[name].facilityList = tfac_group
+        self.tfacGroupDict[name].facility_list = tfac_group
 
     def change_tfac_group(self, name, tfac_group):
-        self.tfacGroupDict[name].facilityList = tfac_group
+        self.tfacGroupDict[name].facility_list = tfac_group
 
     def remove_tfac_group(self, name):
         del self.tfacGroupDict[name]
@@ -217,4 +217,4 @@ class _TrafficFacilityGroup:
 
     def __init__(self):
         self.priority = None
-        self.facilityList = []
+        self.facility_list = []

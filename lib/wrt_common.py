@@ -311,10 +311,10 @@ class TemplateBridge:
         assert False
 
     def on_source_add(self, source_id):
-        pass
+        assert False
 
     def on_source_remove(self, source_id):
-        pass
+        assert False
 
     def on_host_add(self, source_id, ip_data_dict):
         assert False
