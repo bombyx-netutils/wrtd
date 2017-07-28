@@ -6,7 +6,6 @@ import json
 import signal
 import logging
 import socket
-from wrt_util import WrtUtil
 from wrt_util import UrlOpenAsync
 from wrt_common import WrtCommon
 from wrt_common import Managers
@@ -30,8 +29,6 @@ class WrtWanManager:
         self.wanConnIpChecker = None
         self.wanConnIpIsPublic = None
 
-        self.vpnPlugin = None
-
         try:
             cfgfile = os.path.join(self.param.etcDir, "wan-connection.json")
             if os.path.exists(cfgfile):
@@ -54,26 +51,7 @@ class WrtWanManager:
                 self.logger.info("IP forwarding enabled.")
             else:
                 self.logger.info("No internet connection configured.")
-
-            cfgfile = os.path.join(self.param.etcDir, "cascade-vpn.json")
-            if os.path.exists(cfgfile):
-                cfgObj = None
-                with open(cfgfile, "r") as f:
-                    cfgObj = json.load(f)
-                self.vpnPlugin = WrtCommon.getCascadeVpnPlugin(self.param, cfgObj["plugin"])
-                tdir = os.path.join(self.param.tmpDir, "wvpn-%s" % (cfgObj["plugin"]))
-                os.mkdir(tdir)
-                self.vpnPlugin.init2(cfgObj,
-                                     tdir,
-                                     lambda: Managers.call("on_wvpn_up"),
-                                     lambda: Managers.call("on_wvpn_down"))
-                self.logger.info("CASCADE-VPN activated, plugin: %s." % (cfgObj["plugin"]))
-            else:
-                self.logger.info("No CASCADE-VPN configured.")
         except BaseException:
-            if self.vpnPlugin is not None:
-                self.vpnPlugin = None
-                self.logger.info("CASCADE-VPN deactivated.")
             if self.wanConnPlugin is not None:
                 with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
                     f.write("0")
@@ -83,10 +61,6 @@ class WrtWanManager:
             raise
 
     def dispose(self):
-        if self.vpnPlugin is not None:
-            self.vpnPlugin.stop()
-            self.vpnPlugin = None
-            self.logger.info("CASCADE-VPN deactivated.")
         if self.wanConnPlugin is not None:
             with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
                 f.write("0")
@@ -109,36 +83,12 @@ class WrtWanManager:
         # start checking if ip is public
         self._wconnIpCheckStart()
 
-        # start vpn plugin
-        if self.vpnPlugin is not None:
-            self.vpnPlugin.start()
-
     def on_wconn_down(self):
         self.wanConnIpIsPublic = None
-        if self.vpnPlugin is not None:
-            self.vpnPlugin.stop()
         if self.wanConnIpChecker is not None:
             self.wanConnIpChecker.cancel()
             self.wanConnIpChecker = None
         self.param.prefixPool.removeExcludePrefixList("wan")
-
-    def on_wvpn_up(self):
-        if WrtUtil.prefixListConflict(self.vpnPlugin.get_prefix_list(), self.wanConnPlugin.get_prefix_list()):
-            raise Exception("cascade-VPN prefix duplicates with internet connection")
-
-        # check vpn prefix and restart if neccessary
-        if self.param.prefixPool.setExcludePrefixList("vpn", self.vpnPlugin.get_prefix_list()):
-            os.kill(os.getpid(), signal.SIGHUP)
-            raise Exception("bridge prefix duplicates with CASCADE-VPN connection, autofix it and restart")
-
-    def on_wvpn_down(self):
-        self.param.prefixPool.removeExcludePrefixList("vpn")
-
-    def on_cascade_upstream_fail(self, api_client, excp):
-        self.vpnPlugin.disconnect()
-
-    def on_cascade_upstream_down(self, api_client):
-        self.vpnPlugin.disconnect()
 
     def _wconnIpCheckStart(self):
         assert self.wanConnIpChecker is None

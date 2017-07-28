@@ -77,8 +77,8 @@ class DbusMainObject(dbus.service.Object):
             else:
                 ret["wconn-plugin"]["is-connected"] = False
 
-        if self.param.wanManager.vpnPlugin is not None:
-            plugin = self.param.wanManager.vpnPlugin
+        if self.param.cascadeManager.vpnPlugin is not None:
+            plugin = self.param.cascadeManager.vpnPlugin
             ret["wvpn-plugin"] = dict()
             ret["wvpn-plugin"]["name"] = plugin.full_name
             if plugin.is_connected():

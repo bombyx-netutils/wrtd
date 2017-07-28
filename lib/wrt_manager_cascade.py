@@ -3,10 +3,12 @@
 
 import os
 import re
+import json
 import socket
 import signal
 import logging
 from gi.repository import Gio
+from wrt_util import WrtUtil
 from wrt_util import JsonApiEndPoint
 from wrt_common import WrtCommon
 from wrt_common import Managers
@@ -241,12 +243,35 @@ class WrtCascadeManager:
 
     def __init__(self, param):
         self.param = param
+        self.logger = logging.getLogger(self.__module__ + "." + self.__class__.__name__)
+
+        self.vpnPlugin = None
+        try:
+            cfgfile = os.path.join(self.param.etcDir, "cascade-vpn.json")
+            if os.path.exists(cfgfile):
+                cfgObj = None
+                with open(cfgfile, "r") as f:
+                    cfgObj = json.load(f)
+                self.vpnPlugin = WrtCommon.getCascadeVpnPlugin(self.param, cfgObj["plugin"])
+                tdir = os.path.join(self.param.tmpDir, "wvpn-%s" % (cfgObj["plugin"]))
+                os.mkdir(tdir)
+                self.vpnPlugin.init2(cfgObj,
+                                     tdir,
+                                     lambda: Managers.call("on_wvpn_up"),
+                                     lambda: Managers.call("on_wvpn_down"))
+                self.logger.info("CASCADE-VPN activated, plugin: %s." % (cfgObj["plugin"]))
+            else:
+                self.logger.info("No CASCADE-VPN configured.")
+        except:
+            if self.vpnPlugin is not None:
+                self.vpnPlugin = None
+                self.logger.info("CASCADE-VPN deactivated.")
 
         # router info
         self.routerInfo = dict()
         self.routerInfo[self.param.uuid] = dict()
         self.routerInfo[self.param.uuid]["hostname"] = socket.gethostname()
-        if self.param.wanManager.vpnPlugin is not None:
+        if self.vpnPlugin is not None:
             self.routerInfo[self.param.uuid]["cascade-vpn"] = dict()
         if self.param.wanManager.wanConnPlugin is not None:
             self.routerInfo[self.param.uuid]["wan-prefix-list"] = []
@@ -277,19 +302,35 @@ class WrtCascadeManager:
         if self.apiClient is not None:
             pass                # fixme
 
+        if self.vpnPlugin is not None:
+            self.vpnPlugin.stop()
+            self.vpnPlugin = None
+            self.logger.info("CASCADE-VPN deactivated.")
+
     def on_wconn_up(self):
         self._wanPrefixListChange(self.param.wanManager.wanConnPlugin.get_prefix_list())
+        if self.vpnPlugin is not None:
+            self.vpnPlugin.start()
 
     def on_wconn_down(self):
+        if self.vpnPlugin is not None:
+            self.vpnPlugin.stop()
         self._wanPrefixListChange([])
 
     def on_wvpn_up(self):
+        # check vpn prefix
+        if WrtUtil.prefixListConflict(self.vpnPlugin.get_prefix_list(), self.param.wanManager.wanConnPlugin.get_prefix_list()):
+            raise Exception("cascade-VPN prefix duplicates with internet connection")
+        if self.param.prefixPool.setExcludePrefixList("vpn", self.vpnPlugin.get_prefix_list()):
+            os.kill(os.getpid(), signal.SIGHUP)
+            raise Exception("bridge prefix duplicates with CASCADE-VPN connection, autofix it and restart")
+
         # process by myself
         self.routerInfo[self.param.uuid]["cascade-vpn"] = dict()
-        self.routerInfo[self.param.uuid]["cascade-vpn"]["local-ip"] = self.param.wanManager.vpnPlugin.get_local_ip()
-        self.routerInfo[self.param.uuid]["cascade-vpn"]["remote-ip"] = self.param.wanManager.vpnPlugin.get_remote_ip()
+        self.routerInfo[self.param.uuid]["cascade-vpn"]["local-ip"] = self.vpnPlugin.get_local_ip()
+        self.routerInfo[self.param.uuid]["cascade-vpn"]["remote-ip"] = self.vpnPlugin.get_remote_ip()
         assert self.apiClient is None
-        self.apiClient = _ApiClient(self, self.param.wanManager.vpnPlugin.get_remote_ip())
+        self.apiClient = _ApiClient(self, self.vpnPlugin.get_remote_ip())
 
         # notify downstream
         data = dict()
@@ -305,6 +346,7 @@ class WrtCascadeManager:
             self.apiClient = None
         if "cascade-vpn" in self.routerInfo[self.param.uuid]:
             self.routerInfo[self.param.uuid]["cascade-vpn"] = dict()
+        self.param.prefixPool.removeExcludePrefixList("vpn")
 
         # notify downstream
         data = dict()
@@ -348,9 +390,13 @@ class WrtCascadeManager:
         self.banUuidList = []
         self.on_cascade_upstream_router_add(api_client, data["router-list"])
 
+    def on_cascade_upstream_fail(self, api_client, excp):
+        self.vpnPlugin.disconnect()
+
     def on_cascade_upstream_down(self, api_client):
         if api_client.routerInfo is not None and len(api_client.routerInfo) > 0:
             self.on_cascade_upstream_router_remove(api_client, api_client.routerInfo.keys())
+        self.vpnPlugin.disconnect()
 
     def on_cascade_upstream_router_add(self, api_client, data):
         assert len(data) > 0
