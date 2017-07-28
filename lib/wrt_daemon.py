@@ -13,12 +13,12 @@ from gi.repository import GObject
 from dbus.mainloop.glib import DBusGMainLoop
 from wrt_util import WrtUtil
 from wrt_common import WrtCommon
+from wrt_common import PluginHub
 from wrt_common import PrefixPool
 from wrt_common import ManagerCaller
 from wrt_manager_traffic import WrtTrafficManager
 from wrt_manager_wan import WrtWanManager
 from wrt_manager_lan import WrtLanManager
-from wrt_manager_cascade import WrtCascadeManager
 from wrt_dbus import DbusMainObject
 from wrt_dbus import DbusIpForwardObject
 
@@ -51,6 +51,10 @@ class WrtDaemon:
             else:
                 logging.info("UUID loaded: \"%s\"." % (self.param.uuid))
 
+            # load plugin hub
+            self.param.pluginHub = PluginHub(self.param)
+            logging.info("Plugin HUB loaded.")
+
             # load prefix pool
             self.param.prefixPool = PrefixPool(os.path.join(self.param.varDir, "prefix-pool.json"))
             logging.info("Prefix pool loaded.")
@@ -81,7 +85,6 @@ class WrtDaemon:
             self.param.trafficManager = WrtTrafficManager(self.param)
             self.param.wanManager = WrtWanManager(self.param)
             self.param.lanManager = WrtLanManager(self.param)
-            self.param.cascadeManager = WrtCascadeManager(self.param)
             self._loadManagerPlugins()
             self.interfaceTimer = GObject.timeout_add_seconds(10, self._interfaceTimerCallback)
 
@@ -106,9 +109,6 @@ class WrtDaemon:
                     p.stop()
                     logging.info("Manager plugin \"%s\" deactivated." % (p.full_name))
                 self.managerPluginList = []
-            if self.param.cascadeManager is not None:
-                self.param.cascadeManager.dispose()
-                self.param.cascadeManager = None
             if self.param.lanManager is not None:
                 self.param.lanManager.dispose()
                 self.param.lanManager = None
@@ -152,12 +152,13 @@ class WrtDaemon:
             pass
         data = _Stub()
         data.uuid = self.param.uuid
+        data.plugin_hub = self.param.pluginHub
         data.prefix_pool = self.param.prefixPool
         data.traffic_manager = self.param.trafficManager
         data.wan_manager = self.param.wanManager
         data.lan_manager = self.param.lanManager
 
-        for name in WrtCommon.getManagerPluginList(self.param):
+        for name in self.param.pluginHub.getPluginList("manager"):
             fn = os.path.join(self.param.etcDir, "manager-%s.json" % (name))
             if not os.path.exists(fn):
                 continue
@@ -168,8 +169,8 @@ class WrtDaemon:
             else:
                 cfgObj = dict()
 
-            p = WrtCommon.getManagerPlugin(self.param, name)
-            p.init2(cfgObj, self.param.tmpDir, self.param.varDir, data)
+            p = self.param.pluginHub.getPlugin("manager", name)
+            p.init2(cfgObj, self.param.etcDir, self.param.tmpDir, self.param.varDir, data)
             logging.info("Manager plugin \"%s\" activated." % (p.full_name))
 
             for m in self.managerPluginList:

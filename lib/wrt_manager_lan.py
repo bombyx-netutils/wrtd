@@ -12,7 +12,6 @@ import ipaddress
 import pyroute2
 from gi.repository import Gio
 from wrt_util import WrtUtil
-from wrt_common import WrtCommon
 
 
 class WrtLanManager:
@@ -40,24 +39,24 @@ class WrtLanManager:
             logging.info("Default bridge started.")
 
             # start all lan interface plugins
-            for name in WrtCommon.getLanInterfacePluginList(self.param):
+            for name in self.param.pluginHub.getPluginList("lif"):
                 for instanceName, cfgObj, tmpdir, vardir in self._getInstanceAndInfoFromEtcDir("lif", "lan-interface", name):
                     os.mkdir(tmpdir)
                     WrtUtil.ensureDir(vardir)
 
-                    p = WrtCommon.getLanInterfacePlugin(self.param, name, instanceName)
+                    p = self.param.pluginHub.getPlugin("lif", name, instanceName)
                     p.init2(instanceName, cfgObj, tmpdir, vardir)
                     p.start()
                     self.lifPluginList.append(p)
                     logging.info("LAN interface plugin \"%s\" activated." % (p.full_name))
 
             # start all vpn server plugins
-            for name in WrtCommon.getVpnServerPluginList(self.param):
+            for name in self.param.pluginHub.getPluginList("vpns"):
                 for instanceName, cfgObj, tmpdir, vardir in self._getInstanceAndInfoFromEtcDir("vpns", "vpn-server", name):
                     os.mkdir(tmpdir)
                     WrtUtil.ensureDir(vardir)
 
-                    p = WrtCommon.getVpnServerPlugin(self.param, name, instanceName)
+                    p = self.param.pluginHub.getPlugin("vpns", name, instanceName)
                     p.init2(instanceName,
                             cfgObj,
                             tmpdir,

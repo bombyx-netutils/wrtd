@@ -7,7 +7,6 @@ import signal
 import logging
 import socket
 from wrt_util import UrlOpenAsync
-from wrt_common import WrtCommon
 
 
 class WrtWanManager:
@@ -34,7 +33,7 @@ class WrtWanManager:
                 cfgObj = None
                 with open(cfgfile, "r") as f:
                     cfgObj = json.load(f)
-                self.wanConnPlugin = WrtCommon.getWanConnectionPlugin(self.param, cfgObj["plugin"])
+                self.wanConnPlugin = self.param.pluginHub.getPlugin("wconn", cfgObj["plugin"])
                 tdir = os.path.join(self.param.tmpDir, "wconn-%s" % (cfgObj["plugin"]))
                 os.mkdir(tdir)
                 self.wanConnPlugin.init2(cfgObj,

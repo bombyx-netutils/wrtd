@@ -22,6 +22,7 @@ class WrtParam:
 
         self.dnsName = None
         self.uuid = None
+        self.pluginHub = None
         self.prefixPool = None
         self.managerCaller = None
 
@@ -36,4 +37,3 @@ class WrtParam:
         self.trafficManager = None
         self.wanManager = None
         self.lanManager = None
-        self.cascadeManager = None
