@@ -282,6 +282,9 @@ class WrtCascadeManager:
                 self.routerInfo[self.param.uuid]["lan-prefix-list"].append(prefix[0] + "/" + prefix[1])
         self.routerInfo[self.param.uuid]["client-list"] = dict()
 
+        # routes dict
+        self.routesDict = dict()            # dict<gateway-ip, dict<router-id, list<prefix>>>
+
         # client
         self.apiClient = None
 
@@ -292,7 +295,7 @@ class WrtCascadeManager:
         # start CASCADE-API server for all the bridges
         for plugin in self.param.lanManager.vpnsPluginList:
             self.apiServerList.append(_ApiServer(self, plugin.get_bridge()))
-        logging.info("CASCADE-API servers started.")
+        self.logger.info("CASCADE-API servers started.")
 
     def dispose(self):
         for s in self.apiServerList:
@@ -388,6 +391,7 @@ class WrtCascadeManager:
 
     def on_cascade_upstream_up(self, api_client, data):
         self.banUuidList = []
+        self.routesDict[api_client.get_peer_ip()] = dict()
         self.on_cascade_upstream_router_add(api_client, data["router-list"])
 
     def on_cascade_upstream_fail(self, api_client, excp):
@@ -396,6 +400,10 @@ class WrtCascadeManager:
     def on_cascade_upstream_down(self, api_client):
         if api_client.routerInfo is not None and len(api_client.routerInfo) > 0:
             self.on_cascade_upstream_router_remove(api_client, api_client.routerInfo.keys())
+        if True:
+            for router_id in api_client.get_router_info():
+                self._removeRoutes(api_client.get_peer_ip(), router_id)
+            del self.routesDict[api_client.get_peer_ip()]
         self.vpnPlugin.disconnect()
 
     def on_cascade_upstream_router_add(self, api_client, data):
@@ -411,6 +419,7 @@ class WrtCascadeManager:
         if ret:
             os.kill(os.getpid(), signal.SIGHUP)
             raise Exception("prefix duplicates with upstream router %s, autofix it and restart" % (router_id))
+        self._upstreamLanPrefixListChange(api_client, data)
 
         # notify downstream
         for sproc in self.getAllValidApiServerProcessors():
@@ -423,6 +432,7 @@ class WrtCascadeManager:
         for router_id in data:
             self.param.prefixPool.removeExcludePrefixList("upstream-lan-%s" % (router_id))
             self.param.prefixPool.removeExcludePrefixList("upstream-wan-%s" % (router_id))
+            self._removeRoutes(api_client.get_peer_ip(), router_id)
 
         # notify downstream
         for sproc in self.getAllValidApiServerProcessors():
@@ -450,6 +460,7 @@ class WrtCascadeManager:
         if ret:
             os.kill(os.getpid(), signal.SIGHUP)
             raise Exception("prefix duplicates with upstream router %s, autofix it and restart" % (router_id))
+        self._upstreamLanPrefixListChange(api_client, data)
 
         # notify downstream
         for sproc in self.getAllValidApiServerProcessors():
@@ -471,15 +482,23 @@ class WrtCascadeManager:
             sproc.send_notification("router-client-remove", data)
 
     def on_cascade_downstream_up(self, sproc, data):
+        self.routesDict[sproc.get_peer_ip()] = dict()
         if len(data["router-list"]) > 0:
             self.on_cascade_downstream_router_add(sproc, data["router-list"])
 
     def on_cascade_downstream_down(self, sproc):
         self.on_cascade_downstream_router_remove(sproc, list(sproc.get_router_info().keys()))
+        if True:
+            for router_id in sproc.get_router_info():
+                self._removeRoutes(sproc.get_peer_ip(), router_id)
+            del self.routesDict[sproc.get_peer_ip()]
 
     def on_cascade_downstream_router_add(self, sproc, data):
         # process by myself
         self._downstreamWanPrefixListCheck(data)
+        for router_id in data:
+            if "lan-prefix-list" in data[router_id]:
+                self._updateRoutes(sproc.get_peer_ip(), router_id, data[router_id]["lan-prefix-list"])
 
         # notify upstream and other downstream
         if self.hasValidApiClient():
@@ -491,6 +510,7 @@ class WrtCascadeManager:
         # process by myself
         for router_id in data:
             self.param.prefixPool.removeExcludePrefixList("downstream-wan-%s" % (router_id))
+            self._removeRoutes(sproc.get_peer_ip(), router_id)
 
         # notify upstream and other downstream
         if self.hasValidApiClient():
@@ -509,6 +529,10 @@ class WrtCascadeManager:
             obj.send_notification("router-wan-prefix-list-change", data)
 
     def on_cascade_downstream_router_lan_prefix_list_change(self, sproc, data):
+        # process by myself
+        for router_id in data:
+            self._updateRoutes(sproc.get_peer_ip(), router_id, data[router_id]["lan-prefix-list"])
+
         # notify upstream and other downstream
         if self.hasValidApiClient():
             self.apiClient.send_notification("router-lan-prefix-list-change", data)
@@ -571,6 +595,18 @@ class WrtCascadeManager:
         for sproc in self.getAllValidApiServerProcessors():
             sproc.send_notification("router-wan-prefix-list-change", data)
 
+    def _upstreamLanPrefixListChange(self, api_client, data):
+        for router_id in data:
+            if "lan-prefix-list" not in data[router_id]:
+                continue                # called by on_cascade_upstream_router_add()
+            if router_id == api_client.get_peer_uuid():
+                tlist = list(data[router_id]["lan-prefix-list"])
+                for prefix in self.param.wanManager.vpnPlugin.get_prefix_list():
+                    tlist.remove(prefix[0] + "/" + prefix[1])
+            else:
+                tlist = data[router_id]["lan-prefix-list"]
+            self._updateRoutes(api_client.get_peer_ip(), router_id, tlist)
+
     def _downstreamWanPrefixListCheck(self, data):
         # check downstream wan-prefix and restart if neccessary
         show_router_id = None
@@ -625,7 +661,7 @@ class _ApiClient(JsonApiEndPoint):
         sc.set_family(Gio.SocketFamily.IPV4)
         sc.set_protocol(Gio.SocketProtocol.TCP)
 
-        logging.info("Establishing CASCADE-API connection.")
+        self.logger.info("Establishing CASCADE-API connection.")
         self.peerUuid = None
         self.routerInfo = None
         self.bConnected = False
@@ -659,7 +695,7 @@ class _ApiClient(JsonApiEndPoint):
 
             self.bConnected = True
         except Exception as e:
-            logging.error("Failed to establish CASCADE-API connection", exc_info=True)   # fixme
+            self.logger.error("Failed to establish CASCADE-API connection", exc_info=True)   # fixme
             Managers.call("on_cascade_upstream_fail", self, e)
             self.close()
 
@@ -667,8 +703,8 @@ class _ApiClient(JsonApiEndPoint):
         self.peerUuid = data["my-id"]
         self.routerInfo = data["router-list"]
         self.bRegistered = True
-        logging.info("CASCADE-API connection established.")
-        _Helper.logRouterAdd(self.routerInfo)
+        self.logger.info("CASCADE-API connection established.")
+        _Helper.logRouterAdd(self.routerInfo, self.logger)
         Managers.call("on_cascade_upstream_up", self, data)
 
     def _on_register_error(self, reason):
@@ -682,10 +718,10 @@ class _ApiClient(JsonApiEndPoint):
 
     def on_error(self, excp):
         if not self.bRegistered:
-            logging.error("Failed to establish CASCADE-API connection.", exc_info=True)      # fixme
+            self.logger.error("Failed to establish CASCADE-API connection.", exc_info=True)      # fixme
             Managers.call("on_cascade_upstream_fail", self, excp)
         else:
-            logging.error("CASCADE-API connection disconnected with error.", exc_info=True)  # fixme
+            self.logger.error("CASCADE-API connection disconnected with error.", exc_info=True)  # fixme
             Managers.call("on_cascade_upstream_error", self, excp)
 
     def on_close(self):
@@ -693,7 +729,7 @@ class _ApiClient(JsonApiEndPoint):
             pass
         else:
             Managers.call("on_cascade_upstream_down", self)
-            _Helper.logRouterRemoveAll(self.routerInfo)
+            _Helper.logRouterRemoveAll(self.routerInfo, self.logger)
 
     def on_notification_router_add(self, data):
         assert self.bRegistered
@@ -707,13 +743,13 @@ class _ApiClient(JsonApiEndPoint):
             raise Exception("UUID %s duplicate" % (uuid))
 
         self.routerInfo.update(data)
-        _Helper.logRouterAdd(data)
+        _Helper.logRouterAdd(data, self.logger)
         Managers.call("on_cascade_upstream_router_add", self, data)
 
     def on_notification_router_remove(self, data):
         assert self.bRegistered
         Managers.call("on_cascade_upstream_router_remove", self, data)
-        _Helper.logRouterRemove(data, self.routerInfo)
+        _Helper.logRouterRemove(data, self.routerInfo, self.logger)
         for router_id in data:
             del self.routerInfo[router_id]
 
@@ -739,7 +775,7 @@ class _ApiClient(JsonApiEndPoint):
         assert self.bRegistered
         for router_id, item in data.items():
             self.routerInfo[router_id]["client-list"].update(item["client-list"])
-        _Helper.logRouterClientAdd(data)
+        _Helper.logRouterClientAdd(data, self.logger)
         Managers.call("on_cascade_upstream_router_client_add", self, data)
 
     def on_notification_router_client_change(self, data):
@@ -752,7 +788,7 @@ class _ApiClient(JsonApiEndPoint):
     def on_notification_router_client_remove(self, data):
         assert self.bRegistered
         Managers.call("on_cascade_upstream_router_client_remove", self, data)
-        _Helper.logRouterClientRemove(data, self.routerInfo)
+        _Helper.logRouterClientRemove(data, self.routerInfo, self.logger)
         for router_id, item in data.items():
             for ip in item["client-list"]:
                 del self.routerInfo[router_id]["client-list"][ip]
@@ -779,7 +815,7 @@ class _ApiServer:
         conn, dummy = source_object.accept_finish(res)
         sproc = _ApiServerProcessor(self.pObj, self, conn)
         self.sprocList.append(sproc)
-        logging.info("CASCADE-API client %s accepted." % (conn.get_remote_address().get_address().to_string()))
+        self.logger.info("CASCADE-API client %s accepted." % (conn.get_remote_address().get_address().to_string()))
         self.serverListener.accept_async(None, self._on_accept)
 
 
@@ -805,16 +841,16 @@ class _ApiServerProcessor(JsonApiEndPoint):
         return self.routerInfo
 
     def on_error(self, e):
-        logging.error("debugXXXXXXXXXXXX", exc_info=True)            # fixme
+        self.logger.error("debugXXXXXXXXXXXX", exc_info=True)            # fixme
 
     def on_close(self):
         if self.bRegistered:
             Managers.call("on_cascade_downstream_down", self)
             if self.peerUuid is not None:
-                _Helper.logRouterRemoveAll(self.routerInfo)
+                _Helper.logRouterRemoveAll(self.routerInfo, self.logger)
         self.routerInfo = None
         self.peerUuid = None
-        logging.info("CASCADE-API client %s disconnected." % (self.get_peer_ip()))
+        self.logger.info("CASCADE-API client %s disconnected." % (self.get_peer_ip()))
         self.serverObj.sprocList.remove(self)
 
     def on_command_register(self, data, return_callback, error_callback):
@@ -822,7 +858,7 @@ class _ApiServerProcessor(JsonApiEndPoint):
         if "my-id" in data:
             uuid = _Helper.downStreamRouterIdDuplicityCheck(self.pObj.param, data["router-list"])
             if uuid is not None:
-                logging.error("CASCADE-API client %s rejected, UUID %s duplicate." % (self.get_peer_ip(), uuid))
+                self.logger.error("CASCADE-API client %s rejected, UUID %s duplicate." % (self.get_peer_ip(), uuid))
                 error_callback("UUID %s duplicate" % (uuid))
                 # no need to actively close connection, client would close it
                 return
@@ -848,9 +884,9 @@ class _ApiServerProcessor(JsonApiEndPoint):
 
         # registered
         self.bRegistered = True
-        logging.info("CASCADE-API client %s registered." % (self.get_peer_ip()))
+        self.logger.info("CASCADE-API client %s registered." % (self.get_peer_ip()))
         if self.peerUuid is not None:
-            _Helper.logRouterAdd(self.routerInfo)
+            _Helper.logRouterAdd(self.routerInfo, self.logger)
         Managers.call("on_cascade_downstream_up", self, data)
 
     def on_notification_router_add(self, data):
@@ -861,14 +897,14 @@ class _ApiServerProcessor(JsonApiEndPoint):
             raise Exception("UUID %s duplicate" % (uuid))
 
         self.routerInfo.update(data)
-        _Helper.logRouterAdd(data)
+        _Helper.logRouterAdd(data, self.logger)
         Managers.call("on_cascade_downstream_router_add", self, data)
 
     def on_notification_router_remove(self, data):
         assert self.bRegistered and self.peerUuid is not None
 
         Managers.call("on_cascade_downstream_router_remove", self, data)
-        _Helper.logRouterRemove(data, self.routerInfo)
+        _Helper.logRouterRemove(data, self.routerInfo, self.logger)
         for router_id in data:
             del self.routerInfo[router_id]
 
@@ -891,7 +927,7 @@ class _ApiServerProcessor(JsonApiEndPoint):
 
         for router_id, item in data.items():
             self.routerInfo[router_id]["client-list"].update(item["client-list"])
-        _Helper.logRouterClientAdd(data)
+        _Helper.logRouterClientAdd(data, self.logger)
         Managers.call("on_cascade_downstream_router_client_add", self, data)
 
     def on_notification_router_client_change(self, data):
@@ -906,7 +942,7 @@ class _ApiServerProcessor(JsonApiEndPoint):
         assert self.bRegistered and self.peerUuid is not None
 
         Managers.call("on_cascade_downstream_router_client_remove", self, data)
-        _Helper.logRouterClientRemove(data, self.routerInfo)
+        _Helper.logRouterClientRemove(data, self.routerInfo, self.logger)
         for router_id, item in data.items():
             for ip in item["client-list"]:
                 del self.routerInfo[router_id]["client-list"][ip]
@@ -914,12 +950,14 @@ class _ApiServerProcessor(JsonApiEndPoint):
 
 class _Helper:
 
+    @staticmethod
     def prefixListToProtocolPrefixList(prefixList):
         ret = []
         for prefix in prefixList:
             ret.append(prefix[0] + "/" + prefix[1])
         return ret
 
+    @staticmethod
     def protocolPrefixListToPrefixList(protocolPrefixList):
         ret = []
         for prefix in protocolPrefixList:
@@ -927,6 +965,7 @@ class _Helper:
             ret.append((tlist[0], tlist[1]))
         return ret
 
+    @staticmethod
     def upstreamRouterIdDuplicityCheck(param, routerInfo):
         if param.uuid in routerInfo:
             return (param.uuid, None)
@@ -937,6 +976,7 @@ class _Helper:
                 return (ret[0], sproc)
         return None
 
+    @staticmethod
     def downStreamRouterIdDuplicityCheck(param, routerInfo):
         if param.uuid in routerInfo:
             return param.uuid
@@ -952,50 +992,55 @@ class _Helper:
                 return ret[0]
         return None
 
-    def logRouterAdd(data):
+    @staticmethod
+    def logRouterAdd(data, logger):
         for router_id, item in data.items():
             if "hostname" in data:
-                logging.info("Router %s(UUID:%s) appeared." % (item["hostname"], router_id))
+                logger.info("Router %s(UUID:%s) appeared." % (item["hostname"], router_id))
             else:
-                logging.info("Router %s appeared." % (router_id))
+                logger.info("Router %s appeared." % (router_id))
             if "client-list" in item:
                 for ip, data2 in item["client-list"].items():
                     if "hostname" in data2:
-                        logging.info("Client %s(IP:%s) appeared." % (data2["hostname"], ip))
+                        logger.info("Client %s(IP:%s) appeared." % (data2["hostname"], ip))
                     else:
-                        logging.info("Client %s appeared." % (ip))
+                        logger.info("Client %s appeared." % (ip))
 
-    def logRouterRemove(data, router_info):
+    @staticmethod
+    def logRouterRemove(data, router_info, logger):
         for router_id in data:
             data2 = router_info[router_id]
             if "client-list" in data2:
                 o = data2["client-list"]
                 for ip in o.keys():
                     if "hostname" in o[ip]:
-                        logging.info("Client %s(IP:%s) disappeared." % (o[ip]["hostname"], ip))
+                        logger.info("Client %s(IP:%s) disappeared." % (o[ip]["hostname"], ip))
                     else:
-                        logging.info("Client %s disappeared." % (ip))
+                        logger.info("Client %s disappeared." % (ip))
             if "hostname" in data2:
-                logging.info("Router %s(UUID:%s) disappeared." % (data2["hostname"], router_id))
+                logger.info("Router %s(UUID:%s) disappeared." % (data2["hostname"], router_id))
             else:
-                logging.info("Router %s disappeared." % (router_id))
+                logger.info("Router %s disappeared." % (router_id))
 
-    def logRouterRemoveAll(router_info):
-        _Helper.logRouterRemove(list(router_info.keys()), router_info)
+    @staticmethod
+    def logRouterRemoveAll(router_info, logger):
+        _Helper.logRouterRemove(list(router_info.keys()), router_info, logger)
 
-    def logRouterClientAdd(data):
+    @staticmethod
+    def logRouterClientAdd(data, logger):
         for router_id, item in data.items():
             for ip, data2 in item["client-list"].items():
                 if "hostname" in data2:
-                    logging.info("Client %s(IP:%s) appeared." % (data2["hostname"], ip))
+                    logger.info("Client %s(IP:%s) appeared." % (data2["hostname"], ip))
                 else:
-                    logging.info("Client %s appeared." % (ip))
+                    logger.info("Client %s appeared." % (ip))
 
-    def logRouterClientRemove(data, router_info):
+    @staticmethod
+    def logRouterClientRemove(data, router_info, logger):
         for router_id, item in data.items():
             o = router_info[router_id]["client-list"]
             for ip in item["client-list"]:
                 if "hostname" in o[ip]:
-                    logging.info("Client %s(IP:%s) disappeared." % (o[ip]["hostname"], ip))
+                    logger.info("Client %s(IP:%s) disappeared." % (o[ip]["hostname"], ip))
                 else:
-                    logging.info("Client %s disappeared." % (ip))
+                    logger.info("Client %s disappeared." % (ip))

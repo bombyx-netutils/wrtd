@@ -16,17 +16,17 @@ class WrtTrafficManager:
         self.param = param
         self.cfgFile = os.path.join(self.param.tmpDir, "l2-dnsmasq.conf")
         self.pidFile = os.path.join(self.param.tmpDir, "l2-dnsmasq.pid")
+        self.logger = logging.getLogger(self.__module__ + "." + self.__class__.__name__)
 
         self.pluginList = []
         self.wanServDict = dict()           # dict<name,json-object>
         self.tfacGroupDict = dict()         # dict<name,_TrafficFacilityGroup>
-        self.routesDict = dict()            # dict<gateway-ip, dict<router-id, list<prefix>>>
 
         self.dnsPort = None
         self.dnsmasqProc = None
         try:
             self._runDnsmasq()
-            logging.info("Level 2 nameserver started.")
+            self.logger.info("Level 2 nameserver started.")
 
             # start all traffic plugins
             for name in WrtCommon.getTrafficPluginList(self.param):
@@ -50,14 +50,14 @@ class WrtTrafficManager:
                 p.init2(cfgObj, tmpdir, vardir)
                 p.start()
                 self.pluginList.append(p)
-                logging.info("Traffic plugin \"%s\" activated." % (p.full_name))
+                self.logger.info("Traffic plugin \"%s\" activated." % (p.full_name))
         except BaseException:
             self.dispose()
             raise
 
     def dispose(self):
         self._dispose()
-        logging.info("Terminated.")
+        self.logger.info("Terminated.")
 
     def get_l2_nameserver_port(self):
         return self.dnsPort
@@ -93,59 +93,10 @@ class WrtTrafficManager:
         # WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ip protocol icmp accept' % (intf))
         # WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s drop' % (intf))
 
-    def on_cascade_upstream_up(self, api_client, data):
-        self.routesDict[api_client.get_peer_ip()] = dict()
-        self.on_cascade_upstream_router_add(api_client, data["router-list"])
-
-    def on_cascade_upstream_down(self, api_client):
-        for router_id in api_client.get_router_info():
-            self._removeRoutes(api_client.get_peer_ip(), router_id)
-        del self.routesDict[api_client.get_peer_ip()]
-
-    def on_cascade_upstream_router_add(self, api_client, data):
-        self.on_cascade_upstream_router_lan_prefix_list_change(api_client, data)
-
-    def on_cascade_upstream_router_remove(self, api_client, data):
-        for router_id in data:
-            self._removeRoutes(api_client.get_peer_ip(), router_id)
-
-    def on_cascade_upstream_router_lan_prefix_list_change(self, api_client, data):
-        for router_id in data:
-            if "lan-prefix-list" not in data[router_id]:
-                continue                # called by on_cascade_upstream_router_add()
-            if router_id == api_client.get_peer_uuid():
-                tlist = list(data[router_id]["lan-prefix-list"])
-                for prefix in self.param.wanManager.vpnPlugin.get_prefix_list():
-                    tlist.remove(prefix[0] + "/" + prefix[1])
-            else:
-                tlist = data[router_id]["lan-prefix-list"]
-            self._updateRoutes(api_client.get_peer_ip(), router_id, tlist)
-
-    def on_cascade_downstream_up(self, sproc, data):
-        self.routesDict[sproc.get_peer_ip()] = dict()
-        self.on_cascade_downstream_router_add(sproc, data["router-list"])
-
-    def on_cascade_downstream_down(self, sproc):
-        for router_id in sproc.get_router_info():
-            self._removeRoutes(sproc.get_peer_ip(), router_id)
-        del self.routesDict[sproc.get_peer_ip()]
-
-    def on_cascade_downstream_router_add(self, sproc, data):
-        self.on_cascade_downstream_router_lan_prefix_list_change(sproc, data)
-
-    def on_cascade_downstream_router_remove(self, sproc, data):
-        for router_id in data:
-            self._removeRoutes(sproc.get_peer_ip(), router_id)
-
-    def on_cascade_downstream_router_lan_prefix_list_change(self, sproc, data):
-        for router_id in data:
-            if "lan-prefix-list" in data[router_id]:
-                self._updateRoutes(sproc.get_peer_ip(), router_id, data[router_id]["lan-prefix-list"])
-
     def _dispose(self):
         for p in self.pluginList:
             p.stop()
-            logging.info("Traffic plugin \"%s\" deactivated." % (p.full_name))
+            self.logger.info("Traffic plugin \"%s\" deactivated." % (p.full_name))
         self.pluginList = []
 
         self._stopDnsmasq()
