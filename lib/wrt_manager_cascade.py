@@ -7,6 +7,7 @@ import json
 import socket
 import signal
 import logging
+import pyroute2
 from gi.repository import Gio
 from wrt_util import WrtUtil
 from wrt_util import JsonApiEndPoint
@@ -310,6 +311,28 @@ class WrtCascadeManager:
             self.vpnPlugin = None
             self.logger.info("CASCADE-VPN deactivated.")
 
+    def hasValidApiClient(self):
+        return self.apiClient is not None and self.apiClient.bRegistered
+
+    def getAllValidApiServerProcessors(self):
+        return self.getAllValidApiServerProcessorsExcept(None)
+
+    def getAllValidApiServerProcessorsExcept(self, sproc):
+        ret = []
+        for obj in self.apiServerList:
+            for sproc2 in obj.sprocList:
+                if sproc2.bRegistered and sproc2 != sproc:
+                    ret.append(sproc2)
+        return ret
+
+    def getAllRouterApiServerProcessors(self):
+        ret = []
+        for obj in self.apiServerList:
+            for sproc in obj.sprocList:
+                if sproc.bRegistered and sproc.get_peer_uuid() is not None:
+                    ret.append(sproc)
+        return ret
+
     def on_wconn_up(self):
         self._wanPrefixListChange(self.param.wanManager.wanConnPlugin.get_prefix_list())
         if self.vpnPlugin is not None:
@@ -392,6 +415,7 @@ class WrtCascadeManager:
     def on_cascade_upstream_up(self, api_client, data):
         self.banUuidList = []
         self.routesDict[api_client.get_peer_ip()] = dict()
+        self.param.lanManager.add_source("upstream-vpn")
         self.on_cascade_upstream_router_add(api_client, data["router-list"])
 
     def on_cascade_upstream_fail(self, api_client, excp):
@@ -400,6 +424,7 @@ class WrtCascadeManager:
     def on_cascade_upstream_down(self, api_client):
         if api_client.routerInfo is not None and len(api_client.routerInfo) > 0:
             self.on_cascade_upstream_router_remove(api_client, api_client.routerInfo.keys())
+        self.param.lanManager.remove_source("upstream-vpn")
         if True:
             for router_id in api_client.get_router_info():
                 self._removeRoutes(api_client.get_peer_ip(), router_id)
@@ -420,6 +445,7 @@ class WrtCascadeManager:
             os.kill(os.getpid(), signal.SIGHUP)
             raise Exception("prefix duplicates with upstream router %s, autofix it and restart" % (router_id))
         self._upstreamLanPrefixListChange(api_client, data)
+        self._upstreamVpnHostRefresh(api_client)
 
         # notify downstream
         for sproc in self.getAllValidApiServerProcessors():
@@ -429,6 +455,7 @@ class WrtCascadeManager:
         assert len(data) > 0
 
         # process by myself
+        self._upstreamVpnHostRefresh(api_client)
         for router_id in data:
             self.param.prefixPool.removeExcludePrefixList("upstream-lan-%s" % (router_id))
             self.param.prefixPool.removeExcludePrefixList("upstream-wan-%s" % (router_id))
@@ -467,16 +494,25 @@ class WrtCascadeManager:
             sproc.send_notification("lan-prefix-list-change", data)
 
     def on_cascade_upstream_router_client_add(self, api_client, data):
+        # process by myself
+        self._upstreamVpnHostRefresh(api_client)
+
         # notify downstream
         for sproc in self.getAllValidApiServerProcessors():
             sproc.send_notification("router-client-add", data)
 
     def on_cascade_upstream_router_client_change(self, api_client, data):
+        # process by myself
+        self._upstreamVpnHostRefresh(api_client)
+
         # notify downstream
         for sproc in self.getAllValidApiServerProcessors():
             sproc.send_notification("router-client-change", data)
 
     def on_cascade_upstream_router_client_remove(self, api_client, data):
+        # process by myself
+        self._upstreamVpnHostRefresh(api_client)
+
         # notify downstream
         for sproc in self.getAllValidApiServerProcessors():
             sproc.send_notification("router-client-remove", data)
@@ -488,17 +524,17 @@ class WrtCascadeManager:
 
     def on_cascade_downstream_down(self, sproc):
         self.on_cascade_downstream_router_remove(sproc, list(sproc.get_router_info().keys()))
-        if True:
-            for router_id in sproc.get_router_info():
-                self._removeRoutes(sproc.get_peer_ip(), router_id)
-            del self.routesDict[sproc.get_peer_ip()]
+        del self.routesDict[sproc.get_peer_ip()]
 
     def on_cascade_downstream_router_add(self, sproc, data):
         # process by myself
         self._downstreamWanPrefixListCheck(data)
-        for router_id in data:
+        for router_id, router_info in data.items():
             if "lan-prefix-list" in data[router_id]:
                 self._updateRoutes(sproc.get_peer_ip(), router_id, data[router_id]["lan-prefix-list"])
+            if "client-list" in router_info:
+                self.param.lanManager.add_source("downstream-" + router_id)
+                self.param.lanManager.add_client("downstream-" + router_id, router_info["client-list"])
 
         # notify upstream and other downstream
         if self.hasValidApiClient():
@@ -509,8 +545,9 @@ class WrtCascadeManager:
     def on_cascade_downstream_router_remove(self, sproc, data):
         # process by myself
         for router_id in data:
-            self.param.prefixPool.removeExcludePrefixList("downstream-wan-%s" % (router_id))
+            self.param.lanManager.remove_source("downstream-" + router_id)
             self._removeRoutes(sproc.get_peer_ip(), router_id)
+            self.param.prefixPool.removeExcludePrefixList("downstream-wan-%s" % (router_id))
 
         # notify upstream and other downstream
         if self.hasValidApiClient():
@@ -540,6 +577,10 @@ class WrtCascadeManager:
             obj.send_notification("router-lan-prefix-list-change", data)
 
     def on_cascade_downstream_router_client_add(self, sproc, data):
+        # process by myself
+        for router_id, router_info in data.items():
+            self.param.lanManager.add_client("downstream-" + router_id, router_info["client-list"])
+
         # notify upstream and other downstream
         if self.hasValidApiClient():
             self.apiClient.send_notification("router-client-add", data)
@@ -547,6 +588,10 @@ class WrtCascadeManager:
             obj.send_notification("router-client-add", data)
 
     def on_cascade_downstream_router_client_change(self, sproc, data):
+        # process by myself
+        for router_id, router_info in data.items():
+            self.param.lanManager.change_client("downstream-" + router_id, router_info["client-list"])
+
         # notify upstream and other downstream
         if self.hasValidApiClient():
             self.apiClient.send_notification("router-client-change", data)
@@ -554,6 +599,10 @@ class WrtCascadeManager:
             obj.send_notification("router-client-change", data)
 
     def on_cascade_downstream_router_client_remove(self, sproc, data):
+        # process by myself
+        for router_id, router_info in data.items():
+            self.param.lanManager.remove_client("downstream-" + router_id, router_info["client-list"])
+
         # notify upstream and other downstream
         if self.hasValidApiClient():
             self.apiClient.send_notification("router-client-remove", data)
@@ -620,30 +669,70 @@ class WrtCascadeManager:
             os.kill(os.getpid(), signal.SIGHUP)
             raise Exception("prefix duplicates with downstream router %s, autofix it and restart" % (show_router_id))
 
-    def hasValidApiClient(self):
-        return self.apiClient is not None and self.apiClient.bRegistered
+    def _upstreamVpnHostRefresh(self, api_client):
+        # we need to differentiate upstream router and other client, so we do refresh instead of add/change/remove
+        ipDataDict = dict()
 
-    def getAllValidApiServerProcessors(self):
-        return self.getAllValidApiServerProcessorsExcept(None)
+        # add upstream routers into ipDataDict
+        upstreamRouterLocalIpList = []
+        if self.hasValidApiClient():
+            curUpstreamId = api_client.get_peer_uuid()
+            curUpstreamIp = api_client.get_peer_ip()
+            curUpstreamLocalIp = self.param.wanManager.vpnPlugin.get_local_ip()
+            while True:
+                data = api_client.get_router_info()[curUpstreamId]
 
-    def getAllValidApiServerProcessorsExcept(self, sproc):
-        ret = []
-        for obj in self.apiServerList:
-            for sproc2 in obj.sprocList:
-                if sproc2.bRegistered and sproc2 != sproc:
-                    ret.append(sproc2)
-        return ret
+                ipDataDict[curUpstreamIp] = dict()
+                if "hostname" in data:
+                    ipDataDict[curUpstreamIp]["hostname"] = data["hostname"]
+                upstreamRouterLocalIpList.append(curUpstreamLocalIp)
 
-    def getAllRouterApiServerProcessors(self):
-        ret = []
-        for obj in self.apiServerList:
-            for sproc in obj.sprocList:
-                if sproc.bRegistered and sproc.get_peer_uuid() is not None:
-                    ret.append(sproc)
-        return ret
+                if "parent" not in data:
+                    break
+                curUpstreamId = data["parent"]
+                curUpstreamIp = data["cascade-vpn"]["remote-ip"]
+                curUpstreamLocalIp = data["cascade-vpn"]["local-ip"]
+
+        # add all clients into ipDataDict
+        for router in api_client.get_router_info().values():
+            if "client-list" in router:
+                for ip, data in router["client-list"].items():
+                    if ip in upstreamRouterLocalIpList:
+                        continue
+                    ipDataDict[ip] = data
+
+        # refresh to all bridges
+        self.param.lanManager.refresh_client("upstream-vpn")
 
     def _apiClientCanNotify(self):
         return self.apiClient is not None and self.apiClient.bConnected
+
+    def _updateRoutes(self, gateway_ip, router_id, prefix_list):
+        if router_id not in self.routesDict[gateway_ip]:
+            self.routesDict[gateway_ip][router_id] = []
+        with pyroute2.IPRoute() as ipp:
+            # remove routes
+            tlist = list(self.routesDict[gateway_ip][router_id])
+            for prefix in tlist:
+                if prefix not in prefix_list:
+                    ipp.route("del", dst=self.__prefixConvert(prefix))
+                    self.routesDict[gateway_ip][router_id].remove(prefix)
+            # add routes
+            for prefix in prefix_list:
+                if prefix not in self.routesDict[gateway_ip][router_id]:
+                    ipp.route("add", dst=self.__prefixConvert(prefix), gateway=gateway_ip)
+                    self.routesDict[gateway_ip][router_id].append(prefix)
+
+    def _removeRoutes(self, gateway_ip, router_id):
+        if router_id in self.routesDict[gateway_ip]:
+            with pyroute2.IPRoute() as ipp:
+                for prefix in self.routesDict[gateway_ip][router_id]:
+                    ipp.route("del", dst=self.__prefixConvert(prefix))
+                del self.routesDict[gateway_ip][router_id]
+
+    def __prefixConvert(self, prefix):
+        tl = prefix.split("/")
+        return tl[0] + "/" + str(WrtUtil.ipMaskToLen(tl[1]))
 
 
 class _ApiClient(JsonApiEndPoint):

@@ -5,7 +5,6 @@ import os
 import json
 import logging
 import subprocess
-import pyroute2
 from wrt_util import WrtUtil
 from wrt_common import WrtCommon
 
@@ -135,33 +134,6 @@ class WrtTrafficManager:
             self.dnsmasqProc = None
         WrtUtil.forceDelete(self.pidFile)
         WrtUtil.forceDelete(self.cfgFile)
-
-    def _updateRoutes(self, gateway_ip, router_id, prefix_list):
-        if router_id not in self.routesDict[gateway_ip]:
-            self.routesDict[gateway_ip][router_id] = []
-        with pyroute2.IPRoute() as ipp:
-            # remove routes
-            tlist = list(self.routesDict[gateway_ip][router_id])
-            for prefix in tlist:
-                if prefix not in prefix_list:
-                    ipp.route("del", dst=self.__prefixConvert(prefix))
-                    self.routesDict[gateway_ip][router_id].remove(prefix)
-            # add routes
-            for prefix in prefix_list:
-                if prefix not in self.routesDict[gateway_ip][router_id]:
-                    ipp.route("add", dst=self.__prefixConvert(prefix), gateway=gateway_ip)
-                    self.routesDict[gateway_ip][router_id].append(prefix)
-
-    def _removeRoutes(self, gateway_ip, router_id):
-        if router_id in self.routesDict[gateway_ip]:
-            with pyroute2.IPRoute() as ipp:
-                for prefix in self.routesDict[gateway_ip][router_id]:
-                    ipp.route("del", dst=self.__prefixConvert(prefix))
-                del self.routesDict[gateway_ip][router_id]
-
-    def __prefixConvert(self, prefix):
-        tl = prefix.split("/")
-        return tl[0] + "/" + str(WrtUtil.ipMaskToLen(tl[1]))
 
 
 class _TrafficFacilityGroup:
