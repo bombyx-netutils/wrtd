@@ -51,6 +51,10 @@ class WrtDaemon:
             else:
                 logging.info("UUID loaded: \"%s\"." % (self.param.uuid))
 
+            # write pid file
+            with open(self.param.pidFile, "w") as f:
+                f.write(str(os.getpid()))
+
             # load plugin hub
             self.param.pluginHub = PluginHub(self.param)
             logging.info("Plugin HUB loaded.")
@@ -58,14 +62,6 @@ class WrtDaemon:
             # load prefix pool
             self.param.prefixPool = PrefixPool(os.path.join(self.param.varDir, "prefix-pool.json"))
             logging.info("Prefix pool loaded.")
-
-            # create main loop
-            DBusGMainLoop(set_as_default=True)
-            self.param.mainloop = GLib.MainLoop()
-
-            # write pid file
-            with open(self.param.pidFile, "w") as f:
-                f.write(str(os.getpid()))
 
             # create nft table
             WrtUtil.shell('/sbin/nft add table ip wrtd')
@@ -80,6 +76,10 @@ class WrtDaemon:
             # load manager caller
             self.param.managerCaller = ManagerCaller(self.param)
             logging.info("Manager caller initialized.")
+
+            # create main loop
+            DBusGMainLoop(set_as_default=True)
+            self.param.mainloop = GLib.MainLoop()
 
             # business initialize
             self.param.trafficManager = WrtTrafficManager(self.param)
