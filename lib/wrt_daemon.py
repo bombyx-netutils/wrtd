@@ -151,6 +151,9 @@ class WrtDaemon:
         class _Stub:
             pass
         data = _Stub()
+        data.etcDir = self.param.etcDir
+        data.tmpDir = self.param.tmpDir
+        data.varDir = self.param.varDir
         data.uuid = self.param.uuid
         data.plugin_hub = self.param.pluginHub
         data.prefix_pool = self.param.prefixPool
@@ -170,7 +173,7 @@ class WrtDaemon:
                 cfgObj = dict()
 
             p = self.param.pluginHub.getPlugin("manager", name)
-            p.init2(cfgObj, self.param.etcDir, self.param.tmpDir, self.param.varDir, data)
+            p.init2(cfgObj, self.param.tmpDir, self.param.varDir, data)
             logging.info("Manager plugin \"%s\" activated." % (p.full_name))
 
             for m in self.managerPluginList:

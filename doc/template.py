@@ -141,6 +141,18 @@ class TemplatePluginManager:
 class TemplatePluginManagerData:
 
     @property
+    def etcDir(self):
+        assert False
+
+    @property
+    def tmpDir(self):
+        assert False
+
+    @property
+    def varDir(self):
+        assert False
+
+    @property
     def uuid(self):
         assert False
 
