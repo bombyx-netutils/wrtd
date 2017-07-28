@@ -23,13 +23,11 @@ class WrtParam:
         self.dnsName = None
         self.uuid = None
         self.prefixPool = None
-        self.cascade = None
+        self.managerCaller = None
 
         self.mainloop = None
         self.dbusMainObject = None
         self.dbusIpForwardObject = None
-
-        self.cascadeApiPort = 2221
 
         self.pidFile = os.path.join(self.runDir, "wrtd.pid")
         self.logLevel = None

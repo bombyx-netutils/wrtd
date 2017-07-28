@@ -2,11 +2,9 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
-import json
 import logging
 import subprocess
 from wrt_util import WrtUtil
-from wrt_common import WrtCommon
 
 
 class WrtTrafficManager:
@@ -17,7 +15,6 @@ class WrtTrafficManager:
         self.pidFile = os.path.join(self.param.tmpDir, "l2-dnsmasq.pid")
         self.logger = logging.getLogger(self.__module__ + "." + self.__class__.__name__)
 
-        self.pluginList = []
         self.wanServDict = dict()           # dict<name,json-object>
         self.tfacGroupDict = dict()         # dict<name,_TrafficFacilityGroup>
 
@@ -26,32 +23,8 @@ class WrtTrafficManager:
         try:
             self._runDnsmasq()
             self.logger.info("Level 2 nameserver started.")
-
-            # start all traffic plugins
-            for name in WrtCommon.getTrafficPluginList(self.param):
-                fn = os.path.join(self.param.etcDir, "traffic-%s.json" % (name))
-                if not os.path.exists(fn):
-                    continue
-
-                tmpdir = os.path.join(self.param.tmpDir, name)
-                os.mkdir(tmpdir)
-
-                vardir = os.path.join(self.param.varDir, name)
-                WrtUtil.ensureDir(vardir)
-
-                if os.path.getsize(fn) > 0:
-                    with open(fn, "r") as f:
-                        cfgObj = json.load(f)
-                else:
-                    cfgObj = dict()
-
-                p = WrtCommon.getTrafficPlugin(self.param, name)
-                p.init2(cfgObj, tmpdir, vardir)
-                p.start()
-                self.pluginList.append(p)
-                self.logger.info("Traffic plugin \"%s\" activated." % (p.full_name))
         except BaseException:
-            self.dispose()
+            self._dispose()
             raise
 
     def dispose(self):
@@ -93,11 +66,6 @@ class WrtTrafficManager:
         # WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s drop' % (intf))
 
     def _dispose(self):
-        for p in self.pluginList:
-            p.stop()
-            self.logger.info("Traffic plugin \"%s\" deactivated." % (p.full_name))
-        self.pluginList = []
-
         self._stopDnsmasq()
 
     def _runDnsmasq(self):

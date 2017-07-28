@@ -5,10 +5,10 @@ import os
 import re
 import uuid
 import glob
-import fcntl
 import json
 import random
 import ipaddress
+from collections import OrderedDict
 from wrt_util import WrtUtil
 
 
@@ -90,14 +90,14 @@ class WrtCommon:
         return ret
 
     @staticmethod
-    def getTrafficPluginList(param):
-        return WrtCommon._getPluginList(param, "traffic")
+    def getManagerPluginList(param):
+        return WrtCommon._getPluginList(param, "manager")
 
     @staticmethod
-    def getTrafficPlugin(param, name):
-        ret = WrtCommon._getPlugin(param, "traffic", name, "")
+    def getManagerPlugin(param, name):
+        ret = WrtCommon._getPlugin(param, "manager", name, "")
         if ret is None:
-            raise Exception("traffic plugin %s does not exists" % (name))
+            raise Exception("manager plugin %s does not exists" % (name))
         return ret
 
     @staticmethod
@@ -128,63 +128,45 @@ class WrtCommon:
         return None
 
 
-class Managers:
+class ManagerCaller:
 
-    _param = None
-    _callRecord = dict()
+    def __init__(self, param):
+        self.param = param
 
-    @staticmethod
-    def init(param):
-        Managers._param = param
-        Managers._callRecord["traffic"] = dict()
-        Managers._callRecord["wan"] = dict()
-        Managers._callRecord["lan"] = dict()
-        Managers._callRecord["cascade"] = dict()
+        self.callRecord = dict()
+        self.callRecord["traffic"] = dict()
+        self.callRecord["wan"] = dict()
+        self.callRecord["lan"] = dict()
 
-    @staticmethod
-    def call(funcName, *args):
-        Managers._callFunc("traffic", Managers._param.trafficManager, funcName, *args)
-        Managers._callFunc("wan", Managers._param.wanManager, funcName, *args)
-        Managers._callFunc("lan", Managers._param.lanManager, funcName, *args)
-        Managers._callFunc("cascade", Managers._param.cascadeManager, funcName, *args)
+        self.managerDict = OrderedDict()
 
-    @staticmethod
-    def _callFunc(objName, obj, funcName, *args):
+    def add_manager(self, name, manager):
+        self.callRecord[name] = dict()
+        self.managerDict[name] = manager
+
+    def call(self, funcName, *args):
+        self._callFunc("traffic", self.param.trafficManager, funcName, *args)
+        self._callFunc("wan", self.param.wanManager, funcName, *args)
+        self._callFunc("lan", self.param.lanManager, funcName, *args)
+        for name, manager in self.managerDict.items():
+            self._callFunc(name, manager, funcName, *args)
+
+    def _callFunc(self, objName, obj, funcName, *args):
         if obj is None:
             return
 
         if funcName.endswith("_down"):
             upFuncName = re.sub("_down$", "_up", funcName)
-            if upFuncName not in Managers._callRecord[objName]:
+            if upFuncName not in self.callRecord[objName]:
                 return
             if hasattr(obj, funcName):
                 getattr(obj, funcName)(*args)
-            del Managers._callRecord[objName][upFuncName]
+            del self.callRecord[objName][upFuncName]
         else:
             if hasattr(obj, funcName):
                 getattr(obj, funcName)(*args)
             if funcName.endswith("_up"):
-                Managers._callRecord[objName][funcName] = True
-
-
-class DnsMasqHostFilesLock:
-
-    def __init__(self, tmpDir):
-        self.lockFile = os.path.join(tmpDir, "hosts.d", ".lock")
-        self.lockFd = None
-
-    def __enter__(self):
-        try:
-            self.lockFd = os.open(self.lockFile, os.O_WRONLY | os.O_CREAT | os.O_CLOEXEC, 0o600)
-            fcntl.lockf(self.lockFd, fcntl.LOCK_EX)
-        except BaseException:
-            if self.lockFd is not None:
-                os.close(self.lockFd)
-                self.lockFd = None
-
-    def __exit__(self, *_):
-        os.close(self.lockFd)
-        self.lockFd = None
+                self.callRecord[objName][funcName] = True
 
 
 class PrefixPool:
@@ -466,21 +448,42 @@ class TemplatePluginVpnServer:
         assert False
 
 
-# plugin module name: plugins.traffic_*
-# config file: ${ETC}/traffic-(PLUGIN_NAME)-(INSTANCE_NAME).json
-class TemplatePluginTraffic:
+# plugin module name: plugins.manager_*
+# config file: ${ETC}/manager-(PLUGIN_NAME).json
+# manager unload is not supported, so manager_disappear() is not needed
+class TemplatePluginManager:
 
-    def init2(self, cfg, tmpDir, varDir, facilityChangeCallback):
+    def init2(self, cfg, tmpDir, varDir, pluginManagerData):
         assert False
 
-    def start(self):
+    def manager_appear(self, name, manager):
         assert False
 
-    def stop(self):
+
+class TemplatePluginManagerData:
+
+    @property
+    def uuid(self):
         assert False
 
-    def get_priority(self):
-        # returns priority, range [0,100]
+    @property
+    def prefix_pool(self):
+        assert False
+
+    @property
+    def managet_caller(self):
+        assert False
+
+    @property
+    def traffic_manager(self):
+        assert False
+
+    @property
+    def wan_manager(self):
+        assert False
+
+    @property
+    def lan_manager(self):
         assert False
 
 

@@ -14,7 +14,7 @@ from dbus.mainloop.glib import DBusGMainLoop
 from wrt_util import WrtUtil
 from wrt_common import WrtCommon
 from wrt_common import PrefixPool
-from wrt_common import Managers
+from wrt_common import ManagerCaller
 from wrt_manager_traffic import WrtTrafficManager
 from wrt_manager_wan import WrtWanManager
 from wrt_manager_lan import WrtLanManager
@@ -29,6 +29,7 @@ class WrtDaemon:
         self.param = param
         self.cfgFile = os.path.join(self.param.etcDir, "global.json")
         self.bRestart = False
+        self.managerPluginList = []
         self.interfaceDict = dict()
         self.interfaceTimer = None
 
@@ -72,12 +73,16 @@ class WrtDaemon:
             with open(self.param.ownResolvConf, "w") as f:
                 f.write("")
 
+            # load manager caller
+            self.param.managerCaller = ManagerCaller(self.param)
+            logging.info("Manager caller initialized.")
+
             # business initialize
-            Managers.init(self.param)
             self.param.trafficManager = WrtTrafficManager(self.param)
             self.param.wanManager = WrtWanManager(self.param)
             self.param.lanManager = WrtLanManager(self.param)
             self.param.cascadeManager = WrtCascadeManager(self.param)
+            self._loadManagerPlugins()
             self.interfaceTimer = GObject.timeout_add_seconds(10, self._interfaceTimerCallback)
 
             # start DBUS API server
@@ -96,6 +101,11 @@ class WrtDaemon:
             if self.interfaceTimer is not None:
                 GLib.source_remove(self.interfaceTimer)
                 self.interfaceTimer = None
+            if True:
+                for p in self.managerPluginList:
+                    p.stop()
+                    logging.info("Manager plugin \"%s\" deactivated." % (p.full_name))
+                self.managerPluginList = []
             if self.param.cascadeManager is not None:
                 self.param.cascadeManager.dispose()
                 self.param.cascadeManager = None
@@ -136,6 +146,35 @@ class WrtDaemon:
             with open(self.cfgFile, "r") as f:
                 cfgObj = json.load(f)
             self.param.dnsName = cfgObj["dns-name"]
+
+    def _loadManagerPlugins(self):
+        class _Stub:
+            pass
+        data = _Stub()
+        data.uuid = self.param.uuid
+        data.prefix_pool = self.param.prefixPool
+        data.traffic_manager = self.param.trafficManager
+        data.wan_manager = self.param.wanManager
+        data.lan_manager = self.param.lanManager
+
+        for name in WrtCommon.getManagerPluginList(self.param):
+            fn = os.path.join(self.param.etcDir, "manager-%s.json" % (name))
+            if not os.path.exists(fn):
+                continue
+
+            if os.path.getsize(fn) > 0:
+                with open(fn, "r") as f:
+                    cfgObj = json.load(f)
+            else:
+                cfgObj = dict()
+
+            p = WrtCommon.getManagerPlugin(self.param, name)
+            p.init2(cfgObj, self.param.tmpDir, self.param.varDir, data)
+            logging.info("Manager plugin \"%s\" activated." % (p.full_name))
+
+            for m in self.managerPluginList:
+                p.manager_appear(m)
+            self.managerPluginList.append(p)
 
     def _interfaceTimerCallback(self):
         intfList = netifaces.interfaces()

@@ -8,7 +8,6 @@ import logging
 import socket
 from wrt_util import UrlOpenAsync
 from wrt_common import WrtCommon
-from wrt_common import Managers
 
 
 class WrtWanManager:
@@ -41,8 +40,8 @@ class WrtWanManager:
                 self.wanConnPlugin.init2(cfgObj,
                                          tdir,
                                          self.param.ownResolvConf,
-                                         lambda: Managers.call("on_wconn_up"),
-                                         lambda: Managers.call("on_wconn_down"))
+                                         lambda: self.param.managerCaller.call("on_wconn_up"),
+                                         lambda: self.param.managerCaller.call("on_wconn_down"))
                 self.wanConnPlugin.start()
                 self.logger.info("Internet connection activated, plugin: %s." % (cfgObj["plugin"]))
 

@@ -13,7 +13,6 @@ import pyroute2
 from gi.repository import Gio
 from wrt_util import WrtUtil
 from wrt_common import WrtCommon
-from wrt_common import Managers
 
 
 class WrtLanManager:
@@ -35,9 +34,9 @@ class WrtLanManager:
             self.defaultBridge.init2("wrtd-br",
                                      self.param.prefixPool.usePrefix(),
                                      self.param.trafficManager.get_l2_nameserver_port(),
-                                     lambda source_id, ip_data_dict: Managers.call("on_client_add", source_id, ip_data_dict),
-                                     lambda source_id, ip_data_dict: Managers.call("on_client_change", source_id, ip_data_dict),
-                                     lambda source_id, ip_list: Managers.call("on_client_remove", source_id, ip_list))
+                                     lambda source_id, ip_data_dict: self.param.managerCaller.call("on_client_add", source_id, ip_data_dict),
+                                     lambda source_id, ip_data_dict: self.param.managerCaller.call("on_client_change", source_id, ip_data_dict),
+                                     lambda source_id, ip_list: self.param.managerCaller.call("on_client_remove", source_id, ip_list))
             logging.info("Default bridge started.")
 
             # start all lan interface plugins
@@ -65,9 +64,9 @@ class WrtLanManager:
                             vardir,
                             self.param.prefixPool.usePrefix(),
                             self.param.trafficManager.get_l2_nameserver_port(),
-                            lambda source_id, ip_data_dict: Managers.call("on_client_add", source_id, ip_data_dict),
-                            lambda source_id, ip_data_dict: Managers.call("on_client_change", source_id, ip_data_dict),
-                            lambda source_id, ip_list: Managers.call("on_client_remove", source_id, ip_list))
+                            lambda source_id, ip_data_dict: self.param.managerCaller.call("on_client_add", source_id, ip_data_dict),
+                            lambda source_id, ip_data_dict: self.param.managerCaller.call("on_client_change", source_id, ip_data_dict),
+                            lambda source_id, ip_list: self.param.managerCaller.call("on_client_remove", source_id, ip_list))
                     p.start()
                     self.vpnsPluginList.append(p)
                     logging.info("VPN server plugin \"%s\" activated." % (p.full_name))
