@@ -77,15 +77,6 @@ class DbusMainObject(dbus.service.Object):
             else:
                 ret["wconn-plugin"]["is-connected"] = False
 
-        if self.param.cascadeManager.vpnPlugin is not None:
-            plugin = self.param.cascadeManager.vpnPlugin
-            ret["wvpn-plugin"] = dict()
-            ret["wvpn-plugin"]["name"] = plugin.full_name
-            if plugin.is_connected():
-                ret["wvpn-plugin"]["is-connected"] = True
-            else:
-                ret["wvpn-plugin"]["is-connected"] = False
-
         ret["default-bridge"] = dict()
         if True:
             ret["default-bridge"] = dict()
@@ -104,18 +95,6 @@ class DbusMainObject(dbus.service.Object):
             ret["vpns-plugin"][plugin.full_name]["bridge"]["ip"] = WrtCommon.bridgeGetIp(plugin.get_bridge())
             ret["vpns-plugin"][plugin.full_name]["bridge"]["mask"] = plugin.get_bridge().get_prefix()[1]
 
-        ret["cascade"] = dict()
-        if True:
-            ret["cascade"]["my-id"] = self.param.uuid
-            ret["cascade"]["router-list"] = dict()
-            ret["cascade"]["router-list"].update(self.param.cascadeManager.routerInfo)
-            if self.param.cascadeManager.hasValidApiClient():
-                ret["cascade"]["router-list"][self.param.uuid]["parent"] = self.param.cascadeManager.apiClient.get_peer_uuid()
-                ret["cascade"]["router-list"].update(self.param.cascadeManager.apiClient.get_router_info())
-            for sproc in self.param.cascadeManager.getAllRouterApiServerProcessors():
-                ret["cascade"]["router-list"].update(sproc.get_router_info())
-                ret["cascade"]["router-list"][sproc.get_peer_uuid()]["parent"] = self.param.uuid
-
         ret["wan-service"] = []
         if True:
             ret["wan-service"] = list(self.param.trafficManager.wanServDict.keys())
@@ -130,6 +109,9 @@ class DbusMainObject(dbus.service.Object):
                 ret["tfac-group"][name] = dict()
                 ret["tfac-group"][name]["priority"] = group.priority
                 ret["tfac-group"][name]["facilities"] = [tfac["facility_name"] for tfac in group.facility_list]
+
+        for m in self.param.daemon.managerPluginList:
+            ret.update(m.get_router_info())
 
         return json.dumps(ret)
 
