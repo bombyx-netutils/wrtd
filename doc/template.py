@@ -134,6 +134,12 @@ class TemplatePluginManager:
     def init2(self, cfg, etcDir, tmpDir, varDir, pluginManagerData):
         assert False
 
+    def dispose(self):
+        assert False
+
+    def get_router_info(self):
+        assert False
+
     def manager_appear(self, name, manager):
         assert False
 
