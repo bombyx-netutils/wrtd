@@ -66,6 +66,9 @@ class DbusMainObject(dbus.service.Object):
     def GetRouterInfo(self):
         ret = dict()
 
+        ret["uuid"] = self.param.uuid
+        ret["hostname"] = socket.gethostname()
+
         if self.param.wanManager.wanConnPlugin is not None:
             plugin = self.param.wanManager.wanConnPlugin
             ret["wconn-plugin"] = dict()
