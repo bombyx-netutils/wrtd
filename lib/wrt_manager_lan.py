@@ -102,11 +102,11 @@ class WrtLanManager:
 
     def add_source(self, source_id):
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-            bridge.on_source_add("upstream-vpn")
+            bridge.on_source_add(source_id)
 
     def remove_source(self, source_id):
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-            bridge.on_source_remove("upstream-vpn")
+            bridge.on_source_remove(source_id)
 
     def add_client(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
