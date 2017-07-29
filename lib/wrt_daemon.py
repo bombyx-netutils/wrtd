@@ -157,6 +157,7 @@ class WrtDaemon:
         data.uuid = self.param.uuid
         data.plugin_hub = self.param.pluginHub
         data.prefix_pool = self.param.prefixPool
+        data.manager_caller = self.param.managerCaller
         data.traffic_manager = self.param.trafficManager
         data.wan_manager = self.param.wanManager
         data.lan_manager = self.param.lanManager
