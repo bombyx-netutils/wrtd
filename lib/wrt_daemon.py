@@ -105,7 +105,7 @@ class WrtDaemon:
                 GLib.source_remove(self.interfaceTimer)
                 self.interfaceTimer = None
             if True:
-                for p in self.managerPluginList:
+                for p in reversed(self.managerPluginList):
                     p.stop()
                     logging.info("Manager plugin \"%s\" deactivated." % (p.full_name))
                 self.managerPluginList = []
@@ -163,10 +163,7 @@ class WrtDaemon:
 
         for name in self.param.pluginHub.getPluginList("manager"):
             fn = os.path.join(self.param.etcDir, "manager-%s.json" % (name))
-            if not os.path.exists(fn):
-                continue
-
-            if os.path.getsize(fn) > 0:
+            if os.path.exists(fn) and os.path.getsize(fn) > 0:
                 with open(fn, "r") as f:
                     cfgObj = json.load(f)
             else:
