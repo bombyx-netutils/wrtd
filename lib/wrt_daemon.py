@@ -175,7 +175,7 @@ class WrtDaemon:
 
             for m in self.managerPluginList:
                 p.manager_appear(m)
-            self.param.pluginHub.add_manager(name, p)
+            self.param.managerCaller.add_manager(name, p)
             self.managerPluginList.append(p)
 
     def _interfaceTimerCallback(self):
