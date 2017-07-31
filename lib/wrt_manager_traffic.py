@@ -109,3 +109,18 @@ class _TrafficFacilityGroup:
     def __init__(self):
         self.priority = None
         self.facility_list = []
+
+
+
+
+
+
+        # # add nat rule
+        # subprocess.check_call(["/sbin/nft", "add", "table", "ip", "cgfw"])
+        # subprocess.check_call(["/sbin/nft", "add", "chain", "cgfw", "fw", "{", "type", "filter", "hook", "prerouting", "priority", "0", ";", "}"])
+        # subprocess.check_call(["/sbin/nft", "add", "chain", "cgfw", "natpre", "{", "type", "nat", "hook", "prerouting", "priority", "0", ";", "}"])
+        # subprocess.check_call(["/sbin/nft", "add", "chain", "cgfw", "natpost", "{", "type", "nat", "hook", "postrouting", "priority", "0", ";", "}"])
+        # subprocess.check_call(["/sbin/nft", "add", "rule", "cgfw", "fw", "iifname", "\"cgfw\"", "ct", "state", "established,related", "accept"])
+        # subprocess.check_call(["/sbin/nft", "add", "rule", "cgfw", "fw", "iifname", "\"cgfw\"", "ip", "protocol", "icmp", "accept"])
+        # subprocess.check_call(["/sbin/nft", "add", "rule", "cgfw", "fw", "iifname", "\"cgfw\"", "drop"])
+        # subprocess.check_call(["/sbin/nft", "add", "rule", "cgfw", "natpost", "oifname", "\"cgfw\"", "masquerade"])
