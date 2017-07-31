@@ -60,6 +60,9 @@ class PluginTemplateWanConnection:
     def get_ip(self):
         assert False
 
+    def get_netmask():
+        assert False
+
     def get_interface(self):
         assert False
 
