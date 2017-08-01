@@ -83,7 +83,7 @@ class WrtWanManager:
         # start checking if ip is public
         self._wconnIpCheckStart()
 
-    def on_wconn_down(self):
+    def on_wan_conn_down(self):
         self.wanConnIpIsPublic = None
         if self.wanConnIpChecker is not None:
             self.wanConnIpChecker.cancel()
