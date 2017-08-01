@@ -66,6 +66,10 @@ class PluginTemplateWanConnection:
     def get_interface(self):
         assert False
 
+    def get_prefix_list(self):
+        # returns [(ip, mask), (ip,mask ), ...]
+        assert False
+
     def interface_appear(self, ifname):
         # return True means we take this interface
         # must be called after start()
