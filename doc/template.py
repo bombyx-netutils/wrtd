@@ -66,7 +66,7 @@ class PluginTemplateWanConnection:
     def get_interface(self):
         assert False
 
-    def get_prefix_list(self):
+    def get_extra_prefix_list(self):
         # returns [(ip, mask), (ip,mask ), ...]
         assert False
 

@@ -22,6 +22,11 @@ from gi.repository import GLib
 class WrtUtil:
 
     @staticmethod
+    def ipMaskToPrefix(ip, netmask):
+        netobj = ipaddress.IPv4Network(ip + "/" + netmask)
+        return (str(netobj.network_address), str(netobj.netmask))
+
+    @staticmethod
     def prefixListConflict(prefixList1, prefixList2):
         for prefix1 in prefixList1:
             for prefix2 in prefixList2:

@@ -59,7 +59,7 @@ class WrtTrafficManager:
     def remove_tfac_group(self, name):
         del self.tfacGroupDict[name]
 
-    def on_wconn_up(self):
+    def on_wan_conn_up(self):
         WrtUtil.shell('/sbin/nft add rule wrtd natpost oifname %s masquerade' % (self.param.wanManager.wanConnPlugin.get_interface()))
         # WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ct state established,related accept' % (intf))
         # WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ip protocol icmp accept' % (intf))

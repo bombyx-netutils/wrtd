@@ -6,6 +6,7 @@ import json
 import signal
 import logging
 import socket
+from wrt_util import WrtUtil
 from wrt_util import UrlOpenAsync
 
 
@@ -39,8 +40,8 @@ class WrtWanManager:
                 self.wanConnPlugin.init2(cfgObj,
                                          tdir,
                                          self.param.ownResolvConf,
-                                         lambda: self.param.managerCaller.call("on_wconn_up"),
-                                         lambda: self.param.managerCaller.call("on_wconn_down"))
+                                         lambda: self.param.managerCaller.call("on_wan_conn_up"),
+                                         lambda: self.param.managerCaller.call("on_wan_conn_down"))
                 self.wanConnPlugin.start()
                 self.logger.info("Internet connection activated, plugin: %s." % (cfgObj["plugin"]))
 
@@ -67,9 +68,10 @@ class WrtWanManager:
             self.logger.info("Internet connection deactivated.")
         self.logger.info("Terminated.")
 
-    def on_wconn_up(self):
+    def on_wan_conn_up(self):
         # set exclude prefix and restart if neccessary
-        if self.param.prefixPool.setExcludePrefixList("wan", self.wanConnPlugin.get_prefix_list()):
+        wanPrefixList = [WrtUtil.ipMaskToPrefix(self.wanConnPlugin.get_ip(), self.wanConnPlugin.get_netmask())] + self.wanConnPlugin.get_extra_prefix_list()
+        if self.param.prefixPool.setExcludePrefixList("wan", wanPrefixList):
             os.kill(os.getpid(), signal.SIGHUP)
             raise Exception("bridge prefix duplicates with internet connection, autofix it and restart")
 
@@ -97,6 +99,7 @@ class WrtWanManager:
         self.wanConnIpIsPublic = (ip == self.wanConnPlugin.get_ip())
         self.logger.error("Internet IP (%s) check complete, %s IP" % (self.wanConnPlugin.get_ip(), "Public" if self.wanConnIpIsPublic else "NATed"))
         self.wanConnIpChecker = None
+        self.param.managerCaller.call("on_wan_ipcheck_complete", self.wanConnIpIsPublic)
 
     def _wconnIpCheckError(self, returncode, msg):
         self.logger.error("Internet IP (%s) check failed, %s" % (self.wanConnPlugin.get_ip(), msg))
