@@ -169,15 +169,26 @@ class DbusMainObject(dbus.service.Object):
     def AddTrafficFacilityGroup(self, name, priority, tfac_group, sender=None):
         if self.param.trafficManager.has_tfac_group(name):
             raise Exception("Traffic facility grouop \"%s\" already exists." % (name))
-        self.param.trafficManager.add_tfac_group(name, priority, json.loads(tfac_group))
+        tfac_group = json.loads(tfac_group)
+        checkTrafficFacilityGroup(tfac_group)
+
+        self.param.trafficManager.add_tfac_group(name, priority, tfac_group)
         self.tfacGroupOwnerDict[name] = sender
 
     @dbus.service.method('org.fpemud.WRT', in_signature='ss')
     def ChangeTrafficFacilityGroup(self, name, tfac_group):
+        if name not in self.tfacGroupDict:
+            raise Exception("Traffic facility group \"%s\" does not exist." % (name))
+        tfac_group = json.loads(tfac_group)
+        checkTrafficFacilityGroup(tfac_group)
+
         self.param.trafficManager.change_tfac_group(name, json.loads(tfac_group))
 
     @dbus.service.method('org.fpemud.WRT', in_signature='s')
     def RemoveTrafficFacilityGroup(self, name):
+        if name not in self.tfacGroupDict:
+            raise Exception("Traffic facility group \"%s\" does not exist." % (name))
+
         self.param.trafficManager.remove_tfac_group(name)
         del self.tfacGroupOwnerDict[name]
 
@@ -213,3 +224,77 @@ class DbusIpForwardObject(dbus.service.Object):
     @dbus.service.method('org.fpemud.IpForward')
     def Off(self):
         pass
+
+
+def checkTrafficFacilityGroup(tfac_group):
+    i = 0
+    for tfac in tfac_group:
+        i += 1
+
+        if "facility-name" not in tfac:
+            raise Exception("Lacking \"facility-name\" for facility No.%d." % (i))
+
+        if "facility-type" not in tfac:
+            raise Exception("Lacking \"facility-type\" for facility \"%s\"." % (tfac["facility-name"]))
+
+        if tfac["facility-type"] == "nameserver":
+            if "target" not in tfac:
+                raise Exception("Lacking \"target\" for facility \"%s\"." % (tfac["facility-name"]))
+            if not isinstance(tfac["target"], list):
+                raise Exception("Type of \"target\" is invalid for facility \"%s\"." % (tfac["facility-name"]))
+            for item in tfac["target"]:
+                msg = "Some element in \"target\" is invalid for facility \"%s\"." % (tfac["facility-name"])
+                if not isinstance(item, list):
+                    raise Exception(msg)
+                if len(item) != 2:
+                    raise Exception(msg)
+                if not isinstance(item[0], str):
+                    raise Exception(msg)
+                if not isinstance(item[1], int):
+                    raise Exception(msg)
+
+            if "domain-list" not in tfac:
+                raise Exception("Lacking \"domain-list\" for facility \"%s\"." % (tfac["facility-name"]))
+            if not isinstance(tfac["domain-list"], list):
+                raise Exception("Type of \"domain-list\" is invalid for facility \"%s\"." % (tfac["facility-name"]))
+            for item in tfac["domain-list"]:
+                if not isinstance(item, str):
+                    raise Exception("Some element in \"domain-list\" is invalid for facility \"%s\"." % (tfac["facility-name"]))
+
+            continue
+
+        if tfac["facility-type"] == "gateway":
+            if "target" not in tfac:
+                raise Exception("Lacking \"target\" for facility \"%s\"." % (tfac["facility-name"]))
+            msg = "Invalid \"target\" for facility \"%s\"." % (tfac["facility-name"])
+            if not isinstance(tfac["target"], list):
+                raise Exception(msg)
+            if len(tfac["target"]) != 2:
+                raise Exception(msg)
+            if tfac["target"][0] is not None and not isinstance(tfac["target"][0], str):
+                raise Exception(msg)
+            if tfac["target"][1] is not None and not isinstance(tfac["target"][1], str):
+                raise Exception(msg)
+
+            if "network-list" not in tfac:
+                raise Exception("Lacking \"network-list\" for facility \"%s\"." % (tfac["facility-name"]))
+            if not isinstance(tfac["network-list"], list):
+                raise Exception("Type of \"network-list\" is invalid for facility \"%s\"." % (tfac["facility-name"]))
+            for item in tfac["network-list"]:
+                msg = "Some element in \"domain-list\" is invalid for facility \"%s\"." % (tfac["facility-name"])
+                if not isinstance(item, str):
+                    raise Exception(msg)
+                try:
+                    tnet = ipaddress.IPv4Network(item)
+                    if tnet.is_private:
+                        raise Exception(msg)
+                except ipaddress.AddressValueError:
+                    raise Exception(msg)
+                except ipaddress.NetmaskValueError:
+                    raise Exception(msg)
+                except ValueError:
+                    raise Exception(msg)
+
+            continue
+
+        raise Exception("Invalid \"facility-type\" for facility \"%s\"." % (tfac["facility-name"]))

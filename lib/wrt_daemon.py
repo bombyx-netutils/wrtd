@@ -30,7 +30,9 @@ class WrtDaemon:
         self.cfgFile = os.path.join(self.param.etcDir, "global.json")
         self.bRestart = False
         self.managerPluginList = []
+
         self.interfaceDict = dict()
+        self.interfaceScanTimeout = 10          # 10 seconds
         self.interfaceTimer = None
 
     def run(self):
@@ -86,7 +88,7 @@ class WrtDaemon:
             self.param.wanManager = WrtWanManager(self.param)
             self.param.lanManager = WrtLanManager(self.param)
             self._loadManagerPlugins()
-            self.interfaceTimer = GObject.timeout_add_seconds(10, self._interfaceTimerCallback)
+            self.interfaceTimer = GObject.timeout_add_seconds(0, self._interfaceTimerCallback)
 
             # start DBUS API server
             self.param.dbusMainObject = DbusMainObject(self.param)
@@ -180,34 +182,36 @@ class WrtDaemon:
             self.managerPluginList.append(p)
 
     def _interfaceTimerCallback(self):
-        intfList = netifaces.interfaces()
-        intfList = [x for x in intfList if x.startswith("en") or x.startswith("eth") or x.startswith("wl")]
+        try:
+            intfList = netifaces.interfaces()
+            intfList = [x for x in intfList if x.startswith("en") or x.startswith("eth") or x.startswith("wl")]
 
-        addList = list(set(intfList) - set(self.interfaceDict.keys()))
-        removeList = list(set(self.interfaceDict.keys()) - set(intfList))
+            addList = list(set(intfList) - set(self.interfaceDict.keys()))
+            removeList = list(set(self.interfaceDict.keys()) - set(intfList))
 
-        for intf in removeList:
-            plugin = self.interfaceDict[intf]
-            if plugin is not None:
-                plugin.interface_disappear(intf)
-            del self.interfaceDict[intf]
+            for intf in removeList:
+                plugin = self.interfaceDict[intf]
+                if plugin is not None:
+                    plugin.interface_disappear(intf)
+                del self.interfaceDict[intf]
 
-        for intf in addList:
-            if self.param.wanManager.wanConnPlugin is not None:
-                # wan connection plugin
-                if self.param.wanManager.wanConnPlugin.interface_appear(intf):
-                    self.interfaceDict[intf] = self.param.wanManager.wanConnPlugin
-                    continue
+            for intf in addList:
+                if self.param.wanManager.wanConnPlugin is not None:
+                    # wan connection plugin
+                    if self.param.wanManager.wanConnPlugin.interface_appear(intf):
+                        self.interfaceDict[intf] = self.param.wanManager.wanConnPlugin
+                        continue
 
-                # lan interface plugin
-                for plugin in self.param.lanManager.lifPluginList:
-                    if plugin.interface_appear(self.param.lanManager.defaultBridge, intf):
-                        self.interfaceDict[intf] = plugin
-                        break
-                if intf in self.interfaceDict:
-                    continue
+                    # lan interface plugin
+                    for plugin in self.param.lanManager.lifPluginList:
+                        if plugin.interface_appear(self.param.lanManager.defaultBridge, intf):
+                            self.interfaceDict[intf] = plugin
+                            break
+                    if intf in self.interfaceDict:
+                        continue
 
-                # unmanaged interface
-                self.interfaceDict[intf] = None
-
-        return True
+                    # unmanaged interface
+                    self.interfaceDict[intf] = None
+        finally:
+            self.interfaceTimer = GObject.timeout_add_seconds(self.interfaceScanTimeout, self._interfaceTimerCallback)
+            return False
