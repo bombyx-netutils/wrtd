@@ -2,9 +2,12 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
+import re
 import logging
-import ipaddress
+import pyroute2
 import subprocess
+from gi.repository import GLib
+from gi.repository import GObject
 from wrt_util import WrtUtil
 
 
@@ -18,13 +21,19 @@ class WrtTrafficManager:
 
         self.wanServDict = dict()               # dict<name,json-object>
 
-        self.routeFullDict = _RouteFullDict()
-        self.routeDict = dict()
-        self.routeRefreshInterval = 10          # 10 seconds
-        self.routeRefreshTimer = GObject.timeout_add_seconds(0, self._routerRefresh)
+        self.tfacGroupDict = dict()             # dict<name, priority>
 
-        self.domainNameserverFullDict = _DomainNameServerFullDict()
-        self.domainIpFullDict = _DomainIpFullDict()
+        self.routeFullDict = _NamePriorityKeyValueDict()
+        self.routeDict = dict()                 # real route dict
+
+        self.gatewayDict = dict()               # dict<name, set<interface>>
+
+        self.domainNameserverFullDict = _NamePriorityKeyValueDict()
+
+        self.domainIpFullDict = _NamePriorityKeyValueDict()
+
+        self.routeRefreshInterval = 10               # 10 seconds
+        self.routeRefreshTimer = GObject.timeout_add_seconds(0, self._routeRefreshTimerCallback)
 
         self.dnsPort = None
         self.dnsmasqProc = None
@@ -33,7 +42,7 @@ class WrtTrafficManager:
             self.logger.info("Level 2 nameserver started.")
 
             GLib.add
-        except:
+        except BaseException:
             self._dispose()
             raise
 
@@ -60,32 +69,52 @@ class WrtTrafficManager:
     def add_tfac_group(self, name, priority, facility_list):
         assert name not in self.tfacGroupDict
 
-        # record
-        self.tfacGroupDict[name] = _TrafficFacilityGroup()
-        self.tfacGroupDict[name].priority = priority
-        self.tfacGroupDict[name].facility_list = facility_list
+        self.tfacGroupDict[name] = priority
 
-        # trigger route refresh
-        GLib.source_remove(self.routeRefreshTimer)
-        self.routeRefreshTimer = GObject.timeout_add_seconds(0, self._routerRefresh)
+        if self._trafficFacilityListToRouteFullDict(name, priority, facility_list):
+            GLib.source_remove(self.routeRefreshTimer)
+            self.routeRefreshTimer = GObject.timeout_add_seconds(0, self._routeRefreshTimerCallback)
+
+        gatewaySet = self._getGatewaySetFromTrafficFacilityList(facility_list)
+        self._addGatewayNftRules(gatewaySet)
+        self.gatewayDict[name] = gatewaySet
+
+        if self._trafficFacilityListToDomainNameserverFullDict(name, priority, facility_list):
+            pass
 
     def change_tfac_group(self, name, facility_list):
-        assert name in self.tfacGroupDict:
+        assert name in self.tfacGroupDict
 
-        # record
-        self.tfacGroupDict[name].facility_list = facility_list
+        ret = False
+        ret |= self.routeFullDict.remove_by_name(name)
+        ret |= self._trafficFacilityListToRouteFullDict(name, self.tfacGroup[name], facility_list)
+        if ret:
+            GLib.source_remove(self.routeRefreshTimer)
+            self.routeRefreshTimer = GObject.timeout_add_seconds(0, self._routeRefreshTimerCallback)
 
-        # trigger route refresh
-        GLib.source_remove(self.routeRefreshTimer)
-        self.routeRefreshTimer = GObject.timeout_add_seconds(0, self._routerRefresh)
+        gatewaySet = self._getGatewaySetFromTrafficFacilityList(facility_list)
+        self._removeGatewayNftRules(self.gatewayDict[name] - gatewaySet)
+        self._addGatewayNftRules(gatewaySet - self.gatewayDict[name])
+        self.gatewayDict[name] = gatewaySet
+
+        ret = False
+        ret |= self.domainNameserverFullDict.remove_by_name(name)
+        ret |= self._trafficFacilityListToDomainNameserverFullDict(name, self.tfacGroup[name], facility_list)
+        if ret:
+            pass
 
     def remove_tfac_group(self, name):
-        # record
         del self.tfacGroupDict[name]
 
-        # trigger route refresh
-        GLib.source_remove(self.routeRefreshTimer)
-        self.routeRefreshTimer = GObject.timeout_add_seconds(0, self._routerRefresh)
+        if self.routeFullDict.remove_by_name(name):
+            GLib.source_remove(self.routeRefreshTimer)
+            self.routeRefreshTimer = GObject.timeout_add_seconds(0, self._routeRefreshTimerCallback)
+
+        self._removeGatewayNftRules(self.gatewayDict[name])
+        del self.gatewayDict[name]
+
+        if self.domainNameserverFullDict.remove_by_name(name):
+            pass
 
     def on_wan_conn_up(self):
         WrtUtil.shell('/sbin/nft add rule wrtd natpost oifname %s masquerade' % (self.param.wanManager.wanConnPlugin.get_interface()))
@@ -131,20 +160,40 @@ class WrtTrafficManager:
         WrtUtil.forceDelete(self.pidFile)
         WrtUtil.forceDelete(self.cfgFile)
 
-    def _trafficFacilityListToRouteFullDict(name, priority, facility_list):
-        newRouteFullDict = self.routeFullDict.copy()
-        ret.remove_route_by_name(name)
+    def _getGatewaySetFromTrafficFacilityList(self, facility_list):
+        ret = set()
+        for item in facility_list:
+            if item["facility-type"] == "gateway":
+                nexthop, interface = item["target"]
+                if interface is not None:
+                    ret.add(interface)
+        return ret
 
+    def _trafficFacilityListToRouteFullDict(self, name, priority, facility_list):
+        ret = False
         for item in facility_list:
             if item["facility-type"] == "gateway":
                 for prefix in item["network-list"]:
-                    ret.add_route(name, priority, prefix, item["target"][0], item["target"][1])
-
+                    self.routeFullDict.add(name, priority, prefix, item["target"])
+                    ret = True
         return ret
 
-    def _routeRefresh(self):
+    def _trafficFacilityListToDomainNameserverFullDict(self, name, priority, facility_list):
+        ret = False
+        for item in facility_list:
+            if item["facility-type"] == "nameserver":
+                for domain in item["domain-list"]:
+                    self.routeFullDict.add(name, priority, domain, item["target"])
+                    ret = True
+        return ret
+
+    def _trafficFacilityListToDomainIpFullDict(self, name, priority, facility_list):
+        assert False
+        return False
+
+    def _routeRefreshTimerCallback(self):
         try:
-            newRouteDict = self.routeFullDict.get_route_dict()
+            newRouteDict = self.routeFullDict.get_dict()
 
             with pyroute2.IPRoute() as ipp:
                 # remove routes
@@ -181,118 +230,75 @@ class WrtTrafficManager:
                         else:                                                               # change
                             pass        # fixme
                     except pyroute2.netlink.exceptions.NetlinkError as e:
-                        if e[0] == 101 and e[1] == "Network is unreachable":                
+                        if e[0] == 101 and e[1] == "Network is unreachable":
                             del newRouteDict[prefix]        # nexthop is invalid, retry in next cycle
                             continue
                         raise
 
             self.routeDict = newRouteDict
         finally:
-            self.routeRefreshTimer = GObject.timeout_add_seconds(self.routeRefreshInterval, self._routerRefresh)
+            self.routeRefreshTimer = GObject.timeout_add_seconds(self.routeRefreshInterval, self._routeRefreshTimerCallback)
             return False
 
+    def _addGatewayNftRules(self, gatewaySet):
+        for gateway in gatewaySet:
+            gateway = "\"" + gateway + "\""
+            subprocess.check_call(["/sbin/nft", "add", "rule", "wrtd", "fw", "iifname", gateway, "ct", "state", "established,related", "accept"])
+            subprocess.check_call(["/sbin/nft", "add", "rule", "wrtd", "fw", "iifname", gateway, "ip", "protocol", "icmp", "accept"])
+            subprocess.check_call(["/sbin/nft", "add", "rule", "wrtd", "fw", "iifname", gateway, "drop"])
+            subprocess.check_call(["/sbin/nft", "add", "rule", "wrtd", "natpost", "oifname", gateway, "masquerade"])
 
-class _RouteFullDict:
+    def _removeGatewayNftRules(self, gatewaySet):
+        if len(gatewaySet) == 0:
+            return
+
+        msg = WrtUtil.shell('/sbin/nft list table ip wrtd -a', "stdout")
+        for gateway in gatewaySet:
+            for m in re.finditer("^.* \\\"%s\\\" .* # handle ([0-9]+)$" % (gateway), msg, re.M):
+                # a dirty implementation
+                subprocess.call(["/sbin/nft", "delete", "rule", "wrtd", "fw", "handle", m.group(1), "2>/dev/null"], shell=True)
+                subprocess.call(["/sbin/nft", "delete", "rule", "wrtd", "natpre", "handle", m.group(1), "2>/dev/null"], shell=True)
+                subprocess.call(["/sbin/nft", "delete", "rule", "wrtd", "natpost", "handle", m.group(1), "2>/dev/null"], shell=True)
+
+
+class _NamePriorityKeyValueDict:
 
     def __init__(self):
         self.dictImpl = dict()
 
-    def copy(self):
-        ret = _RouteFullDict()
-        ret.dictImpl = copy.deepcopy(self.dictImpl)
+    def add(self, name, priority, key, value):
+        if key not in self.dictImpl:
+            self.dictImpl[key] = dict()
+        if priority not in self.dictImple[key]:
+            self.dictImpl[key][priority] = dict()
+        assert name not in self.dictImpl[key][priority]
+        self.dictImpl[key][priority][name] = value
+
+    def remove_by_name(self, name):
+        ret = False
+        for key in list(self.dictImpl.keys()):
+            for priority in list(self.dictImpl[key].keys()):
+                if name in self.dictImpl[key][priority]:
+                    del self.dictImpl[key][priority][name]
+                    ret = True
+                    if len(self.dictImpl[key][priority]) == 0:
+                        del self.dictImpl[key][priority]
+                        if len(self.dictImpl[key]) == 0:
+                            del self.dictImpl[key]
         return ret
 
-    def add_route(self, name, priority, prefix, nexthop, interface):
-        if prefix not in self.dictImpl:
-            self.dictImpl[prefix] = dict()
-        if priority not in self.dictImple[prefix]:
-            self.dictImpl[prefix][priority] = dict()
-        assert name not in self.dictImpl[prefix][priority]
-        self.dictImpl[prefix][priority][name] = (nexthop, interface)
-
-    def remove_route_by_name(self, name):
-        for prefix in list(self.dictImpl.keys()):
-            for priority in list(self.dictImpl[prefix].keys()):
-                if name in self.dictImpl[prefix][priority]:
-                    del self.dictImpl[prefix][priority][name]
-                    if len(self.dictImpl[prefix][priority]) == 0:
-                        del self.dictImpl[prefix][priority]
-                        if len(self.dictImpl[prefix]) == 0:
-                            del self.dictImpl[prefix]
-
-    def get_route_dict(self):
+    def get_dict(self):
         ret = dict()
-        for prefix, data in self.dictImpl.items():
-            priority = sorted(list(self.dictImpl[prefix].keys()))[0]
-            name = sorted(list(self.dictImpl[prefix][priority].keys()))[0]
-            ret[prefix] = self.dictImpl[prefix][priority][name]
+        for key, data in self.dictImpl.items():
+            priority = sorted(list(data.keys()))[0]
+            name = sorted(list(data[priority].keys()))[0]
+            ret[key] = data[priority][name]
         return ret
 
 
 class _Helper:
 
     @staticmethod
-    def updateRoute(self.routeDict, newRouteDict):
-
-
-
-
-
-
-
-            tlist = list(self.routesDict[gateway_ip][router_id])
-            for prefix in tlist:
-                if prefix not in prefix_list:
-
-
-            # add routes
-            for prefix in prefix_list:
-                if prefix not in self.routesDict[gateway_ip][router_id]:
-                    ipp.route("add", dst=self.prefixConvert(prefix), gateway=gateway_ip)
-                    self.routesDict[gateway_ip][router_id].append(prefix)
-
-        pass
-
-    @staticmethod
     def prefixConvert(self, prefix):
         tl = prefix.split("/")
-        return tl[0] + "/" + str(util.ipMaskToLen(tl[1]))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        # # add nat rule
-        # subprocess.check_call(["/sbin/nft", "add", "table", "ip", "cgfw"])
-        # subprocess.check_call(["/sbin/nft", "add", "chain", "cgfw", "fw", "{", "type", "filter", "hook", "prerouting", "priority", "0", ";", "}"])
-        # subprocess.check_call(["/sbin/nft", "add", "chain", "cgfw", "natpre", "{", "type", "nat", "hook", "prerouting", "priority", "0", ";", "}"])
-        # subprocess.check_call(["/sbin/nft", "add", "chain", "cgfw", "natpost", "{", "type", "nat", "hook", "postrouting", "priority", "0", ";", "}"])
-        # subprocess.check_call(["/sbin/nft", "add", "rule", "cgfw", "fw", "iifname", "\"cgfw\"", "ct", "state", "established,related", "accept"])
-        # subprocess.check_call(["/sbin/nft", "add", "rule", "cgfw", "fw", "iifname", "\"cgfw\"", "ip", "protocol", "icmp", "accept"])
-        # subprocess.check_call(["/sbin/nft", "add", "rule", "cgfw", "fw", "iifname", "\"cgfw\"", "drop"])
-        # subprocess.check_call(["/sbin/nft", "add", "rule", "cgfw", "natpost", "oifname", "\"cgfw\"", "masquerade"])
-
-
-
-
+        return tl[0] + "/" + str(WrtUtil.ipMaskToLen(tl[1]))
