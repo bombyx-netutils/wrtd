@@ -40,8 +40,6 @@ class WrtTrafficManager:
         try:
             self._runDnsmasq()
             self.logger.info("Level 2 nameserver started.")
-
-            GLib.add
         except BaseException:
             self._dispose()
             raise
