@@ -6,6 +6,8 @@ import json
 import signal
 import logging
 import socket
+from gi.repository import GLib
+from gi.repository import GObject
 from wrt_util import WrtUtil
 from wrt_util import UrlOpenAsync
 
@@ -25,7 +27,9 @@ class WrtWanManager:
         self.logger = logging.getLogger(self.__module__ + "." + self.__class__.__name__)
 
         self.wanConnPlugin = None
+
         self.wanConnIpChecker = None
+        self.wanConnIpCheckRestartTimer = None
         self.wanConnIpIsPublic = None
 
         try:
@@ -60,6 +64,7 @@ class WrtWanManager:
             raise
 
     def dispose(self):
+        self._wconnIpCheckDispose()
         if self.wanConnPlugin is not None:
             with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
                 f.write("0")
@@ -84,10 +89,7 @@ class WrtWanManager:
         self._wconnIpCheckStart()
 
     def on_wan_conn_down(self):
-        self.wanConnIpIsPublic = None
-        if self.wanConnIpChecker is not None:
-            self.wanConnIpChecker.cancel()
-            self.wanConnIpChecker = None
+        self._wconnIpCheckDispose()
         self.param.prefixPool.removeExcludePrefixList("wan")
 
     def _wconnIpCheckStart(self):
@@ -104,4 +106,18 @@ class WrtWanManager:
     def _wconnIpCheckError(self, returncode, msg):
         self.logger.error("Internet IP (%s) check failed, %s" % (self.wanConnPlugin.get_ip(), msg))
         self.wanConnIpChecker = None
-        self._wconnIpCheckStart()       # restart check
+        self.wanConnIpCheckRestartTimer = GObject.timeout_add_seconds(10, self._wconnIpCheckTimerCallback)     # restart check after 10 seconds
+
+    def _wconnIpCheckTimerCallback(self):
+        self._wconnIpCheckStart()
+        self.wanConnIpCheckRestartTimer = None
+        return False
+
+    def _wconnIpCheckDispose(self):
+        self.wanConnIpIsPublic = None
+        if self.wanConnIpCheckRestartTimer is not None:
+            GLib.source_remove(self.wanConnIpCheckRestartTimer)
+            self.wanConnIpCheckRestartTimer = None
+        if self.wanConnIpChecker is not None:
+            self.wanConnIpChecker.cancel()
+            self.wanConnIpChecker = None

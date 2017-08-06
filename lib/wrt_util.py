@@ -4,7 +4,6 @@
 import os
 import re
 import sys
-import time
 import socket
 import shutil
 import logging
@@ -365,8 +364,6 @@ class UrlOpenAsync(threading.Thread):
     def cancel(self):
         assert self.proc is not None and not self.bComplete
 
-        while self.proc is None:
-            time.sleep(1.0)
         if self.proc.poll() is None:
             self.proc.terminate()
             self.proc.wait()
