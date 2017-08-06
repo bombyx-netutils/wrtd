@@ -187,7 +187,7 @@ class DbusMainObject(dbus.service.Object):
         tfac_group = json.loads(tfac_group)
         checkTrafficFacilityGroup(tfac_group)
 
-        self.param.trafficManager.change_tfac_group(name, json.loads(tfac_group))
+        self.param.trafficManager.change_tfac_group(name, tfac_group)
 
     @dbus.service.method('org.fpemud.WRT', in_signature='s')
     def RemoveTrafficFacilityGroup(self, name):

@@ -267,7 +267,7 @@ class _NamePriorityKeyValueDict:
     def add(self, name, priority, key, value):
         if key not in self.dictImpl:
             self.dictImpl[key] = dict()
-        if priority not in self.dictImple[key]:
+        if priority not in self.dictImpl[key]:
             self.dictImpl[key][priority] = dict()
         assert name not in self.dictImpl[key][priority]
         self.dictImpl[key][priority][name] = value
