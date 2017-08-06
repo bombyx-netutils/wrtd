@@ -108,7 +108,7 @@ class WrtDaemon:
                 self.interfaceTimer = None
             if True:
                 for p in reversed(self.managerPluginList):
-                    p.stop()
+                    p.dispose()
                     logging.info("Manager plugin \"%s\" deactivated." % (p.full_name))
                 self.managerPluginList = []
             if self.param.lanManager is not None:
