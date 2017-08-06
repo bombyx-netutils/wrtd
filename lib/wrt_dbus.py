@@ -4,6 +4,7 @@
 import json
 import dbus
 import dbus.service
+import logging
 import socket
 import ipaddress
 from wrt_common import WrtCommon
@@ -31,6 +32,8 @@ class DbusMainObject(dbus.service.Object):
 
     def __init__(self, param):
         self.param = param
+        self.logger = logging.getLogger(self.__module__ + "." + self.__class__.__name__)
+
         self.wanServOwnerDict = dict()          # dict<wan-service-name,owner>
         self.tfacGroupOwnerDict = dict()        # dict<tfac-group-name,owner>
 
@@ -54,14 +57,16 @@ class DbusMainObject(dbus.service.Object):
                 snamelist.append(sname)
         for sname in snamelist:
             self.param.trafficManager.remove_wan_service(sname)
+            self.logger.info("WAN service \"%s\" is removed due to owner disappear." % (sname))
 
         # remove traffic facility groups
         snamelist = []
-        for sname, owner in self.wanServOwnerDict.items():
+        for sname, owner in self.tfacGroupOwnerDict.items():
             if owner == name:
                 snamelist.append(sname)
         for sname in snamelist:
             self.param.trafficManager.remove_tfac_group(sname)
+            self.logger.info("Traffic facility group \"%s\" is removed due to owner disappear." % (sname))
 
     @dbus.service.method('org.fpemud.WRT', in_signature='', out_signature='s')
     def GetRouterInfo(self):

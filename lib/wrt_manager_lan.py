@@ -18,6 +18,8 @@ class WrtLanManager:
 
     def __init__(self, param):
         self.param = param
+        self.logger = logging.getLogger(self.__module__ + "." + self.__class__.__name__)
+
         self.defaultBridge = None
         self.lanServDict = dict()           # dict<name,json-object>
         self.lifPluginList = []
@@ -29,14 +31,14 @@ class WrtLanManager:
             os.mkdir(tmpdir)
             vardir = os.path.join(self.param.varDir, "bridge-default")
             WrtUtil.ensureDir(vardir)
-            self.defaultBridge = _DefaultBridge(tmpdir, vardir)
+            self.defaultBridge = _DefaultBridge(self, tmpdir, vardir)
             self.defaultBridge.init2("wrtd-br",
                                      self.param.prefixPool.usePrefix(),
                                      self.param.trafficManager.get_l2_nameserver_port(),
                                      lambda source_id, ip_data_dict: self.param.managerCaller.call("on_client_add", source_id, ip_data_dict),
                                      lambda source_id, ip_data_dict: self.param.managerCaller.call("on_client_change", source_id, ip_data_dict),
                                      lambda source_id, ip_list: self.param.managerCaller.call("on_client_remove", source_id, ip_list))
-            logging.info("Default bridge started.")
+            self.logger.info("Default bridge started.")
 
             # start all lan interface plugins
             for name in self.param.pluginHub.getPluginList("lif"):
@@ -48,7 +50,7 @@ class WrtLanManager:
                     p.init2(instanceName, cfgObj, tmpdir, vardir)
                     p.start()
                     self.lifPluginList.append(p)
-                    logging.info("LAN interface plugin \"%s\" activated." % (p.full_name))
+                    self.logger.info("LAN interface plugin \"%s\" activated." % (p.full_name))
 
             # start all vpn server plugins
             for name in self.param.pluginHub.getPluginList("vpns"):
@@ -68,7 +70,7 @@ class WrtLanManager:
                             lambda source_id, ip_list: self.param.managerCaller.call("on_client_remove", source_id, ip_list))
                     p.start()
                     self.vpnsPluginList.append(p)
-                    logging.info("VPN server plugin \"%s\" activated." % (p.full_name))
+                    self.logger.info("VPN server plugin \"%s\" activated." % (p.full_name))
 
                     if p.get_wan_service() is not None:
                         self.param.trafficManager.add_wan_service(p.full_name, p.get_wan_service())
@@ -86,7 +88,7 @@ class WrtLanManager:
 
     def dispose(self):
         self._dispose()
-        logging.info("Terminated.")
+        self.logger.info("Terminated.")
 
     def add_lan_service(self, service):
         service_id = 0
@@ -193,23 +195,24 @@ class WrtLanManager:
     def _dispose(self):
         for p in self.vpnsPluginList:
             p.stop()
-            logging.info("VPN server plugin \"%s\" deactivated." % (p.full_name))
+            self.logger.info("VPN server plugin \"%s\" deactivated." % (p.full_name))
         self.vpnsPluginList = []
 
         for p in self.lifPluginList:
             p.stop()
-            logging.info("LAN interface plugin \"%s\" deactivated." % (p.full_name))
+            self.logger.info("LAN interface plugin \"%s\" deactivated." % (p.full_name))
         self.lifPluginList = []
 
         if self.defaultBridge is not None:
             self.defaultBridge.dispose()
             self.defaultBridge = None
-            logging.info("Default bridge destroyed.")
+            self.logger.info("Default bridge destroyed.")
 
 
 class _DefaultBridge:
 
-    def __init__(self, tmpDir, varDir):
+    def __init__(self, pObj, tmpDir, varDir):
+        self.pObj = pObj
         self.tmpDir = tmpDir
         self.varDir = varDir
         self.l2DnsPort = None
@@ -422,9 +425,9 @@ class _DefaultBridge:
                 for expiryTime, mac, ip, hostname, clientId in addList:
                     self.__dnsmasqLeaseChangedAddToIpDataDict(ipDataDict, ip, mac, hostname)
                     if hostname != "":
-                        logging.info("Client %s(IP:%s, MAC:%s) appeared." % (hostname, ip, mac))
+                        self.pObj.logger.info("Client %s(IP:%s, MAC:%s) appeared." % (hostname, ip, mac))
                     else:
-                        logging.info("Client %s(%s) appeared." % (ip, mac))
+                        self.pObj.logger.info("Client %s(%s) appeared." % (ip, mac))
                 for expiryTime, mac, ip, hostname, clientId in changeList:
                     self.__dnsmasqLeaseChangedAddToIpDataDict(ipDataDict, ip, mac, hostname)
                     # log is not needed for client change
@@ -442,13 +445,13 @@ class _DefaultBridge:
                 self.clientRemoveFunc(self.get_bridge_id(), ipList)
                 for expiryTime, mac, ip, hostname, clientId in removeList:
                     if hostname != "":
-                        logging.info("Client %s(IP:%s, MAC:%s) disappeared." % (hostname, ip, mac))
+                        self.pObj.logger.info("Client %s(IP:%s, MAC:%s) disappeared." % (hostname, ip, mac))
                     else:
-                        logging.info("Client %s(%s) disappeared." % (ip, mac))
+                        self.pObj.logger.info("Client %s(%s) disappeared." % (ip, mac))
 
             self.lastScanRecord = newLeaseList
         except Exception as e:
-            logging.error("Lease scan failed", exc_info=True)      # fixme
+            self.pObj.logger.error("Lease scan failed", exc_info=True)      # fixme
 
     def ___dnsmasqLeaseChangedFind(self, item, leaseList):
         for item2 in leaseList:
