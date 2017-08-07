@@ -33,7 +33,7 @@ class WrtTrafficManager:
         self.domainIpFullDict = _NamePriorityKeyValueDict()
 
         self.routeRefreshInterval = 10               # 10 seconds
-        self.routeRefreshTimer = GObject.timeout_add_seconds(0, self._routeRefreshTimerCallback)
+        self.routeRefreshTimer = GObject.timeout_add_seconds(self.routeRefreshInterval, self._routeRefreshTimerCallback)
 
         self.dnsPort = None
         self.dnsmasqProc = None

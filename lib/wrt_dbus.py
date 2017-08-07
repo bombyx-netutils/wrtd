@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
+import re
 import json
 import dbus
 import dbus.service
@@ -308,6 +309,8 @@ def checkTrafficFacilityGroup(tfac_group):
                 try:
                     tnet = ipaddress.IPv4Network(item)
                     if tnet.is_private:
+                        raise TfacException(msg)
+                    if re.match("[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+", item.split("/")[0]) is None:
                         raise TfacException(msg)
                 except ipaddress.AddressValueError:
                     raise TfacException(msg)
