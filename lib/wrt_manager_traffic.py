@@ -217,7 +217,8 @@ class WrtTrafficManager:
                         except pyroute2.netlink.exceptions.NetlinkError as e:
                             if e.code == 3:     # message: No such process
                                 pass            # route does not exist, ignore
-                            raise
+                            else:
+                                raise
 
                 # add or change routes
                 for prefix, data in list(newRouteDict.items()):
@@ -245,11 +246,10 @@ class WrtTrafficManager:
                     except pyroute2.netlink.exceptions.NetlinkError as e:
                         if e.code == 17:                    # message: File exists
                             del newRouteDict[prefix]        # route already exists, retry in next cycle
-                            continue
-                        if e.code == 101:                   # message: Network is unreachable
+                        elif e.code == 101:                 # message: Network is unreachable
                             del newRouteDict[prefix]        # nexthop is invalid, retry in next cycle
-                            continue
-                        raise
+                        else:
+                            raise
             self.routeDict = newRouteDict
         except Exception as e:
             self.logger.error("Error occured in route refresh timer callback", traceback.format_exc())
