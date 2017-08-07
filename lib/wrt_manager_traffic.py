@@ -190,8 +190,6 @@ class WrtTrafficManager:
         return False
 
     def _routeRefreshTimerCallback(self):
-        self.logger.info("_routeRefreshTimerCallback")
-
         try:
             newRouteDict = self.routeFullDict.get_dict()
 
@@ -199,14 +197,11 @@ class WrtTrafficManager:
                 # remove routes
                 for prefix in self.routeDict:
                     if prefix not in newRouteDict:
-                        self.logger.info("remove " + prefix)
                         try:
                             ipp.route("del", dst=_Helper.prefixConvert(prefix))
-                            self.logger.info("remove ok")
                         except pyroute2.netlink.exceptions.NetlinkError as e:
                             if e[0] == 3 and e[1] == "No such process":
-                                self.logger.info("remove fail")
-                                pass        # route does not exist, ignore this error
+                                pass        # route does not exist, ignore
                             raise
 
                 # add or change routes
@@ -217,7 +212,7 @@ class WrtTrafficManager:
                         idx_list = ipp.link_lookup(ifname=interface)
                         if idx_list == []:
                             del newRouteDict[prefix]
-                            self.logger.info("add no interface " + interface)
+                            self.logger.info("add no interface " + interface)               # fixme
                             continue
                         assert len(idx_list) == 1
                         idx = idx_list[0]
@@ -225,38 +220,28 @@ class WrtTrafficManager:
                     try:
                         if prefix not in self.routeDict:                                    # add
                             if nexthop is not None and interface is not None:
-                                self.logger.info("add1 " + nexthop + " " + str(idx))
                                 ipp.route("add", dst=_Helper.prefixConvert(prefix), gateway=nexthop, oif=idx)
-                                self.logger.info("add1")
                             elif nexthop is not None and interface is None:
-                                self.logger.info("add2 " + nexthop)
                                 ipp.route("add", dst=_Helper.prefixConvert(prefix), gateway=nexthop)
-                                self.logger.info("add2")
                             elif nexthop is None and interface is not None:
-                                self.logger.info("add3 " + str(idx))
                                 ipp.route("add", dst=_Helper.prefixConvert(prefix), oif=idx)
-                                self.logger.info("add3")
                             else:
                                 assert False
                         else:                                                               # change
-                            self.logger.info("already")
                             pass        # fixme
                     except pyroute2.netlink.exceptions.NetlinkError as e:
                         if e[0] == 17 and e[1] == "File exists":
                             del newRouteDict[prefix]        # route already exists, retry in next cycle
-                            self.logger.info("add fail x")
-                            continue                
+                            continue
                         if e[0] == 101 and e[1] == "Network is unreachable":
                             del newRouteDict[prefix]        # nexthop is invalid, retry in next cycle
-                            self.logger.info("add fail")
                             continue
-                        self.logger.info("add fail2" + str(e))
+                        self.logger.info("add fail2" + str(e))      # fixme
                         raise
             self.routeDict = newRouteDict
         except Exception as e:
-            self.logger.info("add fail3" + str(e))
+            self.logger.info("add fail3" + str(e))                  # fixme
         finally:
-            self.logger.info("end")
             self.routeRefreshTimer = GObject.timeout_add_seconds(self.routeRefreshInterval, self._routeRefreshTimerCallback)
             return False
 
@@ -319,6 +304,6 @@ class _NamePriorityKeyValueDict:
 class _Helper:
 
     @staticmethod
-    def prefixConvert(self, prefix):
+    def prefixConvert(prefix):
         tl = prefix.split("/")
         return tl[0] + "/" + str(WrtUtil.ipMaskToLen(tl[1]))
