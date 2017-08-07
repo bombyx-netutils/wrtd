@@ -198,7 +198,7 @@ class DbusMainObject(dbus.service.Object):
         checkTrafficFacilityGroup(tfac_group)
 
         self.param.trafficManager.change_tfac_group(name, tfac_group)
-        self.logger.info("Traffic facility group \"%s\" removed." % (name))
+        self.logger.info("Traffic facility group \"%s\" changed." % (name))
 
     @dbus.service.method('org.fpemud.WRT', in_signature='s')
     def RemoveTrafficFacilityGroup(self, name):
@@ -207,6 +207,7 @@ class DbusMainObject(dbus.service.Object):
 
         self.param.trafficManager.remove_tfac_group(name)
         del self.tfacGroupOwnerDict[name]
+        self.logger.info("Traffic facility group \"%s\" removed." % (name))
 
 
 ################################################################################
