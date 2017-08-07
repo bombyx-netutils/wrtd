@@ -10,8 +10,8 @@ jsonObj = [
     {
         "facility-name": "test-gateway",
         "facility-type": "gateway",
-        "target": [None, "eth1"],
-        "network-list": ["18.0.0.0/8"],
+        "target": [None, "eth0"],
+        "network-list": ["18.0.0.0/255.0.0.0"],
     },
     {
         "facility-name": "test-nameserver",
