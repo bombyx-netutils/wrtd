@@ -253,13 +253,16 @@ def checkTrafficFacilityGroup(tfac_group):
                 raise TfacException("Type of \"target\" is invalid for facility \"%s\"." % (tfac["facility-name"]))
             for item in tfac["target"]:
                 msg = "Some element in \"target\" is invalid for facility \"%s\"." % (tfac["facility-name"])
-                if not isinstance(item, list):
-                    raise TfacException(msg)
-                if len(item) != 2:
-                    raise TfacException(msg)
-                if not isinstance(item[0], str):
-                    raise TfacException(msg)
-                if not isinstance(item[1], int):
+                if isinstance(item, list):
+                    if len(item) != 2:
+                        raise TfacException(msg)
+                    if not isinstance(item[0], str):
+                        raise TfacException(msg)
+                    if not isinstance(item[1], int):
+                        raise TfacException(msg)
+                elif isinstance(item, str):
+                    pass
+                else:
                     raise TfacException(msg)
 
             if "domain-list" not in tfac:
