@@ -254,9 +254,9 @@ class WrtTrafficManager:
         for gateway in gatewaySet:
             for m in re.finditer("^.* \\\"%s\\\" .* # handle ([0-9]+)$" % (gateway), msg, re.M):
                 # a dirty implementation
-                subprocess.call(["/sbin/nft", "delete", "rule", "wrtd", "fw", "handle", m.group(1), "2>/dev/null"], shell=True)
-                subprocess.call(["/sbin/nft", "delete", "rule", "wrtd", "natpre", "handle", m.group(1), "2>/dev/null"], shell=True)
-                subprocess.call(["/sbin/nft", "delete", "rule", "wrtd", "natpost", "handle", m.group(1), "2>/dev/null"], shell=True)
+                subprocess.call(["/sbin/nft delete rule wrtd fw handle %s 2>/dev/null" % (m.group(1))], shell=True)
+                subprocess.call(["/sbin/nft delete rule wrtd natpre handle %s 2>/dev/null" % (m.group(1))], shell=True)
+                subprocess.call(["/sbin/nft delete rule wrtd natpost handle %s 2>/dev/null" % (m.group(1))], shell=True)
 
 
 class _NamePriorityKeyValueDict:
