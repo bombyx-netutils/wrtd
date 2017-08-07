@@ -162,13 +162,16 @@ class DbusMainObject(dbus.service.Object):
     def AddWanService(self, name, service, sender=None):
         if self.param.trafficManager.has_wan_service(name):
             raise Exception("WAN service \"%s\" already exists." % (name))
+
         self.param.trafficManager.add_wan_service(name, json.loads(service))
         self.wanServOwnerDict[name] = sender
+        self.logger.info("WAN service \"%s\" added by %s." % (name, sender))
 
     @dbus.service.method('org.fpemud.WRT', in_signature='s')
     def RemoveWanService(self, name):
         self.param.trafficManager.remove_wan_service(name)
         del self.wanServOwnerDict[name]
+        self.logger.info("WAN service \"%s\" removed." % (name))
 
     @dbus.service.method('org.fpemud.WRT', sender_keyword='sender', in_signature='sis')
     def AddTrafficFacilityGroup(self, name, priority, tfac_group, sender=None):
@@ -179,6 +182,7 @@ class DbusMainObject(dbus.service.Object):
 
         self.param.trafficManager.add_tfac_group(name, priority, tfac_group)
         self.tfacGroupOwnerDict[name] = sender
+        self.logger.info("Traffic facility group \"%s\" added by %s." % (name, sender))
 
     @dbus.service.method('org.fpemud.WRT', in_signature='ss')
     def ChangeTrafficFacilityGroup(self, name, tfac_group):
@@ -188,6 +192,7 @@ class DbusMainObject(dbus.service.Object):
         checkTrafficFacilityGroup(tfac_group)
 
         self.param.trafficManager.change_tfac_group(name, tfac_group)
+        self.logger.info("Traffic facility group \"%s\" removed." % (name))
 
     @dbus.service.method('org.fpemud.WRT', in_signature='s')
     def RemoveTrafficFacilityGroup(self, name):
