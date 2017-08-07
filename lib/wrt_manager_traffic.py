@@ -242,14 +242,19 @@ class WrtTrafficManager:
                             self.logger.info("already")
                             pass        # fixme
                     except pyroute2.netlink.exceptions.NetlinkError as e:
+                        if e[0] == 17 and e[1] == "File exists":
+                            del newRouteDict[prefix]        # route already exists, retry in next cycle
+                            self.logger.info("add fail x")
+                            continue                
                         if e[0] == 101 and e[1] == "Network is unreachable":
                             del newRouteDict[prefix]        # nexthop is invalid, retry in next cycle
                             self.logger.info("add fail")
                             continue
                         self.logger.info("add fail2" + str(e))
                         raise
-
             self.routeDict = newRouteDict
+        except Exception as e:
+            self.logger.info("add fail3" + str(e))
         finally:
             self.logger.info("end")
             self.routeRefreshTimer = GObject.timeout_add_seconds(self.routeRefreshInterval, self._routeRefreshTimerCallback)
