@@ -225,23 +225,28 @@ class WrtTrafficManager:
                     try:
                         if prefix not in self.routeDict:                                    # add
                             if nexthop is not None and interface is not None:
+                                self.logger.info("add1 " + nexthop + " " + str(idx))
                                 ipp.route("add", dst=_Helper.prefixConvert(prefix), gateway=nexthop, oif=idx)
                                 self.logger.info("add1")
                             elif nexthop is not None and interface is None:
+                                self.logger.info("add2 " + nexthop)
                                 ipp.route("add", dst=_Helper.prefixConvert(prefix), gateway=nexthop)
                                 self.logger.info("add2")
                             elif nexthop is None and interface is not None:
+                                self.logger.info("add3 " + str(idx))
                                 ipp.route("add", dst=_Helper.prefixConvert(prefix), oif=idx)
                                 self.logger.info("add3")
                             else:
                                 assert False
                         else:                                                               # change
+                            self.logger.info("already")
                             pass        # fixme
                     except pyroute2.netlink.exceptions.NetlinkError as e:
                         if e[0] == 101 and e[1] == "Network is unreachable":
                             del newRouteDict[prefix]        # nexthop is invalid, retry in next cycle
                             self.logger.info("add fail")
                             continue
+                        self.logger.info("add fail2" + str(e))
                         raise
 
             self.routeDict = newRouteDict
