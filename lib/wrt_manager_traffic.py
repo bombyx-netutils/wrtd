@@ -186,7 +186,7 @@ class WrtTrafficManager:
         for item in facility_list:
             if item["facility-type"] == "gateway":
                 for prefix in item["network-list"]:
-                    self.routeFullDict.add(name, priority, prefix, item["target"])
+                    self.routeFullDict.set_key_value(name, priority, prefix, item["target"])
                     ret.add(prefix)
         return ret
 
@@ -195,7 +195,7 @@ class WrtTrafficManager:
         for item in facility_list:
             if item["facility-type"] == "nameserver":
                 for domain in item["domain-list"]:
-                    self.domainNameserverFullDict.add(name, priority, domain, item["target"])
+                    self.domainNameserverFullDict.set_key_value(name, priority, domain, item["target"])
                     ret.add(domain)
         return ret
 
@@ -284,12 +284,11 @@ class _NamePriorityKeyValueDict:
     def __init__(self):
         self.dictImpl = dict()
 
-    def add(self, name, priority, key, value):
+    def set_key_value(self, name, priority, key, value):
         if key not in self.dictImpl:
             self.dictImpl[key] = dict()
         if priority not in self.dictImpl[key]:
             self.dictImpl[key][priority] = dict()
-        assert name not in self.dictImpl[key][priority]
         self.dictImpl[key][priority][name] = value
 
     def remove_by_name(self, name):
