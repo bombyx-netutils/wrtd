@@ -168,6 +168,7 @@ class WrtTrafficManager:
             self.dnsmasqProc.terminate()
             self.dnsmasqProc.wait()
             self.dnsmasqProc = None
+        WrtUtil.forceDelete(self.hostsDir)
         WrtUtil.forceDelete(self.pidFile)
         WrtUtil.forceDelete(self.cfgFile)
 
