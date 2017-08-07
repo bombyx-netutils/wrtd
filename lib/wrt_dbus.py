@@ -45,6 +45,8 @@ class DbusMainObject(dbus.service.Object):
         self.remove_from_connection()
 
     def onNameOwnerChanged(self, name, old, new):
+        self.logger.info("onNameOwnerChanged %s, %s, %s" % (name, old, new))
+
         # focus on name deletion, filter other circumstance
         if not name.startswith(":") or new != "":
             return
