@@ -214,8 +214,8 @@ class WrtTrafficManager:
                         try:
                             ipp.route("del", dst=_Helper.prefixConvert(prefix))
                         except pyroute2.netlink.exceptions.NetlinkError as e:
-                            if e[0] == 3 and e[1] == "No such process":
-                                pass        # route does not exist, ignore
+                            if e.code == 3:     # message: No such process
+                                pass            # route does not exist, ignore
                             raise
 
                 # add or change routes
@@ -243,11 +243,10 @@ class WrtTrafficManager:
                         else:                                                               # change
                             pass        # fixme
                     except pyroute2.netlink.exceptions.NetlinkError as e:
-                        self.logger.info("add failt  " + str(e))                  # fixme
-                        if e[0] == 17 and e[1] == "File exists":
+                        if e.code == 17:                    # message: File exists
                             del newRouteDict[prefix]        # route already exists, retry in next cycle
                             continue
-                        if e[0] == 101 and e[1] == "Network is unreachable":
+                        if e.code == 101:                   # message: Network is unreachable
                             del newRouteDict[prefix]        # nexthop is invalid, retry in next cycle
                             continue
                         self.logger.info("add fail2" + str(e))      # fixme
