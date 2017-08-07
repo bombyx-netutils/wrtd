@@ -219,7 +219,6 @@ class WrtTrafficManager:
 
                 # add or change routes
                 for prefix, data in list(newRouteDict.items()):
-                    self.logger.info("add " + prefix)
                     nexthop, interface = data
                     if interface is not None:
                         idx_list = ipp.link_lookup(ifname=interface)
@@ -243,6 +242,7 @@ class WrtTrafficManager:
                         else:                                                               # change
                             pass        # fixme
                     except pyroute2.netlink.exceptions.NetlinkError as e:
+                        self.logger.info("add failt  " + str(e))                  # fixme
                         if e[0] == 17 and e[1] == "File exists":
                             del newRouteDict[prefix]        # route already exists, retry in next cycle
                             continue
