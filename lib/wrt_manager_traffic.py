@@ -190,6 +190,8 @@ class WrtTrafficManager:
         return False
 
     def _routeRefreshTimerCallback(self):
+        self.logger.info("_routeRefreshTimerCallback")
+
         try:
             newRouteDict = self.routeFullDict.get_dict()
 
@@ -197,20 +199,25 @@ class WrtTrafficManager:
                 # remove routes
                 for prefix in self.routeDict:
                     if prefix not in newRouteDict:
+                        self.logger.info("remove " + prefix)
                         try:
                             ipp.route("del", dst=_Helper.prefixConvert(prefix))
+                            self.logger.info("remove ok")
                         except pyroute2.netlink.exceptions.NetlinkError as e:
                             if e[0] == 3 and e[1] == "No such process":
+                                self.logger.info("remove fail")
                                 pass        # route does not exist, ignore this error
                             raise
 
                 # add or change routes
                 for prefix, data in list(newRouteDict.items()):
+                    self.logger.info("add " + prefix)
                     nexthop, interface = data
                     if interface is not None:
                         idx_list = ipp.link_lookup(ifname=interface)
                         if idx_list == []:
                             del newRouteDict[prefix]
+                            self.logger.info("add no interface " + interface)
                             continue
                         assert len(idx_list) == 1
                         idx = idx_list[0]
@@ -219,10 +226,13 @@ class WrtTrafficManager:
                         if prefix not in self.routeDict:                                    # add
                             if nexthop is not None and interface is not None:
                                 ipp.route("add", dst=_Helper.prefixConvert(prefix), gateway=nexthop, oif=idx)
+                                self.logger.info("add1")
                             elif nexthop is not None and interface is None:
                                 ipp.route("add", dst=_Helper.prefixConvert(prefix), gateway=nexthop)
+                                self.logger.info("add2")
                             elif nexthop is None and interface is not None:
                                 ipp.route("add", dst=_Helper.prefixConvert(prefix), oif=idx)
+                                self.logger.info("add3")
                             else:
                                 assert False
                         else:                                                               # change
@@ -230,11 +240,13 @@ class WrtTrafficManager:
                     except pyroute2.netlink.exceptions.NetlinkError as e:
                         if e[0] == 101 and e[1] == "Network is unreachable":
                             del newRouteDict[prefix]        # nexthop is invalid, retry in next cycle
+                            self.logger.info("add fail")
                             continue
                         raise
 
             self.routeDict = newRouteDict
         finally:
+            self.logger.info("end")
             self.routeRefreshTimer = GObject.timeout_add_seconds(self.routeRefreshInterval, self._routeRefreshTimerCallback)
             return False
 
