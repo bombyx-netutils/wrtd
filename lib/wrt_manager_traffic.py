@@ -88,7 +88,7 @@ class WrtTrafficManager:
         assert name in self.tfacGroupDict
 
         ret1 = self.routeFullDict.remove_by_name(name)
-        ret2 = self._trafficFacilityListToRouteFullDict(name, self.tfacGroup[name], facility_list)
+        ret2 = self._trafficFacilityListToRouteFullDict(name, self.tfacGroupDict[name], facility_list)
         if ret1 != ret2:
             GLib.source_remove(self.routeRefreshTimer)
             self.routeRefreshTimer = GObject.timeout_add_seconds(0, self._routeRefreshTimerCallback)
@@ -99,7 +99,7 @@ class WrtTrafficManager:
         self.gatewayDict[name] = gatewaySet
 
         ret1 = self.domainNameserverFullDict.remove_by_name(name)
-        ret2 = self._trafficFacilityListToDomainNameserverFullDict(name, self.tfacGroup[name], facility_list)
+        ret2 = self._trafficFacilityListToDomainNameserverFullDict(name, self.tfacGroupDict[name], facility_list)
         if ret1 != ret2:
             self._stopDnsmasq()
             self._runDnsmasq()
