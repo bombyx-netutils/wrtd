@@ -229,6 +229,7 @@ class TemplateFacilityGateway:
 
     @property
     def network_list(self):
+        """["18.0.0.0/255.0.0.0","19.0.0.0/255.0.0.0"]"""
         assert False
 
 

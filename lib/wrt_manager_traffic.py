@@ -17,6 +17,7 @@ class WrtTrafficManager:
         self.param = param
         self.cfgFile = os.path.join(self.param.tmpDir, "l2-dnsmasq.conf")
         self.pidFile = os.path.join(self.param.tmpDir, "l2-dnsmasq.pid")
+        self.hostsDir = os.path.join(self.param.tmpDir, "l2-dnsmasq.hosts.d")
         self.logger = logging.getLogger(self.__module__ + "." + self.__class__.__name__)
 
         self.wanServDict = dict()               # dict<name,json-object>
@@ -24,18 +25,18 @@ class WrtTrafficManager:
         self.tfacGroupDict = dict()             # dict<name, priority>
 
         self.routeFullDict = _NamePriorityKeyValueDict()
-        self.routeDict = dict()                 # real route dict
-
+        self.routeDict = dict()                 # dict<prefix, data>
         self.gatewayDict = dict()               # dict<name, set<interface>>
 
         self.domainNameserverFullDict = _NamePriorityKeyValueDict()
+        self.domainNameserverDict = dict()
 
         self.domainIpFullDict = _NamePriorityKeyValueDict()
 
         self.routeRefreshInterval = 10               # 10 seconds
-        self.routeRefreshTimer = GObject.timeout_add_seconds(0, self._routeRefreshTimerCallback)
+        self.routeRefreshTimer = GObject.timeout_add_seconds(self.routeRefreshInterval, self._routeRefreshTimerCallback)
 
-        self.dnsPort = None
+        self.dnsPort = WrtUtil.getFreeSocketPort("tcp")
         self.dnsmasqProc = None
         try:
             self._runDnsmasq()
@@ -69,7 +70,8 @@ class WrtTrafficManager:
 
         self.tfacGroupDict[name] = priority
 
-        if self._trafficFacilityListToRouteFullDict(name, priority, facility_list):
+        ret = self._trafficFacilityListToRouteFullDict(name, priority, facility_list)
+        if len(ret) > 0:
             GLib.source_remove(self.routeRefreshTimer)
             self.routeRefreshTimer = GObject.timeout_add_seconds(0, self._routeRefreshTimerCallback)
 
@@ -77,16 +79,17 @@ class WrtTrafficManager:
         self._addGatewayNftRules(gatewaySet)
         self.gatewayDict[name] = gatewaySet
 
-        if self._trafficFacilityListToDomainNameserverFullDict(name, priority, facility_list):
-            pass
+        ret = self._trafficFacilityListToDomainNameserverFullDict(name, priority, facility_list)
+        if len(ret) > 0:
+            self._stopDnsmasq()
+            self._runDnsmasq()
 
     def change_tfac_group(self, name, facility_list):
         assert name in self.tfacGroupDict
 
-        ret = False
-        ret |= self.routeFullDict.remove_by_name(name)
-        ret |= self._trafficFacilityListToRouteFullDict(name, self.tfacGroup[name], facility_list)
-        if ret:
+        ret1 = self.routeFullDict.remove_by_name(name)
+        ret2 = self._trafficFacilityListToRouteFullDict(name, self.tfacGroup[name], facility_list)
+        if ret1 != ret2:
             GLib.source_remove(self.routeRefreshTimer)
             self.routeRefreshTimer = GObject.timeout_add_seconds(0, self._routeRefreshTimerCallback)
 
@@ -95,24 +98,27 @@ class WrtTrafficManager:
         self._addGatewayNftRules(gatewaySet - self.gatewayDict[name])
         self.gatewayDict[name] = gatewaySet
 
-        ret = False
-        ret |= self.domainNameserverFullDict.remove_by_name(name)
-        ret |= self._trafficFacilityListToDomainNameserverFullDict(name, self.tfacGroup[name], facility_list)
-        if ret:
-            pass
+        ret1 = self.domainNameserverFullDict.remove_by_name(name)
+        ret2 = self._trafficFacilityListToDomainNameserverFullDict(name, self.tfacGroup[name], facility_list)
+        if ret1 != ret2:
+            self._stopDnsmasq()
+            self._runDnsmasq()
 
     def remove_tfac_group(self, name):
         del self.tfacGroupDict[name]
 
-        if self.routeFullDict.remove_by_name(name):
+        ret = self.routeFullDict.remove_by_name(name)
+        if len(ret) > 0:
             GLib.source_remove(self.routeRefreshTimer)
             self.routeRefreshTimer = GObject.timeout_add_seconds(0, self._routeRefreshTimerCallback)
 
         self._removeGatewayNftRules(self.gatewayDict[name])
         del self.gatewayDict[name]
 
-        if self.domainNameserverFullDict.remove_by_name(name):
-            pass
+        ret = self.domainNameserverFullDict.remove_by_name(name)
+        if len(ret) > 0:
+            self._stopDnsmasq()
+            self._runDnsmasq()
 
     def on_wan_conn_up(self):
         WrtUtil.shell('/sbin/nft add rule wrtd natpost oifname %s masquerade' % (self.param.wanManager.wanConnPlugin.get_interface()))
@@ -124,7 +130,8 @@ class WrtTrafficManager:
         self._stopDnsmasq()
 
     def _runDnsmasq(self):
-        self.dnsPort = WrtUtil.getFreeSocketPort("tcp")
+        # make hosts directory
+        os.mkdir(self.hostsDir)
 
         # generate dnsmasq config file
         buf = ""
@@ -136,8 +143,14 @@ class WrtTrafficManager:
         buf += "\n"
         buf += "domain-needed\n"
         buf += "bogus-priv\n"
+        buf += "\n"
         buf += "no-hosts\n"
+        buf += "addn-hosts=%s\n" % (self.hostsDir)                       # "hostsdir=" only adds record, no deletion, so not usable
+        buf += "\n"
         buf += "resolv-file=%s\n" % (self.param.ownResolvConf)
+        for domain, nsList in self.domainNameserverFullDict.get_dict().items():
+            for ns in nsList:
+                buf += "server=/%s/%s\n" % (domain, ns)
         buf += "\n"
         with open(self.cfgFile, "w") as f:
             f.write(buf)
@@ -168,21 +181,21 @@ class WrtTrafficManager:
         return ret
 
     def _trafficFacilityListToRouteFullDict(self, name, priority, facility_list):
-        ret = False
+        ret = set()
         for item in facility_list:
             if item["facility-type"] == "gateway":
                 for prefix in item["network-list"]:
                     self.routeFullDict.add(name, priority, prefix, item["target"])
-                    ret = True
+                    ret.add(prefix)
         return ret
 
     def _trafficFacilityListToDomainNameserverFullDict(self, name, priority, facility_list):
-        ret = False
+        ret = set()
         for item in facility_list:
             if item["facility-type"] == "nameserver":
                 for domain in item["domain-list"]:
                     self.domainNameserverFullDict.add(name, priority, domain, item["target"])
-                    ret = True
+                    ret.add(domain)
         return ret
 
     def _trafficFacilityListToDomainIpFullDict(self, name, priority, facility_list):
@@ -201,16 +214,18 @@ class WrtTrafficManager:
                             ipp.route("del", dst=_Helper.prefixConvert(prefix))
                         except pyroute2.netlink.exceptions.NetlinkError as e:
                             if e[0] == 3 and e[1] == "No such process":
-                                pass        # route does not exist, ignore this error
+                                pass        # route does not exist, ignore
                             raise
 
                 # add or change routes
                 for prefix, data in list(newRouteDict.items()):
+                    self.logger.info("add " + prefix)
                     nexthop, interface = data
                     if interface is not None:
                         idx_list = ipp.link_lookup(ifname=interface)
                         if idx_list == []:
                             del newRouteDict[prefix]
+                            self.logger.info("add no interface " + interface)               # fixme
                             continue
                         assert len(idx_list) == 1
                         idx = idx_list[0]
@@ -228,12 +243,17 @@ class WrtTrafficManager:
                         else:                                                               # change
                             pass        # fixme
                     except pyroute2.netlink.exceptions.NetlinkError as e:
+                        if e[0] == 17 and e[1] == "File exists":
+                            del newRouteDict[prefix]        # route already exists, retry in next cycle
+                            continue
                         if e[0] == 101 and e[1] == "Network is unreachable":
                             del newRouteDict[prefix]        # nexthop is invalid, retry in next cycle
                             continue
+                        self.logger.info("add fail2" + str(e))      # fixme
                         raise
-
             self.routeDict = newRouteDict
+        except Exception as e:
+            self.logger.info("add fail3" + str(e))                  # fixme
         finally:
             self.routeRefreshTimer = GObject.timeout_add_seconds(self.routeRefreshInterval, self._routeRefreshTimerCallback)
             return False
@@ -254,9 +274,9 @@ class WrtTrafficManager:
         for gateway in gatewaySet:
             for m in re.finditer("^.* \\\"%s\\\" .* # handle ([0-9]+)$" % (gateway), msg, re.M):
                 # a dirty implementation
-                subprocess.call(["/sbin/nft", "delete", "rule", "wrtd", "fw", "handle", m.group(1), "2>/dev/null"], shell=True)
-                subprocess.call(["/sbin/nft", "delete", "rule", "wrtd", "natpre", "handle", m.group(1), "2>/dev/null"], shell=True)
-                subprocess.call(["/sbin/nft", "delete", "rule", "wrtd", "natpost", "handle", m.group(1), "2>/dev/null"], shell=True)
+                subprocess.call(["/sbin/nft delete rule wrtd fw handle %s 2>/dev/null" % (m.group(1))], shell=True)
+                subprocess.call(["/sbin/nft delete rule wrtd natpre handle %s 2>/dev/null" % (m.group(1))], shell=True)
+                subprocess.call(["/sbin/nft delete rule wrtd natpost handle %s 2>/dev/null" % (m.group(1))], shell=True)
 
 
 class _NamePriorityKeyValueDict:
@@ -273,12 +293,12 @@ class _NamePriorityKeyValueDict:
         self.dictImpl[key][priority][name] = value
 
     def remove_by_name(self, name):
-        ret = False
+        ret = set()
         for key in list(self.dictImpl.keys()):
             for priority in list(self.dictImpl[key].keys()):
                 if name in self.dictImpl[key][priority]:
                     del self.dictImpl[key][priority][name]
-                    ret = True
+                    ret.add(key)
                     if len(self.dictImpl[key][priority]) == 0:
                         del self.dictImpl[key][priority]
                         if len(self.dictImpl[key]) == 0:
@@ -297,6 +317,6 @@ class _NamePriorityKeyValueDict:
 class _Helper:
 
     @staticmethod
-    def prefixConvert(self, prefix):
+    def prefixConvert(prefix):
         tl = prefix.split("/")
         return tl[0] + "/" + str(WrtUtil.ipMaskToLen(tl[1]))
