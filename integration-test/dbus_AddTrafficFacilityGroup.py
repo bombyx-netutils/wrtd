@@ -2,14 +2,16 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import dbus
+import json
+import time
 
 
 jsonObj = [
     {
         "facility-name": "test-gateway",
         "facility-type": "gateway",
-        "target": [None, "eth1"],
-        "network-list": ["18.0.0.0/8"],
+        "target": [None, "eth0"],
+        "network-list": ["18.0.0.0/255.0.0.0"],
     },
     {
         "facility-name": "test-nameserver",
