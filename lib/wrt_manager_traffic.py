@@ -150,7 +150,7 @@ class WrtTrafficManager:
         buf += "resolv-file=%s\n" % (self.param.ownResolvConf)
         for domain, nsList in self.domainNameserverFullDict.get_dict().items():
             for ns in nsList:
-                buf += "server=/%s/%s\n" % (domain, ns)
+                buf += "server=/%s/%s\n" % (domain, ns.replace(":", "#"))
         buf += "\n"
         with open(self.cfgFile, "w") as f:
             f.write(buf)

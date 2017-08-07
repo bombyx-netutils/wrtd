@@ -8,6 +8,7 @@ import dbus.service
 import logging
 import socket
 import ipaddress
+from wrt_util import WrtUtil
 from wrt_common import WrtCommon
 
 
@@ -263,17 +264,12 @@ def checkTrafficFacilityGroup(tfac_group):
                 raise TfacException("Type of \"target\" is invalid for facility \"%s\"." % (tfac["facility-name"]))
             for item in tfac["target"]:
                 msg = "Some element in \"target\" is invalid for facility \"%s\"." % (tfac["facility-name"])
-                if isinstance(item, list):
-                    if len(item) != 2:
+                if ":" in item:
+                    tlist = item.split(":")
+                    if len(tlist) != 2:
                         raise TfacException(msg)
-                    if not isinstance(item[0], str):
+                    if not WrtUtil.is_int(tlist[1]):
                         raise TfacException(msg)
-                    if not isinstance(item[1], int):
-                        raise TfacException(msg)
-                elif isinstance(item, str):
-                    pass
-                else:
-                    raise TfacException(msg)
 
             if "domain-list" not in tfac:
                 raise TfacException("Lacking \"domain-list\" for facility \"%s\"." % (tfac["facility-name"]))

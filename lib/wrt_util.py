@@ -19,6 +19,14 @@ from gi.repository import GLib
 class WrtUtil:
 
     @staticmethod
+    def is_int(s):
+        try:
+            int(s)
+            return True
+        except ValueError:
+            return False
+
+    @staticmethod
     def ipMaskToPrefix(ip, netmask):
         netobj = ipaddress.IPv4Network(ip + "/" + netmask, strict=False)
         return (str(netobj.network_address), str(netobj.netmask))
