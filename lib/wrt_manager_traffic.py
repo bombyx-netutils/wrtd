@@ -5,6 +5,7 @@ import os
 import re
 import logging
 import pyroute2
+import traceback
 import subprocess
 from gi.repository import GLib
 from gi.repository import GObject
@@ -225,7 +226,6 @@ class WrtTrafficManager:
                         idx_list = ipp.link_lookup(ifname=interface)
                         if idx_list == []:
                             del newRouteDict[prefix]
-                            self.logger.info("add no interface " + interface)               # fixme
                             continue
                         assert len(idx_list) == 1
                         idx = idx_list[0]
@@ -249,11 +249,10 @@ class WrtTrafficManager:
                         if e.code == 101:                   # message: Network is unreachable
                             del newRouteDict[prefix]        # nexthop is invalid, retry in next cycle
                             continue
-                        self.logger.info("add fail2" + str(e))      # fixme
                         raise
             self.routeDict = newRouteDict
         except Exception as e:
-            self.logger.info("add fail3" + str(e))                  # fixme
+            self.logger.error("Error occured in route refresh timer callback", traceback.format_exc())
         finally:
             self.routeRefreshTimer = GObject.timeout_add_seconds(self.routeRefreshInterval, self._routeRefreshTimerCallback)
             return False

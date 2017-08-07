@@ -10,6 +10,7 @@ import logging
 import ctypes
 import errno
 import threading
+import traceback
 import subprocess
 import ipaddress
 from collections import OrderedDict
@@ -49,13 +50,6 @@ class WrtUtil:
             if netobj1.overlaps(netobj2):
                 return True
         return False
-
-    @staticmethod
-    def idleInvoke(func, *args):
-        def _idleCallback(func, *args):
-            func(*args)
-            return False
-        return GLib.idle_add(_idleCallback, func, *args)
 
     @staticmethod
     def restartProgram():
@@ -388,6 +382,10 @@ class UrlOpenAsync(threading.Thread):
             self.idleId = GLib.idle_add(self._idleCallback, self.error_callback, self.proc.returncode, err)
 
     def _idleCallback(self, func, *args):
-        func(*args)
-        self.bComplete = True
-        return False
+        try:
+            func(*args)
+        except:
+            logging.error("Error occured in UrlOpenAsync idle callback", traceback.format_exc())
+        finally:
+            self.bComplete = True
+            return False

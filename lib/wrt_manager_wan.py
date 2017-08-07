@@ -4,8 +4,9 @@
 import os
 import json
 import signal
-import logging
 import socket
+import logging
+import traceback
 from gi.repository import GLib
 from gi.repository import GObject
 from wrt_util import WrtUtil
@@ -99,19 +100,23 @@ class WrtWanManager:
 
     def _wconnIpCheckComplete(self, ip):
         self.wanConnIpIsPublic = (ip == self.wanConnPlugin.get_ip())
-        self.logger.error("Internet IP (%s) check complete, %s IP" % (self.wanConnPlugin.get_ip(), "Public" if self.wanConnIpIsPublic else "NATed"))
+        self.logger.info("Internet IP (%s) check complete, %s IP" % (self.wanConnPlugin.get_ip(), "Public" if self.wanConnIpIsPublic else "NATed"))
         self.wanConnIpChecker = None
         self.param.managerCaller.call("on_wan_ipcheck_complete", self.wanConnIpIsPublic)
 
     def _wconnIpCheckError(self, returncode, msg):
-        self.logger.error("Internet IP (%s) check failed, %s" % (self.wanConnPlugin.get_ip(), msg))
+        self.logger.info("Internet IP (%s) check failed, retry in 10 seconds" % (self.wanConnPlugin.get_ip()))
         self.wanConnIpChecker = None
         self.wanConnIpCheckRestartTimer = GObject.timeout_add_seconds(10, self._wconnIpCheckTimerCallback)     # restart check after 10 seconds
 
     def _wconnIpCheckTimerCallback(self):
-        self._wconnIpCheckStart()
-        self.wanConnIpCheckRestartTimer = None
-        return False
+        try:
+            self._wconnIpCheckStart()
+            self.wanConnIpCheckRestartTimer = None
+        except:
+            self.logger.error("Error occured in wan connection ip check timer callback", traceback.format_exc())
+        finally:
+            return False
 
     def _wconnIpCheckDispose(self):
         self.wanConnIpIsPublic = None
