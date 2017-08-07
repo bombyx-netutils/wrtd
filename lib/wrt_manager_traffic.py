@@ -181,7 +181,7 @@ class WrtTrafficManager:
         for item in facility_list:
             if item["facility-type"] == "nameserver":
                 for domain in item["domain-list"]:
-                    self.routeFullDict.add(name, priority, domain, item["target"])
+                    self.domainNameserverFullDict.add(name, priority, domain, item["target"])
                     ret = True
         return ret
 

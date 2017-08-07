@@ -203,7 +203,7 @@ class TemplateFacilityNameserver:
 
     @property
     def target(self):
-        """[(hostname,port)]"""
+        """[hostname or (hostname,port)]"""
         assert False
 
     @property
