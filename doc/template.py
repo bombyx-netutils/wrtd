@@ -143,7 +143,7 @@ class TemplatePluginManager:
     def get_router_info(self):
         assert False
 
-    def manager_appear(self, name, manager):
+    def manager_initialized(self, name):
         assert False
 
 

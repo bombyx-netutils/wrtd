@@ -30,7 +30,7 @@ class WrtDaemon:
         self.param = param
         self.cfgFile = os.path.join(self.param.etcDir, "global.json")
         self.bRestart = False
-        self.managerPluginList = []
+        self.managerPluginDict = dict()
 
         self.interfaceDict = dict()
         self.interfaceScanTimeout = 10          # 10 seconds
@@ -108,10 +108,10 @@ class WrtDaemon:
                 GLib.source_remove(self.interfaceTimer)
                 self.interfaceTimer = None
             if True:
-                for p in reversed(self.managerPluginList):
+                for p in self.managerPluginDict.values():
                     p.dispose()
                     logging.info("Manager plugin \"%s\" deactivated." % (p.full_name))
-                self.managerPluginList = []
+                self.managerPluginDict = dict()
             if self.param.lanManager is not None:
                 self.param.lanManager.dispose()
                 self.param.lanManager = None
@@ -161,9 +161,11 @@ class WrtDaemon:
         data.plugin_hub = self.param.pluginHub
         data.prefix_pool = self.param.prefixPool
         data.manager_caller = self.param.managerCaller
-        data.traffic_manager = self.param.trafficManager
-        data.wan_manager = self.param.wanManager
-        data.lan_manager = self.param.lanManager
+        data.managers = {
+            "traffic": self.param.trafficManager,
+            "wan": self.param.wanManager,
+            "lan": self.param.lanManager,
+        }
 
         for name in self.param.pluginHub.getPluginList("manager"):
             fn = os.path.join(self.param.etcDir, "manager-%s.json" % (name))
@@ -174,13 +176,19 @@ class WrtDaemon:
                 cfgObj = dict()
 
             p = self.param.pluginHub.getPlugin("manager", name)
+            assert name not in self.managerPluginDict
+            self.managerPluginDict[name] = p
+
+        data.managers.update(self.managerPluginDict)
+        for name, p in self.managerPluginDict.items():
+            self.param.managerCaller.add_manager(name, p)
             p.init2(cfgObj, self.param.tmpDir, self.param.varDir, data)
             logging.info("Manager plugin \"%s\" activated." % (p.full_name))
 
-            for m in self.managerPluginList:
-                p.manager_appear(m)
-            self.param.managerCaller.add_manager(name, p)
-            self.managerPluginList.append(p)
+        for name, p in self.managerPluginDict.items():
+            for name2, p2 in self.managerPluginDict.items():
+                if name2 != name:
+                    p.manager_initialized(name2)
 
     def _interfaceTimerCallback(self):
         try:
