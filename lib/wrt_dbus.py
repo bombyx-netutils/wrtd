@@ -124,8 +124,8 @@ class DbusMainObject(dbus.service.Object):
                 ret["tfac-group"][name] = dict()
                 ret["tfac-group"][name]["priority"] = priority
 
-        for m in self.param.daemon.managerPluginList:
-            ret.update(m.get_router_info())
+        for p in self.param.daemon.managerPluginDict.values():
+            ret.update(p.get_router_info())
 
         return json.dumps(ret)
 
