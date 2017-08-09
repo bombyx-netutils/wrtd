@@ -134,6 +134,11 @@ class TemplatePluginVpnServer:
 # manager unload is not supported, so manager_disappear() is not needed
 class TemplatePluginManager:
 
+    @property
+    def dependencies(self):
+        # returns list<manager-name>
+        assert False
+
     def init2(self, cfg, etcDir, tmpDir, varDir, pluginManagerData):
         assert False
 
@@ -141,9 +146,6 @@ class TemplatePluginManager:
         assert False
 
     def get_router_info(self):
-        assert False
-
-    def manager_initialized(self, name):
         assert False
 
 
@@ -178,15 +180,8 @@ class TemplatePluginManagerData:
         assert False
 
     @property
-    def traffic_manager(self):
-        assert False
-
-    @property
-    def wan_manager(self):
-        assert False
-
-    @property
-    def lan_manager(self):
+    def managers(self):
+        # return dict<manager-name, manager-object>
         assert False
 
 

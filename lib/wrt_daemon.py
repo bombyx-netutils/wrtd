@@ -151,6 +151,24 @@ class WrtDaemon:
             self.param.dnsName = cfgObj["dns-name"]
 
     def _loadManagerPlugins(self):
+        # load manager plugin
+        for name in self.param.pluginHub.getPluginList("manager"):
+            assert name not in self.managerPluginDict
+            self.managerPluginDict[name] = self.param.pluginHub.getPlugin("manager", name)
+
+        # get init order
+        tlist = []
+        for name in self.managerPluginDict:
+            bInserted = False
+            for i in range(0, len(tlist)):
+                if name in self.managerPluginDict[tlist[i]].dependencies:
+                    tlist.insert(i, name)
+                    bInserted = True
+                    break
+            if not bInserted:
+                tlist.append(name)
+
+        # create manager data
         class _Stub:
             pass
         data = _Stub()
@@ -166,8 +184,10 @@ class WrtDaemon:
             "wan": self.param.wanManager,
             "lan": self.param.lanManager,
         }
+        data.managers.update(self.managerPluginDict)
 
-        for name in self.param.pluginHub.getPluginList("manager"):
+        # init manager plugin
+        for name in tlist:
             fn = os.path.join(self.param.etcDir, "manager-%s.json" % (name))
             if os.path.exists(fn) and os.path.getsize(fn) > 0:
                 with open(fn, "r") as f:
@@ -175,20 +195,10 @@ class WrtDaemon:
             else:
                 cfgObj = dict()
 
-            p = self.param.pluginHub.getPlugin("manager", name)
-            assert name not in self.managerPluginDict
-            self.managerPluginDict[name] = p
-
-        data.managers.update(self.managerPluginDict)
-        for name, p in self.managerPluginDict.items():
-            self.param.managerCaller.add_manager(name, p)
-            p.init2(cfgObj, self.param.tmpDir, self.param.varDir, data)
+            p = self.managerPluginDict[name]
+            self.param.managerCaller.add_manager(name, p)                       # order sensitive
+            p.init2(cfgObj, self.param.tmpDir, self.param.varDir, data)         # order sensitive
             logging.info("Manager plugin \"%s\" activated." % (p.full_name))
-
-        for name, p in self.managerPluginDict.items():
-            for name2, p2 in self.managerPluginDict.items():
-                if name2 != name:
-                    p.manager_initialized(name2)
 
     def _interfaceTimerCallback(self):
         try:
