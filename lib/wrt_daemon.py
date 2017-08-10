@@ -7,6 +7,7 @@ import json
 import signal
 import shutil
 import logging
+import toposort
 import traceback
 import netifaces
 from gi.repository import GLib
@@ -156,18 +157,6 @@ class WrtDaemon:
             assert name not in self.managerPluginDict
             self.managerPluginDict[name] = self.param.pluginHub.getPlugin("manager", name)
 
-        # get init order
-        tlist = []
-        for name in self.managerPluginDict:
-            bInserted = False
-            for i in range(0, len(tlist)):
-                if name in self.managerPluginDict[tlist[i]].dependencies:
-                    tlist.insert(i, name)
-                    bInserted = True
-                    break
-            if not bInserted:
-                tlist.append(name)
-
         # create manager data
         class _Stub:
             pass
@@ -185,6 +174,12 @@ class WrtDaemon:
             "lan": self.param.lanManager,
         }
         data.managers.update(self.managerPluginDict)
+
+        # get init order
+        tdict = dict()
+        for name in self.managerPluginDict:
+            tdict[name] = set(self.managerPluginDict[name].init_after)
+        tlist = toposort.toposort_flatten(tdict)
 
         # init manager plugin
         for name in tlist:
