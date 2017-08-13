@@ -461,6 +461,6 @@ class _DefaultBridge:
 
     def __dnsmasqLeaseChangedAddToIpDataDict(self, ipDataDict, ip, mac, hostname):
         ipDataDict[ip] = dict()
-        ipDataDict[ip]["wakeup-mac"] = mac
+        ipDataDict[ip]["mac"] = mac
         if hostname != "":
             ipDataDict[ip]["hostname"] = hostname
