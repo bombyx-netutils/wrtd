@@ -5,7 +5,6 @@ import os
 import re
 import logging
 import pyroute2
-import traceback
 import subprocess
 from gi.repository import GLib
 from gi.repository import GObject
@@ -252,7 +251,7 @@ class WrtTrafficManager:
                             raise
             self.routeDict = newRouteDict
         except Exception as e:
-            self.logger.error("Error occured in route refresh timer callback", traceback.format_exc())
+            self.logger.error("Error occured in route refresh timer callback", exc_info=True)
         finally:
             self.routeRefreshTimer = GObject.timeout_add_seconds(self.routeRefreshInterval, self._routeRefreshTimerCallback)
             return False

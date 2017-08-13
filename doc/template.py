@@ -48,6 +48,10 @@ class PluginTemplateWanConnection:
         #   no exception is allowed in downCallback().
         assert False
 
+    def get_interface(self):
+        # always returns valid value
+        assert False
+
     def start(self):
         assert False
 
@@ -61,9 +65,6 @@ class PluginTemplateWanConnection:
         assert False
 
     def get_netmask():
-        assert False
-
-    def get_interface(self):
         assert False
 
     def get_extra_prefix_list(self):

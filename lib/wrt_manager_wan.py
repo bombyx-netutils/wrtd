@@ -6,7 +6,6 @@ import json
 import signal
 import socket
 import logging
-import traceback
 from gi.repository import GLib
 from gi.repository import GObject
 from wrt_util import WrtUtil
@@ -114,7 +113,7 @@ class WrtWanManager:
             self._wconnIpCheckStart()
             self.wanConnIpCheckRestartTimer = None
         except:
-            self.logger.error("Error occured in wan connection ip check timer callback", traceback.format_exc())
+            self.logger.error("Error occured in wan connection ip check timer callback", exc_info=True)
         finally:
             return False
 

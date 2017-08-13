@@ -10,7 +10,6 @@ import logging
 import ctypes
 import errno
 import threading
-import traceback
 import subprocess
 import ipaddress
 from collections import OrderedDict
@@ -385,7 +384,7 @@ class UrlOpenAsync(threading.Thread):
         try:
             func(*args)
         except:
-            logging.error("Error occured in UrlOpenAsync idle callback", traceback.format_exc())
+            logging.error("Error occured in UrlOpenAsync idle callback", exc_info=True)
         finally:
             self.bComplete = True
             return False

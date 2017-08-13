@@ -7,7 +7,6 @@ import json
 import signal
 import shutil
 import logging
-import traceback
 import netifaces
 from gi.repository import GLib
 from gi.repository import GObject
@@ -232,7 +231,7 @@ class WrtDaemon:
                     # unmanaged interface
                     self.interfaceDict[intf] = None
         except:
-            logging.error("Error occured in interface timer callback", traceback.format_exc())
+            logging.error("Error occured in interface timer callback", exc_info=True)
         finally:
             self.interfaceTimer = GObject.timeout_add_seconds(self.interfaceScanTimeout, self._interfaceTimerCallback)
             return False
