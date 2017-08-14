@@ -29,7 +29,7 @@ class TemplateBridge:
     def remove_host(self, source_id, ip_list):
         assert False
 
-    def on_host_refresh(self, source_id, ip_data_dict):
+    def refresh_host(self, source_id, ip_data_dict):
         assert False
 
 
