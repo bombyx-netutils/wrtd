@@ -131,12 +131,8 @@ class WrtLanManager:
             if source_id != bridge.get_bridge_id():
                 bridge.on_host_add(source_id, ip_data_dict)
 
-        data = dict()
-        for ip in ip_data_dict:
-            data[ip] = self.clientDict[ip].copy()
-            for v in self.clientPropDict[ip].values():
-                data[ip].update(v)
-        self.param.managerCaller.call("on_client_add", source_id, ip_data_dict)
+        data = self._clientDataFromIpDataDict(ip_data_dict)
+        self.param.managerCaller.call("on_client_add", source_id, data)
 
     def change_client(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
@@ -147,11 +143,7 @@ class WrtLanManager:
             if source_id != bridge.get_bridge_id():
                 bridge.on_host_change(source_id, ip_data_dict)
 
-        data = dict()
-        for ip in ip_data_dict:
-            data[ip] = self.clientDict[ip].copy()
-            for v in self.clientPropDict[ip].values():
-                data[ip].update(v)
+        data = self._clientDataFromIpDataDict(ip_data_dict)
         self.param.managerCaller.call("on_client_change", source_id, data)
 
     def remove_client(self, source_id, ip_list):
@@ -183,12 +175,7 @@ class WrtLanManager:
             if source_id != bridge.get_bridge_id():
                 bridge.on_host_refresh(source_id, ip_data_dict)
 
-        data = dict()
-        for ip in ip_data_dict:
-            data[ip] = self.clientDict[ip].copy()
-            if ip in self.clientPropDict:
-                for property_dict in self.clientPropDict[ip].values():
-                    data[ip].update(property_dict)
+        data = self._clientDataFromIpDataDict(ip_data_dict)
         self.param.managerCaller.call("on_client_refresh", source_id, data)
 
     def set_client_property(self, ip, property_source, property_dict):
@@ -196,11 +183,7 @@ class WrtLanManager:
             self.clientPropDict[ip] = dict()
         self.clientPropDict[ip][property_source] = property_dict
 
-        data = dict()
-        data[ip] = self.clientDict[ip].copy()
-        if ip in self.clientPropDict:
-            for property_dict in self.clientPropDict[ip].values():
-                data[ip].update(property_dict)
+        data = self._clientDataFromIp(ip)
         self.param.managerCaller.call("on_client_change", self.clientSourceDict[ip], data)
 
     def remove_client_property(self, ip, property_source):
@@ -208,12 +191,29 @@ class WrtLanManager:
         if len(self.clientPropDict[ip]) == 0:
             del self.clientPropDict[ip]
 
-        data = dict()
-        data[ip] = self.clientDict[ip].copy()
-        if ip in self.clientPropDict:
-            for property_dict in self.clientPropDict[ip].values():
-                data[ip].update(property_dict)
+        data = self._clientDataFromIp(ip)
         self.param.managerCaller.call("on_client_change", self.clientSourceDict[ip], data)
+
+    def _clientDataFromIpDataDict(self, ip_data_dict):
+        ret = dict()
+        for ip in ip_data_dict:
+            if ip in self.clientPropDict:
+                ret[ip] = self.clientDict[ip].copy()
+                for property_dict in self.clientPropDict[ip].values():
+                    ret[ip].update(property_dict)
+            else:
+                ret[ip] = self.clientDict[ip]
+        return ret
+
+    def _clientDataFromIp(self, ip):
+        ret = dict()
+        if ip in self.clientPropDict:
+            ret[ip] = self.clientDict[ip].copy()
+            for property_dict in self.clientPropDict[ip].values():
+                ret[ip].update(property_dict)
+        else:
+            ret[ip] = self.clientDict[ip]
+        return ret
 
     def _getInstanceAndInfoFromEtcDir(self, pluginPrefix, cfgfilePrefix, name):
         # Returns (instanceName, cfgobj, tmpdir, vardir)
