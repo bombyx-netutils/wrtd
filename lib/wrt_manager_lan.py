@@ -40,9 +40,9 @@ class WrtLanManager:
             self.defaultBridge.init2("wrtd-br",
                                      self.param.prefixPool.usePrefix(),
                                      self.param.trafficManager.get_l2_nameserver_port(),
-                                     lambda source_id, ip_data_dict: self.add_client(source_id, ip_data_dict),
-                                     lambda source_id, ip_data_dict: self.change_client(source_id, ip_data_dict),
-                                     lambda source_id, ip_list: self.remove_client(source_id, ip_list))
+                                     lambda source_id, ip_data_dict: self.param.managerCaller.call("on_client_add", source_id, ip_data_dict),
+                                     lambda source_id, ip_data_dict: self.param.managerCaller.call("on_client_change", source_id, ip_data_dict),
+                                     lambda source_id, ip_list: self.param.managerCaller.call("on_client_remove", source_id, ip_list))
             self.logger.info("Default bridge started.")
 
             # start all lan interface plugins
@@ -70,9 +70,9 @@ class WrtLanManager:
                             vardir,
                             self.param.prefixPool.usePrefix(),
                             self.param.trafficManager.get_l2_nameserver_port(),
-                            lambda source_id, ip_data_dict: self.add_client(source_id, ip_data_dict),
-                            lambda source_id, ip_data_dict: self.change_client(source_id, ip_data_dict),
-                            lambda source_id, ip_list: self.remove_client(source_id, ip_list))
+                            lambda source_id, ip_data_dict: self.param.managerCaller.call("on_client_add", source_id, ip_data_dict),
+                            lambda source_id, ip_data_dict: self.param.managerCaller.call("on_client_change", source_id, ip_data_dict),
+                            lambda source_id, ip_list: self.param.managerCaller.call("on_client_remove", source_id, ip_list))
                     p.start()
                     self.vpnsPluginList.append(p)
                     self.logger.info("VPN server plugin \"%s\" activated." % (p.full_name))
@@ -107,20 +107,25 @@ class WrtLanManager:
     def remove_lan_service(self, service_id):
         del self.lanServDict[service_id]
 
-    def add_source(self, source_id):
-        for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-            if source_id != bridge.get_bridge_id():
-                bridge.on_source_add(source_id)
-        self.param.managerCaller.call("on_source_add", source_id)
+    def set_client_property(self, ip, property_source, property_dict):
+        if ip not in self.clientPropDict:
+            self.clientPropDict[ip] = dict()
+        self.clientPropDict[ip][property_source] = property_dict
 
-    def remove_source(self, source_id):
-        assert source_id not in self.clientSourceDict.values()
-        for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-            if source_id != bridge.get_bridge_id():
-                bridge.on_source_remove(source_id)
-        self.param.managerCaller.call("on_source_remove", source_id)
+        if ip in self.clientDict:
+            data = self._clientDataFromIp(ip)
+            self.param.managerCaller.call("on_client_change", self.clientSourceDict[ip], data)
 
-    def add_client(self, source_id, ip_data_dict):
+    def remove_client_property(self, ip, property_source):
+        del self.clientPropDict[ip][property_source]
+        if len(self.clientPropDict[ip]) == 0:
+            del self.clientPropDict[ip]
+
+        if ip in self.clientDict:
+            data = self._clientDataFromIp(ip)
+            self.param.managerCaller.call("on_client_change", self.clientSourceDict[ip], data)
+
+    def on_client_add(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
 
         self.clientDict.update(ip_data_dict)
@@ -134,7 +139,7 @@ class WrtLanManager:
         data = self._clientDataFromIpDataDict(ip_data_dict)
         self.param.managerCaller.call("on_client_add", source_id, data)
 
-    def change_client(self, source_id, ip_data_dict):
+    def on_client_change(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
 
         self.clientDict.update(ip_data_dict)
@@ -146,7 +151,7 @@ class WrtLanManager:
         data = self._clientDataFromIpDataDict(ip_data_dict)
         self.param.managerCaller.call("on_client_change", source_id, data)
 
-    def remove_client(self, source_id, ip_list):
+    def on_client_remove(self, source_id, ip_list):
         assert len(ip_list) > 0
 
         for ip in ip_list:
@@ -158,41 +163,6 @@ class WrtLanManager:
                 bridge.on_host_remove(source_id, ip_list)
 
         self.param.managerCaller.call("on_client_remove", source_id, ip_list)
-
-    def refresh_client(self, source_id, ip_data_dict):
-        assert len(ip_data_dict) > 0
-
-        self.clientDict.update(ip_data_dict)
-        remove_list = []
-        for ip, source in self.clientSourceDict.items():
-            if source == source_id and ip not in ip_data_dict:
-                remove_list.append(ip)
-        for ip in remove_list:
-            del self.clientDict[ip]
-            del self.clientSourceDict[ip]
-
-        for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-            if source_id != bridge.get_bridge_id():
-                bridge.on_host_refresh(source_id, ip_data_dict)
-
-        data = self._clientDataFromIpDataDict(ip_data_dict)
-        self.param.managerCaller.call("on_client_refresh", source_id, data)
-
-    def set_client_property(self, ip, property_source, property_dict):
-        if ip not in self.clientPropDict:
-            self.clientPropDict[ip] = dict()
-        self.clientPropDict[ip][property_source] = property_dict
-
-        data = self._clientDataFromIp(ip)
-        self.param.managerCaller.call("on_client_change", self.clientSourceDict[ip], data)
-
-    def remove_client_property(self, ip, property_source):
-        del self.clientPropDict[ip][property_source]
-        if len(self.clientPropDict[ip]) == 0:
-            del self.clientPropDict[ip]
-
-        data = self._clientDataFromIp(ip)
-        self.param.managerCaller.call("on_client_change", self.clientSourceDict[ip], data)
 
     def _clientDataFromIpDataDict(self, ip_data_dict):
         ret = dict()
