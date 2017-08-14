@@ -136,7 +136,7 @@ class TemplatePluginVpnServer:
 class TemplatePluginManager:
 
     @property
-    def dependencies(self):
+    def init_after(self):
         # returns list<manager-name>
         assert False
 

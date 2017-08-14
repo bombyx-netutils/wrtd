@@ -190,9 +190,11 @@ class WrtDaemon:
                 cfgObj = dict()
 
             p = self.managerPluginDict[name]
-            self.param.managerCaller.add_manager(name, p)                       # order sensitive
-            p.init2(cfgObj, self.param.tmpDir, self.param.varDir, data)         # order sensitive
+            p.init2(cfgObj, self.param.tmpDir, self.param.varDir, data)
             logging.info("Manager plugin \"%s\" activated." % (p.full_name))
+
+            self.param.managerCaller.call("on_manager_init", p)
+            self.param.managerCaller.add_manager(name, p)
 
     def _interfaceTimerCallback(self):
         try:
