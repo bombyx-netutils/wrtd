@@ -35,9 +35,9 @@ class WrtLanManager:
             self.defaultBridge.init2("wrtd-br",
                                      self.param.prefixPool.usePrefix(),
                                      self.param.trafficManager.get_l2_nameserver_port(),
-                                     lambda source_id, ip_data_dict: self.param.managerCaller.call("add_client", source_id, ip_data_dict),
-                                     lambda source_id, ip_data_dict: self.param.managerCaller.call("change_client", source_id, ip_data_dict),
-                                     lambda source_id, ip_list: self.param.managerCaller.call("remove_client", source_id, ip_list))
+                                     lambda source_id, ip_data_dict: self.add_client(source_id, ip_data_dict),
+                                     lambda source_id, ip_data_dict: self.change_client(source_id, ip_data_dict),
+                                     lambda source_id, ip_list: self.remove_client(source_id, ip_list))
             self.logger.info("Default bridge started.")
 
             # start all lan interface plugins
@@ -65,9 +65,9 @@ class WrtLanManager:
                             vardir,
                             self.param.prefixPool.usePrefix(),
                             self.param.trafficManager.get_l2_nameserver_port(),
-                            lambda source_id, ip_data_dict: self.param.managerCaller.call("add_client", source_id, ip_data_dict),
-                            lambda source_id, ip_data_dict: self.param.managerCaller.call("change_client", source_id, ip_data_dict),
-                            lambda source_id, ip_list: self.param.managerCaller.call("remove_client", source_id, ip_list))
+                            lambda source_id, ip_data_dict: self.add_client(source_id, ip_data_dict),
+                            lambda source_id, ip_data_dict: self.change_client(source_id, ip_data_dict),
+                            lambda source_id, ip_list: self.remove_client(source_id, ip_list))
                     p.start()
                     self.vpnsPluginList.append(p)
                     self.logger.info("VPN server plugin \"%s\" activated." % (p.full_name))
