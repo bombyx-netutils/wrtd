@@ -104,36 +104,42 @@ class WrtLanManager:
 
     def add_source(self, source_id):
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-            bridge.on_source_add(source_id)
+            if source_id != bridge.get_bridge_id():
+                bridge.on_source_add(source_id)
         self.param.managerCaller.call("on_source_add", source_id)
 
     def remove_source(self, source_id):
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-            bridge.on_source_remove(source_id)
+            if source_id != bridge.get_bridge_id():
+                bridge.on_source_remove(source_id)
         self.param.managerCaller.call("on_source_remove", source_id)
 
     def add_client(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-            bridge.on_host_add(source_id, ip_data_dict)
+            if source_id != bridge.get_bridge_id():
+                bridge.on_host_add(source_id, ip_data_dict)
         self.param.managerCaller.call("on_client_add", source_id, ip_data_dict)
 
     def change_client(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-            bridge.on_host_change(source_id, ip_data_dict)
+            if source_id != bridge.get_bridge_id():
+                bridge.on_host_change(source_id, ip_data_dict)
         self.param.managerCaller.call("on_client_change", source_id, ip_data_dict)
 
     def remove_client(self, source_id, ip_list):
         assert len(ip_list) > 0
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-            bridge.on_host_remove(source_id, ip_list)
+            if source_id != bridge.get_bridge_id():
+                bridge.on_host_remove(source_id, ip_list)
         self.param.managerCaller.call("on_client_remove", source_id, ip_list)
 
     def refresh_client(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-            bridge.on_host_refresh(source_id, ip_data_dict)
+            if source_id != bridge.get_bridge_id():
+                bridge.on_host_refresh(source_id, ip_data_dict)
         self.param.managerCaller.call("on_client_refresh", source_id, ip_data_dict)
 
     def _getInstanceAndInfoFromEtcDir(self, pluginPrefix, cfgfilePrefix, name):
@@ -259,20 +265,13 @@ class _DefaultBridge:
         return (str(self.brnetwork.network_address), str(self.brnetwork.netmask))
 
     def on_source_add(self, source_id):
-        if source_id == self.get_bridge_id():
-            return
         with open(os.path.join(self.hostsDir, source_id), "w") as f:
             f.write("")
 
     def on_source_remove(self, source_id):
-        if source_id == self.get_bridge_id():
-            return
         os.unlink(os.path.join(self.hostsDir, source_id))
 
     def on_host_add(self, source_id, ip_data_dict):
-        if source_id == self.get_bridge_id():
-            return
-
         fn = os.path.join(self.hostsDir, source_id)
         itemDict = WrtUtil.dnsmasqHostFileToOrderedDict(fn)
         bChanged = False
@@ -299,9 +298,6 @@ class _DefaultBridge:
         self.on_host_add(source_id, ip_data_dict)
 
     def on_host_remove(self, source_id, ip_list):
-        if source_id == self.get_bridge_id():
-            return
-
         fn = os.path.join(self.hostsDir, source_id)
         itemDict = WrtUtil.dnsmasqHostFileToOrderedDict(fn)
         bChanged = False
@@ -316,9 +312,6 @@ class _DefaultBridge:
             self.dnsmasqProc.send_signal(signal.SIGHUP)
 
     def on_host_refresh(self, source_id, ip_data_dict):
-        if source_id == self.get_bridge_id():
-            return
-
         fn = os.path.join(self.hostsDir, source_id)
         itemDict = WrtUtil.dnsmasqHostFileToDict(fn)
 
