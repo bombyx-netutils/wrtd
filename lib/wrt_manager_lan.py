@@ -21,9 +21,14 @@ class WrtLanManager:
         self.logger = logging.getLogger(self.__module__ + "." + self.__class__.__name__)
 
         self.defaultBridge = None
-        self.lanServDict = dict()           # dict<name,json-object>
+
         self.lifPluginList = []
         self.vpnsPluginList = []
+
+        self.lanServDict = dict()           # dict<name,json-object>
+        self.clientDict = dict()            # dict<ip,data>
+        self.clientSourceDict = dict()      # dict<ip,source_id>
+        self.clientPropDict = dict()        # dict<ip,dict<property-source,property-dict>>
 
         try:
             # create default bridge
@@ -109,6 +114,7 @@ class WrtLanManager:
         self.param.managerCaller.call("on_source_add", source_id)
 
     def remove_source(self, source_id):
+        assert source_id not in self.clientSourceDict.values()
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             if source_id != bridge.get_bridge_id():
                 bridge.on_source_remove(source_id)
@@ -116,31 +122,98 @@ class WrtLanManager:
 
     def add_client(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
+
+        self.clientDict.update(ip_data_dict)
+        for ip in ip_data_dict:
+            self.clientSourceDict[ip] = source_id
+
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             if source_id != bridge.get_bridge_id():
                 bridge.on_host_add(source_id, ip_data_dict)
+
+        data = dict()
+        for ip in ip_data_dict:
+            data[ip] = self.clientDict[ip].copy()
+            for v in self.clientPropDict[ip].values():
+                data[ip].update(v)
         self.param.managerCaller.call("on_client_add", source_id, ip_data_dict)
 
     def change_client(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
+
+        self.clientDict.update(ip_data_dict)
+
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             if source_id != bridge.get_bridge_id():
                 bridge.on_host_change(source_id, ip_data_dict)
-        self.param.managerCaller.call("on_client_change", source_id, ip_data_dict)
+
+        data = dict()
+        for ip in ip_data_dict:
+            data[ip] = self.clientDict[ip].copy()
+            for v in self.clientPropDict[ip].values():
+                data[ip].update(v)
+        self.param.managerCaller.call("on_client_change", source_id, data)
 
     def remove_client(self, source_id, ip_list):
         assert len(ip_list) > 0
+
+        for ip in ip_list:
+            del self.clientDict[ip]
+            del self.clientSourceDict[ip]
+
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             if source_id != bridge.get_bridge_id():
                 bridge.on_host_remove(source_id, ip_list)
+
         self.param.managerCaller.call("on_client_remove", source_id, ip_list)
 
     def refresh_client(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
+
+        self.clientDict.update(ip_data_dict)
+        remove_list = []
+        for ip, source in self.clientSourceDict.items():
+            if source == source_id and ip not in ip_data_dict:
+                remove_list.append(ip)
+        for ip in remove_list:
+            del self.clientDict[ip]
+            del self.clientSourceDict[ip]
+
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             if source_id != bridge.get_bridge_id():
                 bridge.on_host_refresh(source_id, ip_data_dict)
-        self.param.managerCaller.call("on_client_refresh", source_id, ip_data_dict)
+
+        data = dict()
+        for ip in ip_data_dict:
+            data[ip] = self.clientDict[ip].copy()
+            if ip in self.clientPropDict:
+                for property_dict in self.clientPropDict[ip].values():
+                    data[ip].update(property_dict)
+        self.param.managerCaller.call("on_client_refresh", source_id, data)
+
+    def set_client_property(self, ip, property_source, property_dict):
+        if ip not in self.clientPropDict:
+            self.clientPropDict[ip] = dict()
+        self.clientPropDict[ip][property_source] = property_dict
+
+        data = dict()
+        data[ip] = self.clientDict[ip].copy()
+        if ip in self.clientPropDict:
+            for property_dict in self.clientPropDict[ip].values():
+                data[ip].update(property_dict)
+        self.param.managerCaller.call("on_client_change", self.clientSourceDict[ip], data)
+
+    def remove_client_property(self, ip, property_source):
+        del self.clientPropDict[ip][property_source]
+        if len(self.clientPropDict[ip]) == 0:
+            del self.clientPropDict[ip]
+
+        data = dict()
+        data[ip] = self.clientDict[ip].copy()
+        if ip in self.clientPropDict:
+            for property_dict in self.clientPropDict[ip].values():
+                data[ip].update(property_dict)
+        self.param.managerCaller.call("on_client_change", self.clientSourceDict[ip], data)
 
     def _getInstanceAndInfoFromEtcDir(self, pluginPrefix, cfgfilePrefix, name):
         # Returns (instanceName, cfgobj, tmpdir, vardir)
