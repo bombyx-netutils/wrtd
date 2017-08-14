@@ -102,58 +102,33 @@ class WrtLanManager:
     def remove_lan_service(self, service_id):
         del self.lanServDict[service_id]
 
-    def add_source(self, source_id):
+    def on_source_add(self, source_id):
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             bridge.on_source_add(source_id)
 
-    def remove_source(self, source_id):
+    def on_source_remove(self, source_id):
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             bridge.on_source_remove(source_id)
-
-    def add_client(self, source_id, ip_data_dict):
-        assert len(ip_data_dict) > 0
-        for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-            assert source_id != bridge.get_bridge_id()
-            bridge.on_host_add(source_id, ip_data_dict)
-
-    def change_client(self, source_id, ip_data_dict):
-        assert len(ip_data_dict) > 0
-        for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-            assert source_id != bridge.get_bridge_id()
-            bridge.on_host_change(source_id, ip_data_dict)
-
-    def remove_client(self, source_id, ip_list):
-        assert len(ip_list) > 0
-        for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-            assert source_id != bridge.get_bridge_id()
-            bridge.on_host_remove(source_id, ip_list)
-
-    def refresh_client(self, source_id, ip_data_dict):
-        assert len(ip_data_dict) > 0
-        for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-            assert source_id != bridge.get_bridge_id()
-            bridge.on_host_refresh(source_id, ip_data_dict)
 
     def on_client_add(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-            if source_id == bridge.get_bridge_id():
-                continue
             bridge.on_host_add(source_id, ip_data_dict)
 
     def on_client_change(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-            if source_id == bridge.get_bridge_id():
-                continue
             bridge.on_host_change(source_id, ip_data_dict)
 
     def on_client_remove(self, source_id, ip_list):
         assert len(ip_list) > 0
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
-            if source_id == bridge.get_bridge_id():
-                continue
             bridge.on_host_remove(source_id, ip_list)
+
+    def on_client_refresh(self, source_id, ip_data_dict):
+        assert len(ip_data_dict) > 0
+        for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
+            bridge.on_host_refresh(source_id, ip_data_dict)
 
     def _getInstanceAndInfoFromEtcDir(self, pluginPrefix, cfgfilePrefix, name):
         # Returns (instanceName, cfgobj, tmpdir, vardir)
@@ -285,6 +260,9 @@ class _DefaultBridge:
         os.unlink(os.path.join(self.hostsDir, source_id))
 
     def on_host_add(self, source_id, ip_data_dict):
+        if source_id == self.get_bridge_id():
+            return
+
         fn = os.path.join(self.hostsDir, source_id)
         itemDict = WrtUtil.dnsmasqHostFileToOrderedDict(fn)
         bChanged = False
@@ -311,6 +289,9 @@ class _DefaultBridge:
         self.on_host_add(source_id, ip_data_dict)
 
     def on_host_remove(self, source_id, ip_list):
+        if source_id == self.get_bridge_id():
+            return
+
         fn = os.path.join(self.hostsDir, source_id)
         itemDict = WrtUtil.dnsmasqHostFileToOrderedDict(fn)
         bChanged = False
@@ -325,6 +306,9 @@ class _DefaultBridge:
             self.dnsmasqProc.send_signal(signal.SIGHUP)
 
     def on_host_refresh(self, source_id, ip_data_dict):
+        if source_id == self.get_bridge_id():
+            return
+
         fn = os.path.join(self.hostsDir, source_id)
         itemDict = WrtUtil.dnsmasqHostFileToDict(fn)
 
