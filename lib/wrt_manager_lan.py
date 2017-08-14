@@ -253,10 +253,14 @@ class _DefaultBridge:
         return (str(self.brnetwork.network_address), str(self.brnetwork.netmask))
 
     def on_source_add(self, source_id):
+        if source_id == self.get_bridge_id():
+            return
         with open(os.path.join(self.hostsDir, source_id), "w") as f:
             f.write("")
 
     def on_source_remove(self, source_id):
+        if source_id == self.get_bridge_id():
+            return
         os.unlink(os.path.join(self.hostsDir, source_id))
 
     def on_host_add(self, source_id, ip_data_dict):
