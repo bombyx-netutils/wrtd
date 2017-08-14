@@ -14,19 +14,19 @@ class TemplateBridge:
     def get_bridge_id(self):
         assert False
 
-    def on_source_add(self, source_id):
+    def add_source(self, source_id):
         assert False
 
-    def on_source_remove(self, source_id):
+    def remove_source(self, source_id):
         assert False
 
-    def on_host_add(self, source_id, ip_data_dict):
+    def add_host(self, source_id, ip_data_dict):
         assert False
 
-    def on_host_change(self, source_id, ip_data_dict):
+    def change_host(self, source_id, ip_data_dict):
         assert False
 
-    def on_host_remove(self, source_id, ip_list):
+    def remove_host(self, source_id, ip_list):
         assert False
 
     def on_host_refresh(self, source_id, ip_data_dict):
