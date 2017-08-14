@@ -35,9 +35,9 @@ class WrtLanManager:
             self.defaultBridge.init2("wrtd-br",
                                      self.param.prefixPool.usePrefix(),
                                      self.param.trafficManager.get_l2_nameserver_port(),
-                                     lambda source_id, ip_data_dict: self.param.managerCaller.call("on_client_add", source_id, ip_data_dict),
-                                     lambda source_id, ip_data_dict: self.param.managerCaller.call("on_client_change", source_id, ip_data_dict),
-                                     lambda source_id, ip_list: self.param.managerCaller.call("on_client_remove", source_id, ip_list))
+                                     lambda source_id, ip_data_dict: self.param.managerCaller.call("add_client", source_id, ip_data_dict),
+                                     lambda source_id, ip_data_dict: self.param.managerCaller.call("change_client", source_id, ip_data_dict),
+                                     lambda source_id, ip_list: self.param.managerCaller.call("remove_client", source_id, ip_list))
             self.logger.info("Default bridge started.")
 
             # start all lan interface plugins
@@ -65,9 +65,9 @@ class WrtLanManager:
                             vardir,
                             self.param.prefixPool.usePrefix(),
                             self.param.trafficManager.get_l2_nameserver_port(),
-                            lambda source_id, ip_data_dict: self.param.managerCaller.call("on_client_add", source_id, ip_data_dict),
-                            lambda source_id, ip_data_dict: self.param.managerCaller.call("on_client_change", source_id, ip_data_dict),
-                            lambda source_id, ip_list: self.param.managerCaller.call("on_client_remove", source_id, ip_list))
+                            lambda source_id, ip_data_dict: self.param.managerCaller.call("add_client", source_id, ip_data_dict),
+                            lambda source_id, ip_data_dict: self.param.managerCaller.call("change_client", source_id, ip_data_dict),
+                            lambda source_id, ip_list: self.param.managerCaller.call("remove_client", source_id, ip_list))
                     p.start()
                     self.vpnsPluginList.append(p)
                     self.logger.info("VPN server plugin \"%s\" activated." % (p.full_name))
@@ -102,33 +102,39 @@ class WrtLanManager:
     def remove_lan_service(self, service_id):
         del self.lanServDict[service_id]
 
-    def on_source_add(self, source_id):
+    def add_source(self, source_id):
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             bridge.on_source_add(source_id)
+        self.param.managerCaller.call("on_source_add", source_id)
 
-    def on_source_remove(self, source_id):
+    def remove_source(self, source_id):
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             bridge.on_source_remove(source_id)
+        self.param.managerCaller.call("on_source_remove", source_id)
 
-    def on_client_add(self, source_id, ip_data_dict):
+    def add_client(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             bridge.on_host_add(source_id, ip_data_dict)
+        self.param.managerCaller.call("on_client_add", source_id, ip_data_dict)
 
-    def on_client_change(self, source_id, ip_data_dict):
+    def change_client(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             bridge.on_host_change(source_id, ip_data_dict)
+        self.param.managerCaller.call("on_client_change", source_id, ip_data_dict)
 
-    def on_client_remove(self, source_id, ip_list):
+    def remove_client(self, source_id, ip_list):
         assert len(ip_list) > 0
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             bridge.on_host_remove(source_id, ip_list)
+        self.param.managerCaller.call("on_client_remove", source_id, ip_list)
 
-    def on_client_refresh(self, source_id, ip_data_dict):
+    def refresh_client(self, source_id, ip_data_dict):
         assert len(ip_data_dict) > 0
         for bridge in [self.defaultBridge] + [x.get_bridge() for x in self.vpnsPluginList]:
             bridge.on_host_refresh(source_id, ip_data_dict)
+        self.param.managerCaller.call("on_client_refresh", source_id, ip_data_dict)
 
     def _getInstanceAndInfoFromEtcDir(self, pluginPrefix, cfgfilePrefix, name):
         # Returns (instanceName, cfgobj, tmpdir, vardir)
