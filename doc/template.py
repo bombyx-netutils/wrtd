@@ -64,11 +64,20 @@ class PluginTemplateWanConnection:
     def get_ip(self):
         assert False
 
-    def get_netmask():
+    def get_netmask(self):
         assert False
 
     def get_extra_prefix_list(self):
         # returns [(ip, mask), (ip,mask ), ...]
+        assert False
+
+    def get_business_attributes(self):
+        # returns {
+        #    "bandwidth": 10,           # unit: KB/s, no key means bandwidth is unknown
+        #    "billing": "traffic",      # values: "traffic" or "time", no key means no billing
+        #    "balance": 10.0,
+        #    "balance-unit": "yuan",
+        # }
         assert False
 
     def interface_appear(self, ifname):
