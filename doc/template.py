@@ -72,11 +72,10 @@ class PluginTemplateWanConnection:
         assert False
 
     def get_business_attributes(self):
-        # returns {
+        # returns technical related business attributes:
+        # {
         #    "bandwidth": 10,           # unit: KB/s, no key means bandwidth is unknown
         #    "billing": "traffic",      # values: "traffic" or "time", no key means no billing
-        #    "balance": 10.0,
-        #    "balance-unit": "yuan",
         # }
         assert False
 
