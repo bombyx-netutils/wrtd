@@ -9,3 +9,4 @@ def get_plugin_list():
 
 def get_plugin(name):
     # returns plugin-object
+    assert False
