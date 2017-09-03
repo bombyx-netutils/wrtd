@@ -25,7 +25,8 @@ class WrtLanManager:
         self.lifPluginList = []
         self.vpnsPluginList = []
 
-        self.lanServDict = dict()           # dict<name,json-object>
+        self.propDict = dict()              # dict<property-source,property-dict>
+
         self.clientDict = dict()            # dict<ip,data>
         self.clientSourceDict = dict()      # dict<ip,source_id>
         self.clientPropDict = dict()        # dict<ip,dict<property-source,property-dict>>
@@ -95,17 +96,11 @@ class WrtLanManager:
         self._dispose()
         self.logger.info("Terminated.")
 
-    def add_lan_service(self, service):
-        service_id = 0
-        for i in self.lanServDict.keys():
-            service_id = max(service_id, i + 1)
-        assert service_id not in self.lanServDict.keys()
+    def set_property(self, property_source, property_dict):
+        self.propDict[property_source] = property_dict
 
-        self.lanServDict[service_id] = service
-        return service_id
-
-    def remove_lan_service(self, service_id):
-        del self.lanServDict[service_id]
+    def remove_property(self, property_source):
+        del self.propDict[property_source]
 
     def set_client_property(self, ip, property_source, property_dict):
         if ip not in self.clientPropDict:
