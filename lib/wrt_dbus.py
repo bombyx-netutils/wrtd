@@ -114,10 +114,6 @@ class DbusMainObject(dbus.service.Object):
         if True:
             ret["wan-service"] = list(self.param.trafficManager.wanServDict.keys())
 
-        ret["lan-service"] = []
-        if True:
-            ret["lan-service"] = list(self.param.lanManager.lanServDict.keys())
-
         ret["tfac-group"] = dict()
         if True:
             for name, priority in self.param.trafficManager.tfacGroupDict.items():
