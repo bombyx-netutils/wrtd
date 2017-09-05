@@ -96,6 +96,9 @@ class WrtLanManager:
         self._dispose()
         self.logger.info("Terminated.")
 
+    def has_property(self, property_source):
+        return property_source in self.propDict
+
     def set_property(self, property_source, property_dict):
         self.propDict[property_source] = property_dict
 

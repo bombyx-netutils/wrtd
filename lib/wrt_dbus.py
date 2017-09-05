@@ -24,10 +24,12 @@ from wrt_common import WrtCommon
 # Methods:
 #   info:json                                                GetRouterInfo()
 #   (suggested_filename:str,content:str,warn_msg:str-list)   GenerateClientScript(lif_plugin_id:str, os_type:str)
-#   void                                                     AddWanService(name:str, service:json-str)
+#   void                                                     AddWanService(name:str, service:json)
 #   void                                                     RemoveWanService(name:str)
-#   void                                                     AddTrafficFacilityGroup(name:str, priority:int, tfac_group:json-str)
-#   void                                                     ChangeTrafficFacilityGroup(name:str, tfac_group:json-str)
+#   void                                                     SetHostProperty(data:json)
+#   void                                                     RemoveHostProperty()
+#   void                                                     AddTrafficFacilityGroup(name:str, priority:int, tfac_group:json)
+#   void                                                     ChangeTrafficFacilityGroup(name:str, tfac_group:json)
 #   void                                                     RemoveTrafficFacilityGroup(name:str)
 
 class DbusMainObject(dbus.service.Object):
@@ -64,6 +66,11 @@ class DbusMainObject(dbus.service.Object):
         for sname in snamelist:
             self.param.trafficManager.remove_wan_service(sname)
             self.logger.info("WAN service \"%s\" is removed due to owner disappear." % (sname))
+
+        # remove host property
+        if self.param.lanManager.has_property(name):
+            self.param.lanManager.remove_property(name)
+            self.logger.info("Host property of %s removed." % (name))
 
         # remove traffic facility groups
         snamelist = []
@@ -174,6 +181,16 @@ class DbusMainObject(dbus.service.Object):
         self.param.trafficManager.remove_wan_service(name)
         del self.wanServOwnerDict[name]
         self.logger.info("WAN service \"%s\" removed." % (name))
+
+    @dbus.service.method('org.fpemud.WRT', sender_keyword='sender', in_signature='s')
+    def SetHostProperty(self, data, sender=None):
+        self.param.lanManager.set_property(sender, json.loads(data))
+        self.logger.info("Host property set by %s." % (sender))
+
+    @dbus.service.method('org.fpemud.WRT', sender_keyword='sender', in_signature='s')
+    def RemoveHostProperty(self, sender=None):
+        self.param.lanManager.remove_property(sender)
+        self.logger.info("Host property of %s removed." % (sender))
 
     @dbus.service.method('org.fpemud.WRT', sender_keyword='sender', in_signature='sis')
     def AddTrafficFacilityGroup(self, name, priority, tfac_group, sender=None):
