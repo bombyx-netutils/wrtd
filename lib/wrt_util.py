@@ -381,7 +381,7 @@ class UrlOpenAsync(threading.Thread):
     def _idleCallback(self, func, *args):
         try:
             func(*args)
-        except:
+        except BaseException:
             logging.error("Error occured in UrlOpenAsync idle callback", exc_info=True)
         finally:
             self.bComplete = True

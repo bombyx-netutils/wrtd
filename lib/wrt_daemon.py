@@ -45,7 +45,7 @@ class WrtDaemon:
             logging.getLogger().setLevel(WrtUtil.getLoggingLevel(self.param.logLevel))
             logging.info("Program begins.")
 
-            # check iptables
+            # manipulate iptables
             if not self.param.abortOnError:
                 WrtUtil.iptablesSetEmpty()
             else:
@@ -227,7 +227,7 @@ class WrtDaemon:
 
                     # unmanaged interface
                     self.interfaceDict[intf] = None
-        except:
+        except BaseException:
             logging.error("Error occured in interface timer callback", exc_info=True)
         finally:
             self.interfaceTimer = GObject.timeout_add_seconds(self.interfaceScanTimeout, self._interfaceTimerCallback)

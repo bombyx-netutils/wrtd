@@ -112,7 +112,7 @@ class WrtWanManager:
         try:
             self._wconnIpCheckStart()
             self.wanConnIpCheckRestartTimer = None
-        except:
+        except BaseException:
             self.logger.error("Error occured in wan connection ip check timer callback", exc_info=True)
         finally:
             return False

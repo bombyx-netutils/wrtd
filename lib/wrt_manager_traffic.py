@@ -2,10 +2,10 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
-import re
 import logging
 import pyroute2
 import subprocess
+import iptc
 from gi.repository import GLib
 from gi.repository import GObject
 from wrt_util import WrtUtil
@@ -41,7 +41,7 @@ class WrtTrafficManager:
         try:
             self._runDnsmasq()
             self.logger.info("Level 2 nameserver started.")
-        except:
+        except BaseException:
             self._dispose()
             raise
 
@@ -121,7 +121,11 @@ class WrtTrafficManager:
             self._runDnsmasq()
 
     def on_wan_conn_up(self):
-        WrtUtil.shell('/sbin/nft add rule wrtd natpost oifname %s masquerade' % (self.param.wanManager.wanConnPlugin.get_interface()))
+        rule = iptc.Rule()
+        rule.out_interface = self.param.wanManager.wanConnPlugin.get_interface()
+        rule.create_target("MASQUERADE")
+        iptc.Chain(iptc.Table(iptc.Table.NAT), "POSTROUTING").insert_rule(rule)        # this rule would be auto deleted when WAN conection is down
+
         # WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ct state established,related accept' % (intf))
         # WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s ip protocol icmp accept' % (intf))
         # WrtUtil.shell('/sbin/nft add rule wrtd fw iifname %s drop' % (intf))
@@ -257,24 +261,68 @@ class WrtTrafficManager:
             return False
 
     def _addGatewayFwRules(self, gatewaySet):
-        for gateway in gatewaySet:
-            gateway = "\"" + gateway + "\""
-            subprocess.check_call(["/sbin/nft", "add", "rule", "wrtd", "fw", "iifname", gateway, "ct", "state", "established,related", "accept"])
-            subprocess.check_call(["/sbin/nft", "add", "rule", "wrtd", "fw", "iifname", gateway, "ip", "protocol", "icmp", "accept"])
-            subprocess.check_call(["/sbin/nft", "add", "rule", "wrtd", "fw", "iifname", gateway, "drop"])
-            subprocess.check_call(["/sbin/nft", "add", "rule", "wrtd", "natpost", "oifname", gateway, "masquerade"])
+        filterTable = iptc.Table(iptc.Table.FILTER)
+        natTable = iptc.Table(iptc.Table.NAT)
+        filterTable.autocommit = False
+        natTable.autocommit = False
+        try:
+            for gateway in gatewaySet:
+                for rule in self.__generateGatewayFwRulesFilterInputChain(gateway):
+                    iptc.Chain(filterTable, "INPUT").append_rule(rule)
+                for rule in self.__generateGatewayFwRulesNatPostChain(gateway):
+                    iptc.Chain(natTable, "POSTROUTING").append_rule(rule)
+            filterTable.commit()
+            natTable.commit()
+        finally:
+            filterTable.autocommit = True
+            natTable.autocommit = True
 
     def _removeGatewayFwRules(self, gatewaySet):
-        if len(gatewaySet) == 0:
-            return
+        filterTable = iptc.Table(iptc.Table.FILTER)
+        natTable = iptc.Table(iptc.Table.NAT)
+        filterTable.autocommit = False
+        natTable.autocommit = False
+        try:
+            for gateway in gatewaySet:
+                for rule in self.__generateGatewayFwRulesFilterInputChain(gateway):
+                    iptc.Chain(filterTable, "INPUT").delete_rule(rule)
+                for rule in self.__generateGatewayFwRulesNatPostChain(gateway):
+                    iptc.Chain(natTable, "POSTROUTING").delete_rule(rule)
+            filterTable.commit()
+            natTable.commit()
+        finally:
+            filterTable.autocommit = True
+            natTable.autocommit = True
 
-        msg = WrtUtil.shell('/sbin/nft list table ip wrtd -a', "stdout")
-        for gateway in gatewaySet:
-            for m in re.finditer("^.* \\\"%s\\\" .* # handle ([0-9]+)$" % (gateway), msg, re.M):
-                # a dirty implementation
-                subprocess.call(["/sbin/nft delete rule wrtd fw handle %s 2>/dev/null" % (m.group(1))], shell=True)
-                subprocess.call(["/sbin/nft delete rule wrtd natpre handle %s 2>/dev/null" % (m.group(1))], shell=True)
-                subprocess.call(["/sbin/nft delete rule wrtd natpost handle %s 2>/dev/null" % (m.group(1))], shell=True)
+    def __generateGatewayFwRulesFilterInputChain(self, gateway):
+        ret = []
+
+        rule = iptc.Rule()
+        rule.in_interface = gateway
+        rule.protocol = "icmp"
+        rule.create_target("ACCEPT")
+        ret.append(rule)
+
+        rule = iptc.Rule()
+        rule.in_interface = gateway
+        match = iptc.Match(rule, "state")
+        match.state = "ESTABLISHED,RELATED"
+        rule.add_match(match)
+        rule.create_target("ACCEPT")
+        ret.append(rule)
+
+        rule = iptc.Rule()
+        rule.in_interface = gateway
+        rule.create_target("DROP")
+        ret.append(rule)
+
+        return ret
+
+    def __generateGatewayFwRulesNatPostChain(self, gateway):
+        rule = iptc.Rule()
+        rule.out_interface = gateway
+        rule.create_target("MASQUERADE")
+        return [rule]
 
 
 class _NamePriorityKeyValueDict:
