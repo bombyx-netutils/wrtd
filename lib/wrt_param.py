@@ -31,6 +31,7 @@ class WrtParam:
         self.dbusIpForwardObject = None
 
         self.pidFile = os.path.join(self.runDir, "wrtd.pid")
+        self.abortOnError = False
         self.logLevel = None
         self.config = None
 

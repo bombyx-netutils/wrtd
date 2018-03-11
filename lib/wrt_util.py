@@ -12,6 +12,7 @@ import errno
 import threading
 import subprocess
 import ipaddress
+import iptc
 from collections import OrderedDict
 from gi.repository import GLib
 
@@ -208,29 +209,6 @@ class WrtUtil:
         return 32 - (netmask ^ 0xFFFFFFFF).bit_length()
 
     @staticmethod
-    def nftAddRule(table, chain, rule):
-        """WARN: rule argument must use **standard** format, or you are not able to find the handle number"""
-
-        # add rule
-        WrtUtil.shell('/sbin/nft add rule %s %s %s' % (table, chain, rule))
-
-        # obtain and return rule handle number
-        msg = WrtUtil.shell("/sbin/nft list table %s -a" % (table), "stdout")
-        mlist = list(re.finditer("^\\s+%s # handle ([0-9]+)$" % (rule), msg, re.M))
-        assert len(mlist) == 1
-        return int(mlist[0].group(1))
-
-    @staticmethod
-    def nftDeleteRule(table, chain, ruleHandle):
-        WrtUtil.shell('/sbin/nft delete rule %s %s handle %d' % (table, chain, ruleHandle))
-
-    @staticmethod
-    def nftForceDeleteTable(table):
-        rc, msg = WrtUtil.shell("/sbin/nft list table %s" % (table), "retcode+stdout")
-        if rc == 0:
-            WrtUtil.shell("/sbin/nft delete table %s" % (table))
-
-    @staticmethod
     def getFreeSocketPort(portType):
         if portType == "tcp":
             stlist = [socket.SOCK_STREAM]
@@ -280,6 +258,26 @@ class WrtUtil:
                 clientId = "" if m.group(5) == "*" else m.group(5)
                 ret.append((expiryTime, mac, ip, hostname, clientId))
         return ret
+
+    @staticmethod
+    def iptablesIsEmpty():
+        for tname in iptc.Table.ALL:
+            table = iptc.Table(tname)
+            for chain in table.chains:
+                if not table.builtin_chain(chain):
+                    return False
+                if chain.rules != []:
+                    return False
+        return True
+
+    @staticmethod
+    def iptablesSetEmpty():
+        for tname in iptc.Table.ALL:
+            table = iptc.Table(tname)
+            table.flush()
+            for chain in table.chains:
+                chain.flush()
+        return True
 
 
 class StdoutRedirector:

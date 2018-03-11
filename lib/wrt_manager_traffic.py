@@ -76,7 +76,7 @@ class WrtTrafficManager:
             self.routeRefreshTimer = GObject.timeout_add_seconds(0, self._routeRefreshTimerCallback)
 
         gatewaySet = self._getGatewaySetFromTrafficFacilityList(facility_list)
-        self._addGatewayNftRules(gatewaySet)
+        self._addGatewayFwRules(gatewaySet)
         self.gatewayDict[name] = gatewaySet
 
         ret = self._trafficFacilityListToDomainNameserverFullDict(name, priority, facility_list)
@@ -94,8 +94,8 @@ class WrtTrafficManager:
             self.routeRefreshTimer = GObject.timeout_add_seconds(0, self._routeRefreshTimerCallback)
 
         gatewaySet = self._getGatewaySetFromTrafficFacilityList(facility_list)
-        self._removeGatewayNftRules(self.gatewayDict[name] - gatewaySet)
-        self._addGatewayNftRules(gatewaySet - self.gatewayDict[name])
+        self._removeGatewayFwRules(self.gatewayDict[name] - gatewaySet)
+        self._addGatewayFwRules(gatewaySet - self.gatewayDict[name])
         self.gatewayDict[name] = gatewaySet
 
         ret1 = self.domainNameserverFullDict.remove_by_name(name)
@@ -112,7 +112,7 @@ class WrtTrafficManager:
             GLib.source_remove(self.routeRefreshTimer)
             self.routeRefreshTimer = GObject.timeout_add_seconds(0, self._routeRefreshTimerCallback)
 
-        self._removeGatewayNftRules(self.gatewayDict[name])
+        self._removeGatewayFwRules(self.gatewayDict[name])
         del self.gatewayDict[name]
 
         ret = self.domainNameserverFullDict.remove_by_name(name)
@@ -256,7 +256,7 @@ class WrtTrafficManager:
             self.routeRefreshTimer = GObject.timeout_add_seconds(self.routeRefreshInterval, self._routeRefreshTimerCallback)
             return False
 
-    def _addGatewayNftRules(self, gatewaySet):
+    def _addGatewayFwRules(self, gatewaySet):
         for gateway in gatewaySet:
             gateway = "\"" + gateway + "\""
             subprocess.check_call(["/sbin/nft", "add", "rule", "wrtd", "fw", "iifname", gateway, "ct", "state", "established,related", "accept"])
@@ -264,7 +264,7 @@ class WrtTrafficManager:
             subprocess.check_call(["/sbin/nft", "add", "rule", "wrtd", "fw", "iifname", gateway, "drop"])
             subprocess.check_call(["/sbin/nft", "add", "rule", "wrtd", "natpost", "oifname", gateway, "masquerade"])
 
-    def _removeGatewayNftRules(self, gatewaySet):
+    def _removeGatewayFwRules(self, gatewaySet):
         if len(gatewaySet) == 0:
             return
 

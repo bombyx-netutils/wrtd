@@ -45,6 +45,13 @@ class WrtDaemon:
             logging.getLogger().setLevel(WrtUtil.getLoggingLevel(self.param.logLevel))
             logging.info("Program begins.")
 
+            # check iptables
+            if not self.param.abortOnError:
+                WrtUtil.iptablesSetEmpty()
+            else:
+                if not WrtUtil.iptablesIsEmpty():
+                    raise Exception("iptables is not empty, wrtd use iptables exclusively")
+
             # load configuration
             self._loadCfg()
 
@@ -65,12 +72,6 @@ class WrtDaemon:
             # load prefix pool
             self.param.prefixPool = PrefixPool(os.path.join(self.param.varDir, "prefix-pool.json"))
             logging.info("Prefix pool loaded.")
-
-            # create nft table
-            WrtUtil.shell('/sbin/nft add table ip wrtd')
-            WrtUtil.shell('/sbin/nft add chain wrtd fw { type filter hook prerouting priority 0 \\; }')
-            WrtUtil.shell('/sbin/nft add chain wrtd natpre { type nat hook prerouting priority 0 \\; }')
-            WrtUtil.shell('/sbin/nft add chain wrtd natpost { type nat hook postrouting priority 100 \\; }')      # don't know why priority must be 100, from "https://wiki.nftables.org/wiki-nftables/index.php/Performing_Network_Address_Translation_(NAT)"
 
             # create our own resolv.conf
             with open(self.param.ownResolvConf, "w") as f:
@@ -121,7 +122,6 @@ class WrtDaemon:
             if self.param.trafficManager is not None:
                 self.param.trafficManager.dispose()
                 self.param.trafficManager = None
-            WrtUtil.nftForceDeleteTable("wrtd")
             logging.shutdown()
             shutil.rmtree(self.param.tmpDir)
             if self.bRestart:
