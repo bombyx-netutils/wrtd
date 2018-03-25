@@ -25,6 +25,7 @@ uninstall:
 	rm -f "$(DESTDIR)/$(prefix)/sbin/wrtd"
 	rm -f "$(DESTDIR)/$(prefix)/lib/systemd/system/wrtd.service"
 	rm -f "$(DESTDIR)/$(prefix)/etc/dbus-1/system.d/org.fpemud.WRT.conf"
+	rm -f "$(DESTDIR)/$(prefix)/etc/dbus-1/system.d/org.fpemud.IpForward.conf"
 	rm -rf "$(DESTDIR)/$(prefix)/lib/wrtd"
 	rm -rf "$(DESTDIR)/etc/wrtd"
 
