@@ -261,7 +261,8 @@ class WrtUtil:
 
     @staticmethod
     def iptablesIsEmpty():
-        for tname in iptc.Table.ALL:
+        # iptc.Table.ALL contains "security" table which is very rare
+        for tname in ["filter", "mangle", "raw", "nat"]:
             table = iptc.Table(tname)
             for chain in table.chains:
                 if not table.builtin_chain(chain):
@@ -272,7 +273,8 @@ class WrtUtil:
 
     @staticmethod
     def iptablesSetEmpty():
-        for tname in iptc.Table.ALL:
+        # iptc.Table.ALL contains "security" table which is very rare
+        for tname in ["filter", "mangle", "raw", "nat"]:
             table = iptc.Table(tname)
             table.flush()
             for chain in table.chains:
