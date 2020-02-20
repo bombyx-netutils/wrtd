@@ -6,6 +6,7 @@ import json
 import signal
 import socket
 import logging
+from jsoncomment import JsonComment
 from gi.repository import GLib
 from gi.repository import GObject
 from wrt_util import WrtUtil
@@ -37,7 +38,7 @@ class WrtWanManager:
             if os.path.exists(cfgfile):
                 cfgObj = None
                 with open(cfgfile, "r") as f:
-                    cfgObj = json.load(f)
+                    cfgObj = JsonComment(json).load(f)
                 self.wanConnPlugin = self.param.pluginHub.getPlugin("wconn", cfgObj["plugin"])
                 tdir = os.path.join(self.param.tmpDir, "wconn-%s" % (cfgObj["plugin"]))
                 os.mkdir(tdir)

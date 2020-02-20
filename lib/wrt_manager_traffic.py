@@ -254,7 +254,7 @@ class WrtTrafficManager:
                         else:
                             raise
             self.routeDict = newRouteDict
-        except Exception as e:
+        except Exception:
             self.logger.error("Error occured in route refresh timer callback", exc_info=True)
         finally:
             self.routeRefreshTimer = GObject.timeout_add_seconds(self.routeRefreshInterval, self._routeRefreshTimerCallback)

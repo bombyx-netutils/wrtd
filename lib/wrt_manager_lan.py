@@ -10,6 +10,7 @@ import subprocess
 import logging
 import ipaddress
 import pyroute2
+from jsoncomment import JsonComment
 from gi.repository import Gio
 from wrt_util import WrtUtil
 
@@ -201,7 +202,7 @@ class WrtLanManager:
 
             if os.path.getsize(fn) > 0:
                 with open(fn, "r") as f:
-                    cfgObj = json.load(f)
+                    cfgObj = JsonComment(json).load(f)
             else:
                 cfgObj = dict()
 
@@ -478,7 +479,7 @@ class _DefaultBridge:
                         self.pObj.logger.info("Client %s(%s) disappeared." % (ip, mac))
 
             self.lastScanRecord = newLeaseList
-        except Exception as e:
+        except Exception:
             self.pObj.logger.error("Lease scan failed", exc_info=True)      # fixme
 
     def ___dnsmasqLeaseChangedFind(self, item, leaseList):

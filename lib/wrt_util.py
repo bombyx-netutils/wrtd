@@ -244,7 +244,7 @@ class WrtUtil:
            This function returns [(expiry-time,mac,ip,hostname,client-id), (expiry-time,mac,ip,hostname,client-id)]
         """
 
-        pattern = "([0-9]+) +([0-9a-f:]+) +([0-9\.]+) +(\\S+) +(\\S+)"
+        pattern = "([0-9]+) +([0-9a-f:]+) +([0-9\\.]+) +(\\S+) +(\\S+)"
         ret = []
         with open(filename, "r") as f:
             for line in f.read().split("\n"):
