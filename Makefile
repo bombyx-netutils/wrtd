@@ -7,10 +7,10 @@ install:
 	install -d -m 0755 "$(DESTDIR)/$(prefix)/sbin"
 	install -m 0755 wrtd "$(DESTDIR)/$(prefix)/sbin"
 
-	install -d -m 0755 "$(DESTDIR)/$(prefix)/lib/wrtd"
-	cp -r lib/* "$(DESTDIR)/$(prefix)/lib/wrtd"
-	find "$(DESTDIR)/$(prefix)/lib/wrtd" -path "$(DESTDIR)/$(prefix)/lib/wrtd/plugins" -prune -o -type f | xargs chmod 644
-	find "$(DESTDIR)/$(prefix)/lib/wrtd" -path "$(DESTDIR)/$(prefix)/lib/wrtd/plugins" -prune -o -type d | xargs chmod 755
+	install -d -m 0755 "$(DESTDIR)/$(prefix)/lib64/wrtd"
+	cp -r lib/* "$(DESTDIR)/$(prefix)/lib64/wrtd"
+	find "$(DESTDIR)/$(prefix)/lib64/wrtd" -path "$(DESTDIR)/$(prefix)/lib64/wrtd/plugins" -prune -o -type f | xargs chmod 644
+	find "$(DESTDIR)/$(prefix)/lib64/wrtd" -path "$(DESTDIR)/$(prefix)/lib64/wrtd/plugins" -prune -o -type d | xargs chmod 755
 
 	install -d -m 0755 "$(DESTDIR)/etc/wrtd"
 
@@ -26,7 +26,7 @@ uninstall:
 	rm -f "$(DESTDIR)/$(prefix)/lib/systemd/system/wrtd.service"
 	rm -f "$(DESTDIR)/$(prefix)/etc/dbus-1/system.d/org.fpemud.WRT.conf"
 	rm -f "$(DESTDIR)/$(prefix)/etc/dbus-1/system.d/org.fpemud.IpForward.conf"
-	rm -rf "$(DESTDIR)/$(prefix)/lib/wrtd"
+	rm -rf "$(DESTDIR)/$(prefix)/lib64/wrtd"
 	rm -rf "$(DESTDIR)/etc/wrtd"
 
 .PHONY: all install uninstall

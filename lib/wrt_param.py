@@ -8,7 +8,7 @@ class WrtParam:
 
     def __init__(self):
         self.etcDir = "/etc/wrtd"
-        self.libDir = "/usr/lib/wrtd"
+        self.libDir = "/usr/lib64/wrtd"
         self.dataDir = "/usr/share/wrtd"
         self.runDir = "/run/wrtd"
         self.logDir = "/var/log/wrtd"
