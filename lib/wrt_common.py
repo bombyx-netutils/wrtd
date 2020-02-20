@@ -54,27 +54,22 @@ class PluginHub:
     def getPluginList(self, prefix):
         ret = []
         for fn in glob.glob(os.path.join(self.param.libDir, "plugins", prefix + "_*")):
-            modname = fn
-            modname = modname[len(self.param.libDir + "/"):]
-            modname = modname.replace("/", ".")
-            exec("import %s" % (modname))
-            ret += eval("%s.get_plugin_list()" % (modname))
+            fn = os.path.basename(fn)
+            fn = fn.replace(prefix + "_", "")
+            ret.append(fn)
         return ret
 
     def getPlugin(self, prefix, name, instance_name=""):
-        for fn in glob.glob(os.path.join(self.param.libDir, "plugins", prefix + "_*")):
-            modname = fn
-            modname = modname[len(self.param.libDir + "/"):]
-            modname = modname.replace("/", ".")
-            exec("import %s" % (modname))
-            if name in eval("%s.get_plugin_list()" % (modname)):
-                obj = eval("%s.get_plugin(\"%s\")" % (modname, name))
-                if instance_name != "":
-                    obj.full_name = name + "-" + instance_name
-                else:
-                    obj.full_name = name
-                return obj
-        raise Exception("%s plugin %s does not exist" % (prefix, name))
+        modname = os.path.join(self.param.libDir, "plugins", prefix + "_" + name)
+        modname = modname[len(self.param.libDir + "/"):]
+        modname = modname.replace("/", ".")
+        exec("import %s" % (modname))
+        obj = eval("%s._PluginObject()")
+        if instance_name != "":
+            obj.full_name = name + "-" + instance_name
+        else:
+            obj.full_name = name
+        return obj
 
 
 class ManagerCaller:
