@@ -2,11 +2,9 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
-import json
 import signal
 import socket
 import logging
-from jsoncomment import JsonComment
 from gi.repository import GLib
 from gi.repository import GObject
 from wrt_util import WrtUtil
@@ -36,9 +34,7 @@ class WrtWanManager:
         try:
             cfgfile = os.path.join(self.param.etcDir, "wan-connection.json")
             if os.path.exists(cfgfile):
-                cfgObj = None
-                with open(cfgfile, "r") as f:
-                    cfgObj = JsonComment(json).load(f)
+                cfgObj = WrtUtil.loadJsonCfg(cfgfile)
                 self.wanConnPlugin = self.param.pluginHub.getPlugin("wconn", cfgObj["plugin"])
                 tdir = os.path.join(self.param.tmpDir, "wconn-%s" % (cfgObj["plugin"]))
                 os.mkdir(tdir)

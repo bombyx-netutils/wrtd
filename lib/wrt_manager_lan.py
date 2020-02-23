@@ -4,13 +4,11 @@
 import os
 import glob
 import signal
-import json
 import socket
 import subprocess
 import logging
 import ipaddress
 import pyroute2
-from jsoncomment import JsonComment
 from gi.repository import Gio
 from wrt_util import WrtUtil
 
@@ -201,8 +199,7 @@ class WrtLanManager:
                 fullName = name
 
             if os.path.getsize(fn) > 0:
-                with open(fn, "r") as f:
-                    cfgObj = JsonComment(json).load(f)
+                cfgObj = WrtUtil.loadJsonCfg(fn)
             else:
                 cfgObj = dict()
 

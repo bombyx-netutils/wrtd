@@ -3,13 +3,11 @@
 
 import os
 import sys
-import json
 import signal
 import shutil
 import logging
 import toposort
 import netifaces
-from jsoncomment import JsonComment
 from gi.repository import GLib
 from gi.repository import GObject
 from dbus.mainloop.glib import DBusGMainLoop
@@ -154,9 +152,7 @@ class WrtDaemon:
 
     def _loadCfg(self):
         if os.path.exists(self.cfgFile):
-            cfgObj = None
-            with open(self.cfgFile, "r") as f:
-                cfgObj = JsonComment(json).load(f)
+            cfgObj = WrtUtil.loadJsonCfg(self.cfgFile)
             self.param.dnsName = cfgObj["dns-name"]
 
     def _loadManagerPlugins(self):
@@ -193,8 +189,7 @@ class WrtDaemon:
         for name in tlist:
             fn = os.path.join(self.param.etcDir, "manager-%s.json" % (name))
             if os.path.exists(fn) and os.path.getsize(fn) > 0:
-                with open(fn, "r") as f:
-                    cfgObj = JsonComment(json).load(f)
+                cfgObj = WrtUtil.loadJsonCfg(fn)
             else:
                 cfgObj = dict()
 

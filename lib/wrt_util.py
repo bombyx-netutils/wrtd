@@ -4,6 +4,7 @@
 import os
 import re
 import sys
+import json
 import socket
 import shutil
 import logging
@@ -13,11 +14,22 @@ import threading
 import subprocess
 import ipaddress
 import iptc
+from jsoncomment import JsonComment
 from collections import OrderedDict
 from gi.repository import GLib
 
 
 class WrtUtil:
+
+    @staticmethod
+    def readFile(filename):
+        with open(filename, "r") as f:
+            return f.read()
+
+    @staticmethod
+    def loadJsonCfg(cfgfile):
+        with open(cfgfile, "r") as f:
+            return JsonComment(json).load(f)
 
     @staticmethod
     def is_int(s):
