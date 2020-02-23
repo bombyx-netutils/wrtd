@@ -4,47 +4,12 @@
 
 # config file: ${ETC}/wan-connection.json
 # only allow one plugin be loaded
-# must set an all deny firewall rule for the out interface before wan connection is up
 class TemplatePlugin:
 
-    def init2(self, tmpDir, ownResolvConf, upCallback, downCallback):
-        # upCallback:
-        #   is_alive() should return True in upCallback().
-        #   exception raised by upCallback() would make the plugin bring down the connection.
-        # downCallback:
-        #   is_alive() should return False in downCallback().
-        #   no exception is allowed in downCallback().
-        assert False
-
-    def get_interface(self):
-        # always returns valid value
-        assert False
-
-    def start(self):
+    def start(self, cfgObj, api):
         assert False
 
     def stop(self):
-        assert False
-
-    def is_connected(self):
-        assert False
-
-    def get_ip(self):
-        assert False
-
-    def get_netmask(self):
-        assert False
-
-    def get_extra_prefix_list(self):
-        # returns [(ip, mask), (ip,mask ), ...]
-        assert False
-
-    def get_business_attributes(self):
-        # returns technical related business attributes:
-        # {
-        #    "bandwidth": 10,           # unit: KB/s, no key means bandwidth is unknown
-        #    "billing": "traffic",      # values: "traffic" or "time", no key means no billing
-        # }
         assert False
 
     def interface_appear(self, ifname):
@@ -59,15 +24,35 @@ class TemplatePlugin:
 
 class TemplatePluginApi:
 
-    def activated(self, internet_ip, prefix_list, gateway, route_list):
+    def get_tmp_dir(self):
         pass
 
-    def deactivated(self):
+    def activate_interface(self, ifname, ifconfig):
+        # Returns interface configuration.
+        # must not be called in event callback
+        # Example:
+        # {
+        #     "prefix": "10.254.1.155/24",
+        #     "gateway": "121.33.99.247",         # optional
+        #     "nameservers": [                    # optional
+        #         "10.202.72.118",
+        #         "10.202.72.119",
+        #     ],
+        #     "routes": [                         # optional
+        #         {
+        #             "prefix": "10.0.0.0/8",
+        #             "gateway": "10.254.7.247",
+        #         },
+        #     ],
+        #     "internet-ip": "121.33.97.55",      # optional
+        #     "business-attributes": {            # optional
+        #         "bandwidth": 10,                # unit: KB/s, no key means bandwidth is unknown
+        #         "billing": "traffic",           # values: "traffic" or "time", no key means no billing
+        #     },
+        # }
         pass
 
-        # upCallback:
-        #   is_alive() should return True in upCallback().
-        #   exception raised by upCallback() would make the plugin bring down the connection.
-        # downCallback:
-        #   is_alive() should return False in downCallback().
-        #   no exception is allowed in downCallback().
+    def deactive_interface(self, ifname):
+        # must not be called in event callback
+        # no need to call after interface is disappeared
+        pass
