@@ -2,6 +2,36 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 
+class TemplateInternetIp:
+
+    @property
+    def ip_address(self):
+        assert False
+
+    @property
+    def interface(self):
+        assert False
+
+
+class TemplateInterfaceConfig:
+
+    @property
+    def ip_prefix(self):
+        assert False
+
+    @property
+    def gateway(self):
+        assert False
+
+    @property
+    def nameservers(self):
+        assert False
+
+    @property
+    def routes(self):
+        assert False
+
+
 class TemplateBridge:
 
     def get_name(self):
@@ -32,61 +62,6 @@ class TemplateBridge:
     def refresh_host(self, source_id, ip_data_dict):
         assert False
 
-
-# plugin module name: plugins.wconn_*
-# config file: ${ETC}/wan-connection.json
-# only allow one plugin be loaded
-# must set an all deny firewall rule for the out interface immediately after wan connection is up
-class PluginTemplateWanConnection:
-
-    def init2(self, tmpDir, ownResolvConf, upCallback, downCallback):
-        # upCallback:
-        #   is_alive() should return True in upCallback().
-        #   exception raised by upCallback() would make the plugin bring down the connection.
-        # downCallback:
-        #   is_alive() should return False in downCallback().
-        #   no exception is allowed in downCallback().
-        assert False
-
-    def get_interface(self):
-        # always returns valid value
-        assert False
-
-    def start(self):
-        assert False
-
-    def stop(self):
-        assert False
-
-    def is_connected(self):
-        assert False
-
-    def get_ip(self):
-        assert False
-
-    def get_netmask(self):
-        assert False
-
-    def get_extra_prefix_list(self):
-        # returns [(ip, mask), (ip,mask ), ...]
-        assert False
-
-    def get_business_attributes(self):
-        # returns technical related business attributes:
-        # {
-        #    "bandwidth": 10,           # unit: KB/s, no key means bandwidth is unknown
-        #    "billing": "traffic",      # values: "traffic" or "time", no key means no billing
-        # }
-        assert False
-
-    def interface_appear(self, ifname):
-        # return True means we take this interface
-        # must be called after start()
-        assert False
-
-    def interface_disappear(self, ifname):
-        # must be called after start()
-        assert False
 
 # plugin module name: plugins.lif_*
 # config file: ${ETC}/lan-interface-(PLUGIN_NAME)-(INSTANCE_NAME).json
