@@ -140,18 +140,16 @@ class DbusMainObject(dbus.service.Object):
 
         if self.param.dnsName is not None:
             suggested_filename, content = pluginObj.generate_client_script(self.param.dnsName, os_type)
-            if self.param.wanManager.wanConnPlugin is None or not self.param.wanManager.wanConnPlugin.is_connected():
+            if not self.param.wanManager.is_connected():
                 return (suggested_filename, content, ["Domain name %s is not validated." % (self.param.dnsName)])
-            elif socket.gethostbyname(self.param.dnsName) != self.param.wanManager.wanConnPlugin.get_ip():
-                return (suggested_filename, content, ["Domain name %s does not resolve to WAN IP address \"%s\"." % (self.param.dnsName, self.param.wanManager.wanConnPlugin.get_ip())])
+            elif socket.gethostbyname(self.param.dnsName) != self.param.wanManager.get_ip():
+                return (suggested_filename, content, ["Domain name %s does not resolve to WAN IP address \"%s\"." % (self.param.dnsName, self.param.wanManager.get_ip())])
             else:
                 return (suggested_filename, content, [])
         else:
-            if self.param.wanManager.wanConnPlugin is None:
+            if not self.param.wanManager.is_connected():
                 raise Exception("No internet connection.")
-            if not self.param.wanManager.wanConnPlugin.is_connected():
-                raise Exception("No internet connection.")
-            ip = self.param.wanManager.wanConnPlugin.get_ip()
+            ip = self.param.wanManager.get_ip()
             msgList = ["No domain name specified, using WAN IP address %s as cloud server address." % (ip)]
             if self.param.wanManager.wanConnIpIsPublic is None:
                 msgList.append("Internet connection IP address publicity checking is in progress.")

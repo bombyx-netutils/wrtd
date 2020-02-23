@@ -122,7 +122,7 @@ class WrtTrafficManager:
 
     def on_wan_conn_up(self):
         rule = iptc.Rule()
-        rule.out_interface = self.param.wanManager.wanConnPlugin.get_interface()
+        rule.out_interface = self.param.wanManager.get_interface()
         rule.create_target("MASQUERADE")
         iptc.Chain(iptc.Table(iptc.Table.NAT), "POSTROUTING").insert_rule(rule)        # this rule would be auto deleted when WAN conection is down
 
