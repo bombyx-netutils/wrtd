@@ -199,7 +199,7 @@ class WrtLanManager:
                 fullName = name
 
             if os.path.getsize(fn) > 0:
-                cfgObj = WrtUtil.loadJsonCfg(fn)
+                cfgObj = WrtUtil.loadJsonEtcCfg(fn)
             else:
                 cfgObj = dict()
 

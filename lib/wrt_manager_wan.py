@@ -34,7 +34,7 @@ class WrtWanManager:
         try:
             cfgfile = os.path.join(self.param.etcDir, "wan-connection.json")
             if os.path.exists(cfgfile):
-                cfgObj = WrtUtil.loadJsonCfg(cfgfile)
+                cfgObj = WrtUtil.loadJsonEtcCfg(cfgfile)
                 self.wanConnPlugin = self.param.pluginHub.getPlugin("wconn", cfgObj["plugin"])
                 tdir = os.path.join(self.param.tmpDir, "wconn-%s" % (cfgObj["plugin"]))
                 os.mkdir(tdir)

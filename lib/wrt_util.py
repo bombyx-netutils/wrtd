@@ -27,7 +27,7 @@ class WrtUtil:
             return f.read()
 
     @staticmethod
-    def loadJsonCfg(cfgfile):
+    def loadJsonEtcCfg(cfgfile):
         with open(cfgfile, "r") as f:
             return JsonComment(json).load(f)
 

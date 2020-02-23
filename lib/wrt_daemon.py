@@ -152,7 +152,7 @@ class WrtDaemon:
 
     def _loadCfg(self):
         if os.path.exists(self.cfgFile):
-            cfgObj = WrtUtil.loadJsonCfg(self.cfgFile)
+            cfgObj = WrtUtil.loadJsonEtcCfg(self.cfgFile)
             self.param.dnsName = cfgObj["dns-name"]
 
     def _loadManagerPlugins(self):
@@ -189,7 +189,7 @@ class WrtDaemon:
         for name in tlist:
             fn = os.path.join(self.param.etcDir, "manager-%s.json" % (name))
             if os.path.exists(fn) and os.path.getsize(fn) > 0:
-                cfgObj = WrtUtil.loadJsonCfg(fn)
+                cfgObj = WrtUtil.loadJsonEtcCfg(fn)
             else:
                 cfgObj = dict()
 
