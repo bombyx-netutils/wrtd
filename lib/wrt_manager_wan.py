@@ -43,8 +43,7 @@ class WrtWanManager:
                 cfgObj = WrtUtil.loadJsonEtcCfg(cfgfile)
                 self.wanConnPluginApi = WanConnectionPluginApi(self, cfgObj["plugin"])
                 self.wanConnPlugin = self.param.pluginHub.getPlugin("wconn", cfgObj["plugin"])
-                self.wanConnPlugin.init2(cfgObj, self.wanConnPluginApi)
-                self.wanConnPlugin.start()
+                self.wanConnPlugin.start(cfgObj, self.wanConnPluginApi)
                 self.logger.info("Internet connection activated, plugin: %s." % (cfgObj["plugin"]))
             else:
                 self.logger.info("No internet connection configured.")
