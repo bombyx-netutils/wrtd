@@ -69,11 +69,11 @@ class WrtWanManager:
             self.wanConnPluginApi = None
         self.logger.info("Terminated.")
 
-    def on_wan_conn_up(self, ifname, ifconfig):
+    def on_wan_conn_up(self):
         # set exclude prefix and restart if neccessary
         wanPrefixList = []
         for ifc in self.ifconfigDict.values():
-            wanPrefixList.append(WrtUtil.ipMaskToPrefix(ifc.prefix.split("/")[0], ifc.prefix.split("/")[1]))
+            wanPrefixList.append(WrtUtil.ipMaskToPrefix(ifc["prefix"].split("/")[0], ifc["prefix"].split("/")[1]))
         if self.param.prefixPool.setExcludePrefixList("wan", wanPrefixList):
             os.kill(os.getpid(), signal.SIGHUP)
             raise Exception("bridge prefix duplicates with internet connection, autofix it and restart")
@@ -167,12 +167,13 @@ class WanConnectionPluginApi:
         return self.tdir
 
     def activate_interface(self, ifname, ifconfig):
+        ip = ifconfig["prefix"].split("/")[0]
         bnet = ipaddress.IPv4Network(ifconfig["prefix"], strict=False)
 
         with pyroute2.IPRoute() as ipp:
             idx = ipp.link_lookup(ifname=ifname)[0]
             ipp.link("set", index=idx, state="up")
-            ipp.addr("add", index=idx, address=bnet.ip, mask=bnet.prefixlen, broadcast=str(bnet.broadcast_address))
+            ipp.addr("add", index=idx, address=ip, mask=bnet.prefixlen, broadcast=str(bnet.broadcast_address))
             if "gateway" in ifconfig:
                 ipp.route('add', dst="0.0.0.0/0", gateway=ifconfig["gateway"], oif=idx)
             if "routes" in ifconfig:
