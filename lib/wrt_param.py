@@ -15,6 +15,8 @@ class WrtParam:
         self.tmpDir = "/tmp/wrtd"
         self.varDir = "/var/wrtd"
 
+        self.procIpForwareFile = "/proc/sys/net/ipv4/ip_forward"
+
         self.ownResolvConf = os.path.join(self.tmpDir, "resolv.conf")
         self.dataFile = os.path.join(self.varDir, "global.json")
 

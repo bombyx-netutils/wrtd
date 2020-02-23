@@ -49,16 +49,10 @@ class WrtWanManager:
                                          lambda: self.param.managerCaller.call("on_wan_conn_down"))
                 self.wanConnPlugin.start()
                 self.logger.info("Internet connection activated, plugin: %s." % (cfgObj["plugin"]))
-
-                with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
-                    f.write("1")
-                self.logger.info("IP forwarding enabled.")
             else:
                 self.logger.info("No internet connection configured.")
         except BaseException:
             if self.wanConnPlugin is not None:
-                with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
-                    f.write("0")
                 self.wanConnPlugin.stop()
                 self.wanConnPlugin = None
                 self.logger.info("Internet connection deactivated.")
@@ -67,8 +61,6 @@ class WrtWanManager:
     def dispose(self):
         self._wconnIpCheckDispose()
         if self.wanConnPlugin is not None:
-            with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
-                f.write("0")
             self.wanConnPlugin.stop()
             self.wanConnPlugin = None
             self.logger.info("Internet connection deactivated.")

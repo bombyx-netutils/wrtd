@@ -93,6 +93,14 @@ class WrtDaemon:
             self._loadManagerPlugins()
             self.interfaceTimer = GObject.timeout_add_seconds(0, self._interfaceTimerCallback)
 
+            # enable ip forward
+            if WrtUtil.readFile(self.param.procIpForwareFile) == "0":
+                with open(self.param.procIpForwareFile, "w") as f:
+                    f.write("1")
+                logging.info("IP forwarding enabled.")
+            else:
+                logging.warn("IP forwarding already enabled.")
+
             # start DBUS API server
             self.param.dbusMainObject = DbusMainObject(self.param)
             self.param.dbusIpForwardObject = DbusIpForwardObject(self.param)
