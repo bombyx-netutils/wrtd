@@ -64,7 +64,7 @@ class PluginHub:
         modname = modname[len(self.param.libDir + "/"):]
         modname = modname.replace("/", ".")
         exec("import %s" % (modname))
-        obj = eval("%s._PluginObject()")
+        obj = eval("%s._PluginObject()" % (modname))
         if instance_name != "":
             obj.full_name = name + "-" + instance_name
         else:
