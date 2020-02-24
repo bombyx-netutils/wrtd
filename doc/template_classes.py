@@ -2,36 +2,6 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 
-class TemplateInternetIp:
-
-    @property
-    def ip_address(self):
-        assert False
-
-    @property
-    def interface(self):
-        assert False
-
-
-class TemplateInterfaceConfig:
-
-    @property
-    def ip_prefix(self):
-        assert False
-
-    @property
-    def gateway(self):
-        assert False
-
-    @property
-    def nameservers(self):
-        assert False
-
-    @property
-    def routes(self):
-        assert False
-
-
 class TemplateBridge:
 
     def get_name(self):
@@ -170,14 +140,15 @@ class TemplatePluginManagerData:
 
 
 # template for json object
-class TemplateFacilityNameserver:
+# FIXME: should support more protocols
+class TemplateNetworkTrafficFacilityNameserver:
 
     @property
-    def facility_name(self):
+    def name(self):
         assert False
 
     @property
-    def facility_type(self):
+    def ntfac_type(self):
         return "nameserver"
 
     @property
@@ -189,16 +160,20 @@ class TemplateFacilityNameserver:
     def domain_list(self):
         assert False
 
+    @property
+    def domain_blacklist(self):
+        assert False
+
 
 # template for json object
-class TemplateFacilityGateway:
+class TemplateNetworkTrafficFacilityGateway:
 
     @property
-    def facility_name(self):
+    def name(self):
         assert False
 
     @property
-    def facility_type(self):
+    def ntfac_type(self):
         return "gateway"
 
     @property
@@ -211,27 +186,75 @@ class TemplateFacilityGateway:
         """["18.0.0.0/255.0.0.0","19.0.0.0/255.0.0.0"]"""
         assert False
 
+    @property
+    def network_blacklist(self):
+        """["18.0.0.0/255.0.0.0","19.0.0.0/255.0.0.0"]"""
+        assert False
+
 
 # template for json object
-class TemplateFacilityHttpProxy:
+class TemplateNetworkTrafficFacilityDefaultGateway:
+
+    @property
+    def name(self):
+        assert False
+
+    @property
+    def ntfac_type(self):
+        return "default-gateway"
+
+    @property
+    def target(self):
+        """(next-hop,interface), invalid if both is None"""
+        assert False
+
+    @property
+    def network_list(self):
+        """["18.0.0.0/255.0.0.0","19.0.0.0/255.0.0.0"]"""
+        assert False
+
+    @property
+    def network_blacklist(self):
+        """["18.0.0.0/255.0.0.0","19.0.0.0/255.0.0.0"]"""
+        assert False
+
+
+# template for json object
+class TemplateNetworkTrafficFacilityHttpProxy:
 
     """HTTP/HTTPS/FTP proxy"""
 
     @property
-    def facility_name(self):
+    def name(self):
         assert False
 
     @property
-    def facility_type(self):
+    def ntfac_type(self):
         return "http-proxy"
 
     @property
     def target(self):
-        """{"http":(hostname, port),"https":(hostname,port),"ftp":(hostname,port)}"""
+        """(hostname,port)"""
         assert False
 
     @property
     def domain_list(self):
+        assert False
+
+    @property
+    def domain_blacklist(self):
+        assert False
+
+
+# template for json object
+class TemplatePublicIp:
+
+    @property
+    def ip(self):
+        assert False
+
+    @property
+    def interface(self):
         assert False
 
 

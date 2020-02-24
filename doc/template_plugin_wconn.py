@@ -27,32 +27,12 @@ class TemplatePluginApi:
     def get_tmp_dir(self):
         pass
 
-    def activate_interface(self, ifname, ifconfig):
-        # Returns interface configuration.
-        # must not be called in event callback
-        # Example:
-        # {
-        #     "prefix": "10.254.1.155/24",
-        #     "gateway": "121.33.99.247",         # optional
-        #     "nameservers": [                    # optional
-        #         "10.202.72.118",
-        #         "10.202.72.119",
-        #     ],
-        #     "routes": [                         # optional
-        #         {
-        #             "prefix": "10.0.0.0/8",
-        #             "gateway": "10.254.7.247",
-        #         },
-        #     ],
-        #     "internet-ip": "121.33.97.55",      # optional
-        #     "business-attributes": {            # optional
-        #         "bandwidth": 10,                # unit: KB/s, no key means bandwidth is unknown
-        #         "billing": "traffic",           # values: "traffic" or "time", no key means no billing
-        #     },
-        # }
+    def reserve_interface(self, ifname_pattern):
+        # ifname_pattern is to be used by fnmatch.fnmatch()
         pass
 
-    def deactive_interface(self, ifname):
-        # must not be called in event callback
-        # no need to call after interface is disappeared
+    def ntfac_changed(self, facility_list):
+        pass
+
+    def public_ip_changed(self, public_ip):
         pass

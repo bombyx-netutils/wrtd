@@ -165,6 +165,12 @@ class WanConnectionPluginApi:
     def get_tmp_dir(self):
         return self.tdir
 
+    def add_ntfac(self, ntfac_name, ntfac_object):
+        pass
+
+    def remove_ntfac(self, ntfac_name, ntfac_object):
+        pass
+
     def activate_interface(self, ifname, ifconfig):
         ip = ifconfig["prefix"].split("/")[0]
         bnet = ipaddress.IPv4Network(ifconfig["prefix"], strict=False)
