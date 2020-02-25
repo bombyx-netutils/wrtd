@@ -23,7 +23,6 @@ from wrt_common import WrtCommon
 #
 # Methods:
 #   info:json                                                GetRouterInfo()
-#   (suggested_filename:str,content:str,warn_msg:str-list)   GenerateClientScript(lif_plugin_id:str, os_type:str)
 #   void                                                     AddWanService(name:str, service:json)
 #   void                                                     RemoveWanService(name:str)
 #   void                                                     AddTrafficFacilityGroup(name:str, priority:int, tfac_group:json)
@@ -124,39 +123,6 @@ class DbusMainObject(dbus.service.Object):
             ret.update(p.get_router_info())
 
         return json.dumps(ret)
-
-    @dbus.service.method('org.fpemud.WRT', in_signature='ss', out_signature='ssas')
-    def GenerateClientScript(self, vpns_plugin_full_name, os_type):
-        if os_type not in ["linux", "win32"]:
-            raise Exception("Invalid OS type.")
-
-        pluginObj = None
-        for po in self.param.lanManager.vpnsPluginList:
-            if po.full_name == vpns_plugin_full_name:
-                pluginObj = po
-                break
-        if pluginObj is None:
-            raise Exception("The specified plugin does not exist.")
-
-        if self.param.dnsName is not None:
-            suggested_filename, content = pluginObj.generate_client_script(self.param.dnsName, os_type)
-            if not self.param.wanManager.is_connected():
-                return (suggested_filename, content, ["Domain name %s is not validated." % (self.param.dnsName)])
-            elif socket.gethostbyname(self.param.dnsName) != self.param.wanManager.get_ip():
-                return (suggested_filename, content, ["Domain name %s does not resolve to WAN IP address \"%s\"." % (self.param.dnsName, self.param.wanManager.get_ip())])
-            else:
-                return (suggested_filename, content, [])
-        else:
-            if not self.param.wanManager.is_connected():
-                raise Exception("No internet connection.")
-            ip = self.param.wanManager.get_ip()
-            msgList = ["No domain name specified, using WAN IP address %s as cloud server address." % (ip)]
-            if self.param.wanManager.wanConnIpIsPublic is None:
-                msgList.append("Internet connection IP address publicity checking is in progress.")
-            elif not self.param.wanManager.wanConnIpIsPublic:
-                msgList.append("Internet connection IP address is not public.")
-            suggested_filename, content = pluginObj.generate_client_script(ip, os_type)
-            return (suggested_filename, content, msgList)
 
     @dbus.service.method('org.fpemud.WRT', sender_keyword='sender', in_signature='ss')
     def AddWanService(self, name, service, sender=None):
