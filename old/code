@@ -92,3 +92,18 @@
         assert False
 
 
+
+        if os.path.exists(self.cfgFile):
+            cfgObj = WrtUtil.loadJsonEtcCfg(self.cfgFile)
+            self.param.dnsName = cfgObj["dns-name"]
+
+
+        # check dns name
+        if self.param.dnsName is not None:
+            internetIpList = []
+            for ifc in self.ifconfigDict.values():
+                if "internet-ip" in ifc:
+                    internetIpList.append(ifc["internet-ip"])
+            if socket.gethostbyname(self.param.dnsName) not in internetIpList:
+                self.logger.warn("Invalid DNS name %s." % (self.param.dnsName))
+

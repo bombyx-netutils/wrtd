@@ -22,7 +22,6 @@ class WrtParam:
 
         self.daemon = None
 
-        self.dnsName = None
         self.uuid = None
         self.pluginHub = None
         self.prefixPool = None
