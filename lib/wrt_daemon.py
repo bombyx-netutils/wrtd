@@ -151,9 +151,7 @@ class WrtDaemon:
         return True
 
     def _loadCfg(self):
-        if os.path.exists(self.cfgFile):
-            cfgObj = WrtUtil.loadJsonEtcCfg(self.cfgFile)
-            self.param.dnsName = cfgObj["dns-name"]
+        pass
 
     def _loadManagerPlugins(self):
         # load manager plugin

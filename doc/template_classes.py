@@ -78,10 +78,6 @@ class TemplatePluginVpnServer:
     def get_wan_service(self):
         assert False
 
-    def generate_client_script(self, wan_ip, os_type):
-        # returns (suggested-script-filename, script-content)
-        assert False
-
 
 # plugin module name: plugins.manager_*
 # config file: ${ETC}/manager-(PLUGIN_NAME).json

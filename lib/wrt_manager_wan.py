@@ -4,7 +4,6 @@
 import os
 import shutil
 import signal
-import socket
 import logging
 import pyroute2
 from wrt_util import WrtUtil
@@ -50,7 +49,6 @@ class WrtWanManager:
             raise
 
     def dispose(self):
-        self._wconnIpCheckDispose()
         if self.wanConnPlugin is not None:
             self.wanConnPlugin.stop()
             self.wanConnPlugin = None
@@ -69,20 +67,7 @@ class WrtWanManager:
             os.kill(os.getpid(), signal.SIGHUP)
             raise Exception("bridge prefix duplicates with internet connection, autofix it and restart")
 
-        # check dns name
-        if self.param.dnsName is not None:
-            internetIpList = []
-            for ifc in self.ifconfigDict.values():
-                if "internet-ip" in ifc:
-                    internetIpList.append(ifc["internet-ip"])
-            if socket.gethostbyname(self.param.dnsName) not in internetIpList:
-                self.logger.warn("Invalid DNS name %s." % (self.param.dnsName))
-
-        # start checking if ip is public
-        self._wconnIpCheckStart()
-
     def on_wan_conn_down(self):
-        self._wconnIpCheckDispose()
         self.param.prefixPool.removeExcludePrefixList("wan")
 
     # FIXME
