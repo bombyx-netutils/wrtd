@@ -7,7 +7,6 @@ import signal
 import socket
 import logging
 import pyroute2
-import ipaddress
 from wrt_util import WrtUtil
 
 
@@ -121,13 +120,8 @@ class WanConnectionPluginApi:
         pass
 
     def activate_interface(self, ifname, ifconfig):
-        ip = ifconfig["prefix"].split("/")[0]
-        bnet = ipaddress.IPv4Network(ifconfig["prefix"], strict=False)
-
         with pyroute2.IPRoute() as ipp:
             idx = ipp.link_lookup(ifname=ifname)[0]
-            ipp.link("set", index=idx, state="up")
-            ipp.addr("add", index=idx, address=ip, mask=bnet.prefixlen, broadcast=str(bnet.broadcast_address))
             if "gateway" in ifconfig:
                 ipp.route('add', dst="0.0.0.0/0", gateway=ifconfig["gateway"], oif=idx)
             if "routes" in ifconfig:
