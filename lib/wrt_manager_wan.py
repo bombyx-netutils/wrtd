@@ -128,9 +128,4 @@ class WanConnectionPluginApi:
         with open(self.parent.param.ownResolvConf, "w") as f:
             f.write("")
 
-        with pyroute2.IPRoute() as ipp:
-            idx = ipp.link_lookup(ifname="ifname")[0]
-            ipp.link("set", index=idx, state="down")
-            ipp.flush_addr(index=idx)
-
         self.parent.param.managerCaller.call("on_wan_conn_down")
