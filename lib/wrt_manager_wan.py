@@ -122,7 +122,7 @@ class WanConnectionPluginApi:
 
         self.parent.param.managerCaller.call("on_wan_conn_up")
 
-    def deactive_interface(self, ifname):
+    def deactivate_interface(self, ifname):
         del self.parent.ifconfigDict[ifname]
 
         with open(self.parent.param.ownResolvConf, "w") as f:
