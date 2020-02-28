@@ -98,10 +98,16 @@ class WanConnectionPluginApi:
     def get_tmp_dir(self):
         return self.tdir
 
-    def add_ntfac(self, ntfac_name, ntfac_object):
+    def get_var_dir(self):
+        assert False
+
+    def reserve_interface(self, ifmatch_pattern):
         pass
 
-    def remove_ntfac(self, ntfac_name, ntfac_object):
+    def tfac_list_changed(self, tfac_list):
+        pass
+
+    def public_ip_changed(self, public_ip):
         pass
 
     def activate_interface(self, ifname, ifconfig):

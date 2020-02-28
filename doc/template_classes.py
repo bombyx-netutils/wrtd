@@ -33,52 +33,6 @@ class TemplateBridge:
         assert False
 
 
-# plugin module name: plugins.lif_*
-# config file: ${ETC}/lan-interface-(PLUGIN_NAME)-(INSTANCE_NAME).json
-# allow multiple plugins be loaded, and one plugin can have multiple instances
-class TemplatePluginLanInterface:
-
-    def init2(self, instanceName, cfg, tmpDir, varDir):
-        assert False
-
-    def start(self):
-        assert False
-
-    def stop(self):
-        assert False
-
-    def interface_appear(self, bridge, ifname):
-        # return True means we take this interface
-        # must be called after start()
-        assert False
-
-    def interface_disappear(self, ifname):
-        # must be called after start()
-        assert False
-
-
-# plugin module name: plugins.vpns_*
-# config file: ${ETC}/vpn-server-(PLUGIN_NAME)-(INSTANCE_NAME).json
-# allow multiple plugins be loaded, and one plugin can have multiple instances
-class TemplatePluginVpnServer:
-
-    def init2(self, instanceName, cfg, tmpDir, varDir, bridgePrefix, l2DnsPort, clientAddCallback, clientChangeCallback, clientRemoveCallback):
-        assert False
-
-    def start(self):
-        assert False
-
-    def stop(self):
-        assert False
-
-    def get_bridge(self):
-        # must be called after start()
-        assert False
-
-    def get_wan_service(self):
-        assert False
-
-
 # plugin module name: plugins.manager_*
 # config file: ${ETC}/manager-(PLUGIN_NAME).json
 # manager unload is not supported, so manager_disappear() is not needed
